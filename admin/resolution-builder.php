@@ -4,305 +4,337 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Resolution Builder — Uganda Astronomical Society</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/uas/css/base.css">
+  <style>
+    .change-row { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 0.75rem; }
+    .vote-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; }
+    .vote-tally { display: flex; gap: 1.5rem; font-size: 0.9rem; }
+    .vote-tally strong { font-size: 1.3rem; }
+    .res-row { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 0.75rem; }
+  </style>
 </head>
 <body>
   <nav class="nav">
-    <a href="/" class="nav-brand">Uganda Astronomical Society</a>
-    <div class="nav-links">
-      <a href="/" class="nav-link <?= basename($_SERVER['PHP_SELF']) === 'index.php' ? 'active' : '' ?>">Home</a>
-      <a href="/about" class="nav-link <?= basename($_SERVER['PHP_SELF']) === 'about.php' ? 'active' : '' ?>">About</a>
-      <a href="/programmes" class="nav-link <?= basename($_SERVER['PHP_SELF']) === 'programmes.php' ? 'active' : '' ?>">Programmes</a>
-      <a href="/events" class="nav-link <?= basename($_SERVER['PHP_SELF']) === 'events.php' ? 'active' : '' ?>">Events</a>
-      <a href="/dashboard" class="nav-link <?= basename($_SERVER['PHP_SELF']) === 'dashboard.php' ? 'active' : '' ?>">Dashboard</a>
-      <?php if (!is_logged_in()): ?>
-        <a href="/auth/login" class="nav-link">Login</a>
-      <?php endif; ?>
-    </div>
-    <div class="nav-user">
-      <?= isset($_SESSION['user_id']) ? "Welcome, {$_SESSION['user_name']}" : 'Login' ?> |
-      <a href="/auth/logout">Logout</a>
+    <div class="container" style="display:flex;align-items:center;width:100%">
+      <a href="/" class="nav-brand">UAS</a>
+      <div class="nav-links">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+        <a href="/admin" class="nav-link">Admin</a>
+      </div>
+      <div class="nav-user" id="navUser"></div>
     </div>
   </nav>
 
-  <main class="container">
-    <section class="hero">
-      <div class="max-w-prose">
-        <h1>Governance Resolution Builder</h1>
-        <p class="text-dim">Create board resolutions that automatically enact system changes when approved</p>
-      </div>
-    </section>
+  <main class="container" style="max-width: 760px">
+    <div class="dash-header">
+      <h1>Governance Resolution Builder</h1>
+      <p class="text-dim">Resolutions auto-apply when the last vote meets quorum</p>
+    </div>
 
-    <section class="mt-6">
-      <?php
-      require_once __DIR__ . '/api/config.php';
-      require_once __DIR__ . '/auth.php';
-      require_once __DIR__ . '/rbac.php';
-      require_once __DIR__ . '/governance.php';
-      
-      if (!is_logged_in()) json_error('Authentication required', 401);
-      
-      $user = require_login();
-      $caps = user_capabilities($user['id']);
-      ?>
-      
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Create Resolution</span>
-        </div>
-        
-        <form id="resolutionForm" method="POST" action="/resolutions" class="flex flex-col gap-4">
-          <input type="hidden" name="route" value="create">
-          
-          <div class="grid-2 gap-3">
-            <div>
-              <label class="form-label">Resolution Code</label>
-              <input type="text" name="code" class="form-input" value="UAS-BRD-2026-" readonly>
-            </div>
-            <div>
-              <label class="form-label">Resolution Type</label>
-              <select name="type" class="form-select" onchange="updateChangeFields()">
-                <option value="">Select type</option>
-                <option value="role_create">Create Role</option>
-                <option value="cap_assign">Assign Capability</option>
-                <option value="cap_revoke">Revoke Capability</option>
-                <option value="appoint">Appoint Member</option>
-                <option value="remove">Remove Member</option>
-                <option value="programme_create">Create Programme</option>
-                <option value="policy_adopt">Adopt Policy</option>
-              </select>
-            </div>
-          </div>
-          
-          <div id="changeFields" class="mt-3">
-            <!-- Dynamic fields will be injected by JS -->
-          </div>
-          
-          <div class="grid-2 gap-3">
-            <div>
-              <label class="form-label">Title</label>
-              <input type="text" name="title" class="form-input" required>
-            </div>
-            <div>
-              <label class="form-label">Description</label>
-              <textarea name="description" class="form-textarea" rows="2" placeholder="Describe the resolution"></textarea>
-            </div>
-          </div>
-          
-          <div class="grid-2 gap-3">
-            <div>
-              <label class="form-label">Quorum</label>
-              <input type="number" name="quorum" class="form-input" value="0" min="0" placeholder="0 = simple majority">
-            </div>
-            <div>
-              <label class="form-label">Majority</label>
-              <select name="majority" class="form-select">
-                <option value="simple">Simple Majority</option>
-                <option value="two_thirds">2/3 Majority</option>
-                <option value="unanimous">Unanimous</option>
-              </select>
-            </div>
-          </div>
-          
-          <div class="grid-2 gap-3">
-            <div>
-              <label class="form-label">Voting Deadline</label>
-              <input type="datetime-local" name="voting_deadline" class="form-input">
-            </div>
-            <div>
-              <label class="form-label">Proposed By</label>
-              <input type="hidden" name="proposed_by" value="<?= $user['id'] ?>">
-              <span class="text-dim"><?= htmlspecialchars($user['name']) ?></span>
-            </div>
-          </div>
-          
-          <div>
-            <label class="form-label">Changes</label>
-            <p class="text-sm text-dim mb-1">Select the system changes this resolution will enact:</p>
-            <div id="changesSummary" class="flex flex-col gap-2 small text-dim"></div>
-          </div>
-          
-          <button type="submit" class="btn btn-primary">Create Resolution</button>
-        </form>
+    <!-- Create Resolution -->
+    <div class="card" id="createCard">
+      <div class="card-header">
+        <span class="card-title">Create Resolution</span>
       </div>
-      
-      <!-- Voting Interface -->
-      <?php
-      if (isset($_GET['resolution'])) {
-        $resId = (int) $_GET['resolution'];
-        $res = get_resolution($resId);
-        if ($res && $res['status'] === 'voting') {
-      ?>
-      <div class="card mt-6">
-        <div class="card-header">
-          <span class="card-title">Voting: <?= htmlspecialchars($res['title']) ?></span>
-          <span class="badge badge-voting">Voting Open</span>
-        </div>
-        
-        <div class="flex flex-between items-center gap-3 mb-3">
-          <div>
-            <p>For: <strong><?= $res['votes_for'] ?></strong></p>
-            <p>Against: <strong><?= $res['votes_against'] ?></strong></p>
-            <p>Abstain: <strong><?= $res['votes_abstain'] ?></strong></p>
-          </div>
-          <p>Quorum Required: <strong><?= $res['quorum'] ?: 'Simple majority' ?></strong></p>
-        </div>
-        
+      <div class="mt-2">
         <div class="grid-2 gap-3">
           <div>
-            <button onclick="castVote('for')" class="btn btn-success btn-sm">Vote For</button>
-            <p class="text-dim mt-1">Yes</p>
+            <label class="form-label">Resolution Type</label>
+            <select class="form-select" id="resType" onchange="updateChangeFields()">
+              <option value="">Select type</option>
+              <option value="role_create">Create Role</option>
+              <option value="appoint">Appoint Member</option>
+              <option value="remove">Remove Member</option>
+              <option value="cap_assign">Assign Capability</option>
+              <option value="cap_revoke">Revoke Capability</option>
+              <option value="programme_create">Create Programme</option>
+              <option value="policy_adopt">Adopt Policy</option>
+            </select>
           </div>
           <div>
-            <button onclick="castVote('against')" class="btn btn-outline btn-sm">Vote Against</button>
-            <p class="text-dim mt-1">No</p>
+            <label class="form-label">Title</label>
+            <input class="form-input" id="resTitle" placeholder="Resolution title">
           </div>
         </div>
-        
-        <p class="text-dim mt-3">Voting deadline: <?= $res['voting_deadline'] ? date('M j, Y H:i', strtotime($res['voting_deadline'])) : 'No deadline' ?></p>
-        
-        <p class="text-dim mt-3" id="quorumStatus">
-          <?php
-          $total = $res['votes_for'] + $res['votes_against'] + $res['votes_abstain'];
-          $quorum = (int) $res['quorum'];
-          if ($quorum > 0 && $total < $quorum) {
-            $need = $quorum - $total;
-            echo "Need {$need} more votes to meet quorum";
-          } elseif ($quorum > 0) {
-            echo "Quorum met ({$total} votes cast)";
-          } else {
-            echo "No quorum requirement (simple majority)";
-          }
-          ?>
-        </p>
-        
-        <p class="text-dim mt-3" id="outcomeStatus"></p>
+
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-textarea" id="resDesc" rows="2" placeholder="What will this resolution enact?"></textarea>
+        </div>
+
+        <div id="changeFields" class="mt-2"></div>
+
+        <div class="grid-2 gap-3">
+          <div>
+            <label class="form-label">Quorum (0 = any vote decides)</label>
+            <input type="number" class="form-input" id="resQuorum" value="0" min="0">
+          </div>
+          <div>
+            <label class="form-label">Majority</label>
+            <select class="form-select" id="resMajority">
+              <option value="simple">Simple Majority</option>
+              <option value="two_thirds">2/3 Majority</option>
+              <option value="unanimous">Unanimous</option>
+            </select>
+          </div>
+        </div>
+
+        <button class="btn btn-primary mt-3" onclick="createResolution()">Create Resolution</button>
+        <p class="text-sm text-dim mt-2" id="createStatus"></p>
       </div>
-      <?php
-        }
-      }
-      ?>
-    </section>
+    </div>
+
+    <!-- Resolutions List -->
+    <h3 class="section-title mt-6" style="text-align:left">Resolutions</h3>
+    <div id="resolutionsList" class="mt-2"></div>
   </main>
 
   <footer class="mt-6 text-center text-dim small">
-    <p>Uganda Astronomical Society · Institutional Platform</p>
+    <p>Uganda Astronomical Society &middot; Institutional Platform</p>
   </footer>
 
+  <script src="/uas/js/api.js"></script>
   <script>
-    // Resolution type → change fields mapper
-    const changeFieldTemplates = {
-      'role_create': () => `
-        <div class="form-group">
-          <label class="form-label">Role Title</label>
-          <input type="text" name="changes[0][payload][title]" class="form-input" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Role Description</label>
-          <textarea name="changes[0][payload][description]" class="form-textarea" rows="2"></textarea>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Capability IDs (comma-separated)</label>
-          <input type="text" name="changes[0][payload][capability_ids]" class="form-input" placeholder="e.g. articles.approve,events.publish">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Assign To User ID</label>
-          <input type="number" name="changes[0][payload][assign_to_user_id]" class="form-input">
-        </div>
-      `,
-      'cap_assign': () => `
-        <div class="form-group">
-          <label class="form-label">Role ID</label>
-          <input type="number" name="changes[0][payload][role_id]" class="form-input" min="1">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Capability ID</label>
-          <input type="number" name="changes[0][payload][capability_id]" class="form-input" min="1">
-        </div>
-      `,
-      'cap_revoke': () => `
-        <div class="form-group">
-          <label class="form-label">Role ID</label>
-          <input type="number" name="changes[0][payload][role_id]" class="form-input" min="1">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Capability ID</label>
-          <input type="number" name="changes[0][payload][capability_id]" class="form-input" min="1">
-        </div>
-      `,
-      'appoint': () => `
-        <div class="form-group">
-          <label class="form-label">Role ID</label>
-          <input type="number" name="changes[0][payload][role_id]" class="form-input" min="1">
-        </div>
-        <div class="form-group">
-          <label class="form-label">User ID</label>
-          <input type="number" name="changes[0][payload][user_id]" class="form-input" min="1">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Effective To (YYYY-MM-DD, leave blank for permanent)</label>
-          <input type="date" name="changes[0][payload][effective_to]" class="form-input">
-        </div>
-      `,
-      'remove': () => `
-        <div class="form-group">
-          <label class="form-label">Role ID</label>
-          <input type="number" name="changes[0][payload][role_id]" class="form-input" min="1">
-        </div>
-        <div class="form-group">
-          <label class="form-label">User ID</label>
-          <input type="number" name="changes[0][payload][user_id]" class="form-input" min="1">
-        </div>
-      `,
-      'programme_create': () => `
-        <div class="form-group">
-          <label class="form-label">Programme Title</label>
-          <input type="text" name="changes[0][payload][title]" class="form-input" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Description</label>
-          <textarea name="changes[0][payload][description]" class="form-textarea" rows="2"></textarea>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Lead User ID</label>
-          <input type="number" name="changes[0][payload][lead_id]" class="form-input" min="1">
-        </div>
-      `,
-      'policy_adopt': () => `
-        <div class="form-group">
-          <label class="form-label">Policy Title</label>
-          <input type="text" name="changes[0][payload][title]" class="form-input" required>
-        </div>
-        <div class="form-group">
-          <label class="form-law">Policy Description</label>
-          <textarea name="changes[0][payload][description]" class="form-textarea" rows="3"></textarea>
-        </div>
-      `
-    };
-    
+    const memberOptions = [];
+    const roleOptions = [];
+
+    async function load() {
+      try {
+        await api.me();
+        if (!api.hasCap('resolutions.create') && !api.hasCap('resolutions.vote')) {
+          window.location.href = '/dashboard';
+          return;
+        }
+        updateNavUser();
+        updateChangeFields();
+        await refreshResolutions();
+        await Promise.all([loadMembers(), loadRoles()]);
+      } catch(e) { window.location.href = '/login'; }
+    }
+
+    async function loadMembers() {
+      try {
+        const members = await api.getMembers();
+        memberOptions.length = 0;
+        members.forEach(m => memberOptions.push({ id: m.user_id, label: m.name + ' (' + m.email + ')' }));
+      } catch(e) {}
+    }
+
+    async function loadRoles() {
+      try {
+        const roles = await api.getRoles();
+        roleOptions.length = 0;
+        roles.forEach(r => roleOptions.push({ id: r.id, label: r.title }));
+      } catch(e) {}
+    }
+
+    function memberSelect(id) {
+      return `<select class="form-select" id="${id}">${memberOptions.map(m => `<option value="${m.id}">${esc(m.label)}</option>`).join('')}</select>`;
+    }
+
+    function roleSelect(id) {
+      return `<select class="form-select" id="${id}">${roleOptions.map(r => `<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select>`;
+    }
+
     function updateChangeFields() {
-      const type = document.querySelector('select[name="type"]').value;
-      const container = document.getElementById('changeFields');
-      const summary = document.getElementById('changesSummary');
-      
-      if (!type || !changeFieldTemplates[type]) {
-        container.innerHTML = '<p class="text-dim">Select a resolution type to see change fields</p>';
-        summary.innerHTML = '';
-        return;
+      const type = document.getElementById('resType').value;
+      const div = document.getElementById('changeFields');
+      if (!type) { div.innerHTML = ''; return; }
+      const field = (label, html) => `<div class="form-group"><label class="form-label">${label}</label>${html}</div>`;
+
+      switch (type) {
+        case 'role_create':
+          div.innerHTML = `
+            <div class="change-row">
+              ${field('Role Title', '<input class="form-input" id="chgTitle" placeholder="e.g. Outreach Coordinator">')}
+              ${field('Role Description', '<textarea class="form-textarea" id="chgDesc" rows="2"></textarea>')}
+              ${field('Capabilities (comma-separated slugs)', '<input class="form-input" id="chgCaps" placeholder="articles.approve, events.publish">')}
+              ${field('Assign to Member', memberSelect('chgUser'))}
+            </div>`;
+          break;
+        case 'appoint':
+          div.innerHTML = `
+            <div class="change-row">
+              ${field('Role', roleSelect('chgRole'))}
+              ${field('Member', memberSelect('chgUser'))}
+              ${field('Effective To (YYYY-MM-DD, blank = permanent)', '<input type="date" class="form-input" id="chgEffTo">')}
+            </div>`;
+          break;
+        case 'remove':
+          div.innerHTML = `
+            <div class="change-row">
+              ${field('Role', roleSelect('chgRole'))}
+              ${field('Member', memberSelect('chgUser'))}
+            </div>`;
+          break;
+        case 'cap_assign':
+        case 'cap_revoke':
+          div.innerHTML = `
+            <div class="change-row">
+              ${field('Role', roleSelect('chgRole'))}
+              ${field('Capability ID', '<input type="number" class="form-input" id="chgCapId" min="1">')}
+            </div>`;
+          break;
+        case 'programme_create':
+          div.innerHTML = `
+            <div class="change-row">
+              ${field('Programme Title', '<input class="form-input" id="chgTitle">')}
+              ${field('Description', '<textarea class="form-textarea" id="chgDesc" rows="2"></textarea>')}
+              ${field('Lead', memberSelect('chgUser'))}
+            </div>`;
+          break;
+        case 'policy_adopt':
+          div.innerHTML = `
+            <div class="change-row">
+              ${field('Policy Title', '<input class="form-input" id="chgTitle">')}
+              ${field('Policy Text', '<textarea class="form-textarea" id="chgDesc" rows="3"></textarea>')}
+            </div>`;
+          break;
       }
-      
-      container.innerHTML = changeFieldTemplates[type]();
-      summary.innerHTML = '<p class="text-sm"><strong>This resolution will:</strong></p>';
     }
-    
-    // Initial render
-    updateChangeFields();
-    
-    function castVote(value) {
-      if (!confirm(`Cast vote: ${value}`)) return;
-      // In a real app, this would API-call cast_vote
-      alert(`Vote recorded: ${value}`);
+
+    function buildChanges() {
+      const type = document.getElementById('resType').value;
+      const changes = [];
+      switch (type) {
+        case 'role_create': {
+          const caps = (document.getElementById('chgCaps').value || '').split(',').map(s => s.trim()).filter(Boolean);
+          const payload = {
+            title: document.getElementById('chgTitle').value,
+            description: document.getElementById('chgDesc').value,
+            capability_ids: caps,
+          };
+          const uid = document.getElementById('chgUser').value;
+          if (uid) payload.assign_to_user_id = parseInt(uid, 10);
+          changes.push({ change_type: 'role_create', payload });
+          break;
+        }
+        case 'appoint': {
+          changes.push({ change_type: 'appoint', payload: {
+            role_id: parseInt(document.getElementById('chgRole').value, 10),
+            user_id: parseInt(document.getElementById('chgUser').value, 10),
+            effective_to: document.getElementById('chgEffTo').value || null,
+          }});
+          break;
+        }
+        case 'remove':
+          changes.push({ change_type: 'remove', payload: {
+            role_id: parseInt(document.getElementById('chgRole').value, 10),
+            user_id: parseInt(document.getElementById('chgUser').value, 10),
+          }});
+          break;
+        case 'cap_assign':
+        case 'cap_revoke':
+          changes.push({ change_type: type, payload: {
+            role_id: parseInt(document.getElementById('chgRole').value, 10),
+            capability_id: parseInt(document.getElementById('chgCapId').value, 10),
+          }});
+          break;
+        case 'programme_create':
+          changes.push({ change_type: 'programme_create', payload: {
+            title: document.getElementById('chgTitle').value,
+            description: document.getElementById('chgDesc').value,
+            lead_id: parseInt(document.getElementById('chgUser').value, 10) || null,
+          }});
+          break;
+        case 'policy_adopt':
+          changes.push({ change_type: 'policy_adopt', payload: {
+            title: document.getElementById('chgTitle').value,
+            description: document.getElementById('chgDesc').value,
+          }});
+          break;
+      }
+      return changes;
     }
+
+    async function createResolution() {
+      const type = document.getElementById('resType').value;
+      if (!type) { alert('Select a resolution type'); return; }
+      const title = document.getElementById('resTitle').value;
+      if (!title) { alert('Enter a title'); return; }
+      try {
+        const body = {
+          title,
+          description: document.getElementById('resDesc').value,
+          type,
+          quorum: parseInt(document.getElementById('resQuorum').value, 10) || 0,
+          majority: document.getElementById('resMajority').value,
+          changes: buildChanges(),
+        };
+        const res = await api.createResolution(body);
+        document.getElementById('createStatus').textContent = 'Created — submit and begin voting.';
+        document.getElementById('resTitle').value = '';
+        document.getElementById('resDesc').value = '';
+        await refreshResolutions();
+        const r = document.getElementById('res-' + res.id);
+        if (r) r.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function submitResolution(id) {
+      try { await api.submitResolution(id); await refreshResolutions(); }
+      catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function beginVoting(id) {
+      try { await api.beginVoting(id); await refreshResolutions(); }
+      catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function castVote(id, value) {
+      try { await api.castVote(id, value); await refreshResolutions(); }
+      catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function refreshResolutions() {
+      const resolutions = await api.getResolutions().catch(() => []);
+      const div = document.getElementById('resolutionsList');
+      if (!resolutions.length) { div.innerHTML = '<p class="text-dim">No resolutions yet.</p>'; return; }
+      div.innerHTML = resolutions.map(r => `
+        <div class="res-row" id="res-${r.id}">
+          <div class="flex-between">
+            <div>
+              <strong>${esc(r.title)}</strong>
+              <span class="badge badge-${esc(r.status)}" style="margin-left:0.5rem">${esc(r.status)}</span>
+              <span class="text-sm text-dim" style="margin-left:0.5rem">${esc(r.code)}</span>
+            </div>
+            <span class="text-sm text-dim">${esc(r.proposer_name || '—')}</span>
+          </div>
+          ${r.description ? `<p class="text-sm text-dim mt-1">${esc(r.description)}</p>` : ''}
+          <div class="vote-tally mt-2">
+            <span>For <strong class="text-success">${r.votes_for}</strong></span>
+            <span>Against <strong class="text-danger">${r.votes_against}</strong></span>
+            <span>Abstain <strong>${r.votes_abstain}</strong></span>
+            <span>Quorum <strong>${r.quorum || 'any'}</strong></span>
+            <span>Majority <strong>${esc(r.majority)}</strong></span>
+          </div>
+          <div class="mt-2 flex" style="gap:0.5rem;flex-wrap:wrap">
+            ${r.status === 'draft' ? `<button class="btn btn-primary btn-sm" onclick="submitResolution(${r.id})">Submit</button>` : ''}
+            ${r.status === 'submitted' && api.hasCap('resolutions.manage') ? `<button class="btn btn-primary btn-sm" onclick="beginVoting(${r.id})">Begin Voting</button>` : ''}
+            ${r.status === 'voting' && api.hasCap('resolutions.vote') ? `
+              <button class="btn btn-success btn-sm" onclick="castVote(${r.id}, 'for')">Vote For</button>
+              <button class="btn btn-outline btn-sm" onclick="castVote(${r.id}, 'against')">Vote Against</button>
+              <button class="btn btn-outline btn-sm" onclick="castVote(${r.id}, 'abstain')">Abstain</button>
+            ` : ''}
+            ${r.status === 'applied' ? `<span class="text-sm text-success">Auto-applied ${esc(r.applied_at)}</span>` : ''}
+            ${r.status === 'failed' ? `<span class="text-sm text-danger">Defeated</span>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+    function updateNavUser() {
+      const el = document.getElementById('navUser');
+      el.innerHTML = api._user
+        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
+        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
+    }
+
+    load();
+    setInterval(() => { if (api._user) refreshResolutions().catch(() => {}); }, 10000);
   </script>
 </body>
 </html>

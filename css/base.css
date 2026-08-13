@@ -183,3 +183,4 @@ tr:hover td { background: rgba(59,130,246,0.04); }
 .modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.5rem; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
 .modal-close { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 1.2rem; }
+.badge-applied { background: #064e3b; color: #34d399; }

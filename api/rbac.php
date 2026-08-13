@@ -92,8 +92,14 @@ function create_role(string $title, string $description, array $capIds, int $cre
   $stmt->execute([$title, $description, $createdBy, $resolutionId]);
   $roleId = (int) db()->lastInsertId();
 
-  foreach ($capIds as $capId) {
-    assign_capability($roleId, $capId, $createdBy);
+  $slugStmt = db()->prepare('SELECT id FROM capabilities WHERE slug = ?');
+  foreach ($capIds as $cap) {
+    $capId = is_numeric($cap) ? (int) $cap : null;
+    if (!$capId) {
+      $slugStmt->execute([$cap]);
+      $capId = (int) $slugStmt->fetchColumn();
+    }
+    if ($capId) assign_capability($roleId, $capId, $createdBy);
   }
 
   audit_log('role_create', 'role', $roleId, [
