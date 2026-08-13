@@ -52,7 +52,7 @@ try {
   // --- MEMBERS ---
   elseif ($path === '/members' && $method === 'GET') {
     require_login();
-    $stmt = db()->prepare('SELECT m.*, u.name, u.email, u.avatar_url, u.institution, u.location FROM members m JOIN users u ON u.id = m.user_id ORDER BY m.joined_date DESC');
+    $stmt = db()->prepare('SELECT m.*, u.name, u.email, u.avatar_url, u.institution, u.location, u.status AS user_status FROM members m JOIN users u ON u.id = m.user_id ORDER BY m.joined_date DESC');
     $stmt->execute();
     json_response($stmt->fetchAll());
   }
@@ -216,6 +216,7 @@ try {
     db()->prepare('INSERT INTO events (programme_id, project_id, title, description, organizer_id, date, end_date, location, capacity, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
       ->execute([$data['programme_id'] ?? null, $data['project_id'] ?? null, $data['title'], $data['description'] ?? null, $user['id'], $data['date'], $data['end_date'] ?? null, $data['location'] ?? null, $data['capacity'] ?? null, $user['id']]);
     $id = (int) db()->lastInsertId();
+    transition('event', $id, 'submitted', $user['id']);
     audit_log('event_create', 'event', $id);
     json_response(['id' => $id], 201);
   }

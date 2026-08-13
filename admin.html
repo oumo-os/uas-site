@@ -116,6 +116,8 @@
       if (!members.length) { div.innerHTML = '<p class="text-dim">No members.</p>'; return; }
       div.innerHTML = members.map(m => {
         const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        const accountStatus = m.user_status || 'active';
+        const canApprove = api.hasCap('members.approve') && accountStatus === 'pending';
         return `
           <div class="member-row">
             <div class="member-avatar">${initials}</div>
@@ -123,10 +125,22 @@
               <h4>${esc(m.name)}</h4>
               <p>${esc(m.email)} &middot; ${esc(m.membership_number || '—')} &middot; ${esc(m.category)}</p>
             </div>
-            <span class="badge badge-${m.status === 'active' ? 'active' : 'inactive'}">${esc(m.status)}</span>
+            <span class="badge badge-${accountStatus === 'active' ? 'active' : 'inactive'}">${esc(accountStatus)}</span>
+            ${canApprove ? `
+              <button class="btn btn-primary btn-sm" onclick="setMemberStatus(${m.user_id}, 'active')">Approve</button>
+              <button class="btn btn-outline btn-sm" onclick="setMemberStatus(${m.user_id}, 'pending')">Reject</button>
+            ` : ''}
           </div>
         `;
       }).join('');
+    }
+
+    async function setMemberStatus(userId, status) {
+      try {
+        await api.approveMember(userId, status);
+        const members = await api.getMembers();
+        renderMembers(members);
+      } catch(e) { alert(e.error || 'Failed'); }
     }
 
     function renderRoles(roles) {

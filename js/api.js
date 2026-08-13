@@ -62,6 +62,7 @@ const api = {
   // Members
   async getMembers() { return this.request('/members'); },
   async getMember(id) { return this.request('/members/' + id); },
+  async approveMember(userId, status) { return this.request('/members', { method: 'POST', body: { user_id: userId, status } }); },
 
   // Roles
   async getRoles() { return this.request('/roles'); },
