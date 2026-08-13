@@ -50,26 +50,41 @@ function register(string $name, string $email, string $password, array $extra = 
   if ($stmt->fetch()) json_error('Email already registered', 409);
 
   $hash = password_hash($password, PASSWORD_DEFAULT);
-  $stmt = db()->prepare(
-    'INSERT INTO users (name, email, password, phone, bio, institution, location, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-  );
-  $stmt->execute([
-    $name, $email, $hash,
-    $extra['phone'] ?? null,
-    $extra['bio'] ?? null,
-    $extra['institution'] ?? null,
-    $extra['location'] ?? null,
-    'pending'  // accounts require approval
-  ]);
-  $userId = (int) db()->lastInsertId();
 
-  // Auto-create member record
-  $memberNum = 'UAS-' . date('Y') . '-' . str_pad($userId, 4, '0', STR_PAD_LEFT);
-  db()->prepare(
-    'INSERT INTO members (user_id, membership_number, category, status, joined_date)
-     VALUES (?, ?, ?, ?, ?)'
-  )->execute([$userId, $memberNum, $extra['category'] ?? 'regular', 'active', date('Y-m-d')]);
+  try {
+    db()->beginTransaction();
+
+    $stmt = db()->prepare(
+      'INSERT INTO users (name, email, password, phone, bio, institution, location, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+    $stmt->execute([
+      $name, $email, $hash,
+      $extra['phone'] ?? null,
+      $extra['bio'] ?? null,
+      $extra['institution'] ?? null,
+      $extra['location'] ?? null,
+      'pending'  // accounts require approval
+    ]);
+    $userId = (int) db()->lastInsertId();
+
+    // Per-year sequence: next number after the current max membership number
+    $year = date('Y');
+    $stmt = db()->prepare("SELECT COALESCE(MAX(CAST(SUBSTRING(membership_number, -4) AS UNSIGNED)), 0) + 1 FROM members WHERE membership_number LIKE 'UAS-{$year}-%'");
+    $stmt->execute();
+    $memberNum = 'UAS-' . $year . '-' . str_pad($stmt->fetchColumn(), 4, '0', STR_PAD_LEFT);
+
+    // Auto-create member record
+    db()->prepare(
+      'INSERT INTO members (user_id, membership_number, category, status, joined_date)
+       VALUES (?, ?, ?, ?, ?)'
+    )->execute([$userId, $memberNum, $extra['category'] ?? 'regular', 'active', date('Y-m-d')]);
+
+    db()->commit();
+  } catch (Exception $e) {
+    db()->rollBack();
+    json_error('Registration failed', 500);
+  }
 
   $_SESSION['user_id'] = $userId;
   audit_log('register', 'user', $userId);

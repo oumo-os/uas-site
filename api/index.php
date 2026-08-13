@@ -59,9 +59,32 @@ try {
   elseif ($path === '/members' && $method === 'POST') {
     $user = require_cap('members.approve');
     $data = input_json();
+    $newStatus = $data['status'] === 'active' ? 'active' : 'pending';
     db()->prepare("UPDATE members SET status = ?, approved_by = ?, approved_at = NOW() WHERE user_id = ?")
-      ->execute([$data['status'], $user['id'], $data['user_id']]);
-    audit_log('member_approve', 'member', $data['user_id'], ['approved_by' => $user['id']]);
+      ->execute([$newStatus, $user['id'], $data['user_id']]);
+    db()->prepare("UPDATE users SET status = ? WHERE id = ?")
+      ->execute([$newStatus, $data['user_id']]);
+
+    // On approval, ensure the member holds the baseline Member role
+    if ($newStatus === 'active') {
+      $stmt = db()->prepare('SELECT id FROM roles WHERE title = ?');
+      $stmt->execute(['Member']);
+      $memberRoleId = $stmt->fetchColumn();
+      if (!$memberRoleId) {
+        $baseline = [1, 7, 27, 34]; // articles.submit, events.create, documents.upload, reports.create
+        $memberRoleId = create_role('Member', 'Baseline membership role', $baseline, $user['id']);
+      }
+      $stmt = db()->prepare('SELECT id FROM role_assignments WHERE role_id = ? AND user_id = ? AND status = "active"');
+      $stmt->execute([$memberRoleId, $data['user_id']]);
+      if (!$stmt->fetch()) {
+        assign_role($memberRoleId, $data['user_id'], $user['id']);
+      }
+    }
+
+    audit_log('member_approve', 'member', $data['user_id'], [
+      'approved_by' => $user['id'],
+      'status' => $newStatus
+    ]);
     json_response(['ok' => true]);
   }
   elseif (preg_match('#^/members/(\d+)$#', $path, $m) && $method === 'GET') {
@@ -220,12 +243,22 @@ try {
     db()->prepare('INSERT INTO articles (author_id, title, body, category, tags, image_url, approver_role_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
       ->execute([$user['id'], $data['title'], $data['body'] ?? null, $data['category'] ?? 'article', json_encode($data['tags'] ?? []), $data['image_url'] ?? null, $data['approver_role_id'] ?? null]);
     $id = (int) db()->lastInsertId();
+    transition('article', $id, 'submitted', $user['id']);
     audit_log('article_create', 'article', $id);
     json_response(['id' => $id], 201);
   }
   elseif (preg_match('#^/articles/(\d+)/approve$#', $path, $m) && $method === 'POST') {
     $user = require_cap('articles.approve');
-    transition('article', (int) $m[1], 'approved', $user['id']);
+    $aid = (int) $m[1];
+    // Stage through review if not already under review
+    if (get_current_state('article', $aid) === 'submitted') {
+      db()->prepare(
+        "INSERT INTO workflow_states (object_type, object_id, state, assignee_id, notes)
+         VALUES ('article', ?, 'under_review', ?, 'auto-staged by approver')"
+      )->execute([$aid, $user['id']]);
+      update_object_status('article', $aid, 'under_review');
+    }
+    transition('article', $aid, 'approved', $user['id']);
     json_response(['ok' => true]);
   }
   elseif (preg_match('#^/articles/(\d+)/publish$#', $path, $m) && $method === 'POST') {
