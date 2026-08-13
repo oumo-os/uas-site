@@ -25,6 +25,11 @@ function require_login(): array {
   return $user;
 }
 
+function public_user(array $user): array {
+  unset($user['password']);
+  return $user;
+}
+
 function login(string $email, string $password): array {
   $stmt = db()->prepare('SELECT * FROM users WHERE email = ?');
   $stmt->execute([$email]);

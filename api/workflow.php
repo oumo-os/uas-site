@@ -271,6 +271,7 @@ function get_pending_items(array $filters = []): array {
  * Institutional health metrics.
  */
 function institutional_health(): array {
+  close_expired_voting();
   $health = [];
 
   // Members

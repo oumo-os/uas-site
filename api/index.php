@@ -33,12 +33,12 @@ try {
   if ($path === '/auth/login' && $method === 'POST') {
     $data = input_json();
     $user = login($data['email'], $data['password']);
-    json_response(['user' => $user, 'capabilities' => user_capabilities($user['id'])]);
+    json_response(['user' => public_user($user), 'capabilities' => user_capabilities($user['id'])]);
   }
   elseif ($path === '/auth/register' && $method === 'POST') {
     $data = input_json();
     $user = register($data['name'], $data['email'], $data['password'], $data);
-    json_response(['user' => $user], 201);
+    json_response(['user' => public_user($user)], 201);
   }
   elseif ($path === '/auth/logout' && $method === 'POST') {
     logout();
@@ -46,7 +46,7 @@ try {
   }
   elseif ($path === '/auth/me') {
     $user = require_login();
-    json_response(['user' => $user, 'capabilities' => user_capabilities($user['id']), 'roles' => user_roles($user['id'])]);
+    json_response(['user' => public_user($user), 'capabilities' => user_capabilities($user['id']), 'roles' => user_roles($user['id'])]);
   }
 
   // --- MEMBERS ---
@@ -138,6 +138,11 @@ try {
   elseif (preg_match('#^/resolutions/(\d+)/begin-voting$#', $path, $m) && $method === 'POST') {
     $user = require_cap('resolutions.manage');
     begin_voting((int) $m[1]);
+    json_response(['ok' => true]);
+  }
+  elseif ($path === '/governance/close-expired' && $method === 'POST') {
+    require_cap('resolutions.manage');
+    close_expired_voting();
     json_response(['ok' => true]);
   }
 

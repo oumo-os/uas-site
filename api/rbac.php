@@ -10,7 +10,7 @@ function user_capabilities(int $userId): array {
   static $cache = [];
   if (isset($cache[$userId])) return $cache[$userId];
 
-  $stmt = db()->prepare(`
+  $stmt = db()->prepare("
     SELECT DISTINCT c.slug
     FROM role_assignments ra
     JOIN role_capabilities rc ON rc.role_id = ra.role_id
@@ -18,7 +18,7 @@ function user_capabilities(int $userId): array {
     WHERE ra.user_id = ? AND ra.status = 'active'
       AND (ra.effective_to IS NULL OR ra.effective_to >= CURDATE())
       AND ra.effective_from <= CURDATE()
-  `);
+  ");
   $stmt->execute([$userId]);
   $caps = $stmt->fetchAll(PDO::FETCH_COLUMN);
   $cache[$userId] = $caps;
@@ -36,14 +36,14 @@ function user_has_cap(int $userId, string $capability): bool {
  * Get all active roles for a user.
  */
 function user_roles(int $userId): array {
-  $stmt = db()->prepare(`
+  $stmt = db()->prepare("
     SELECT r.*, ra.effective_from, ra.effective_to, ra.assigned_by, ra.resolution_id
     FROM role_assignments ra
     JOIN roles r ON r.id = ra.role_id
     WHERE ra.user_id = ? AND ra.status = 'active' AND r.status = 'active'
       AND (ra.effective_to IS NULL OR ra.effective_to >= CURDATE())
       AND ra.effective_from <= CURDATE()
-  `);
+  ");
   $stmt->execute([$userId]);
   return $stmt->fetchAll();
 }
@@ -142,7 +142,9 @@ function authority_trace(int $userId): array {
   $roles = user_roles($userId);
   $trace = [];
   foreach ($roles as $role) {
-    $caps = user_capabilities($userId);
+    $stmt = db()->prepare('SELECT c.slug FROM role_capabilities rc JOIN capabilities c ON c.id = rc.capability_id WHERE rc.role_id = ?');
+    $stmt->execute([$role['id']]);
+    $caps = $stmt->fetchAll(PDO::FETCH_COLUMN);
     $resolutionId = $role['resolution_id'];
     $resolution = null;
     if ($resolutionId) {

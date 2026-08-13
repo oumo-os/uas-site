@@ -135,7 +135,7 @@
       ?>
       <div class="card mt-6">
         <div class="card-header">
-          <span class="card-title">Voting: <?= htmlspecialchars($res['title'])</span>
+          <span class="card-title">Voting: <?= htmlspecialchars($res['title']) ?></span>
           <span class="badge badge-voting">Voting Open</span>
         </div>
         
@@ -166,7 +166,8 @@
           $total = $res['votes_for'] + $res['votes_against'] + $res['votes_abstain'];
           $quorum = (int) $res['quorum'];
           if ($quorum > 0 && $total < $quorum) {
-            echo "Need {$quorum - $total} more votes to meet quorum";
+            $need = $quorum - $total;
+            echo "Need {$need} more votes to meet quorum";
           } elseif ($quorum > 0) {
             echo "Quorum met ({$total} votes cast)";
           } else {

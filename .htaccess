@@ -1,2 +1,9 @@
 RewriteEngine On
+
+# Clean URLs: /about -> about.html, etc.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([a-z0-9-]+)$ $1.html [QSA,L]
+
+# API: /api/... -> api/index.php
 RewriteRule ^api/(.*)$ api/index.php?route=$1 [QSA,L]

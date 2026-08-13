@@ -141,11 +141,8 @@ function check_and_apply(int $resolutionId): void {
   $totalVotes = $res['votes_for'] + $res['votes_against'] + $res['votes_abstain'];
   $quorum = (int) $res['quorum'];
 
-  // Need at least quorum votes (if quorum > 0)
+  // Vote-triggered auto-apply: the last qualifying vote decides the outcome immediately.
   if ($quorum > 0 && $totalVotes < $quorum) return;
-
-  // Check if voting deadline passed (if set)
-  if ($res['voting_deadline'] && strtotime($res['voting_deadline']) > time()) return;
 
   // Determine outcome based on majority type
   $majority = $res['majority'];
@@ -181,6 +178,19 @@ function check_and_apply(int $resolutionId): void {
       "INSERT INTO workflow_states (object_type, object_id, state) VALUES ('resolution', ?, 'failed')"
     )->execute([$resolutionId]);
     audit_log('resolution_failed', 'resolution', $resolutionId);
+  }
+}
+
+/**
+ * Deadline sweep: close resolutions whose voting deadline has passed.
+ * Quorum-met resolutions are decided by majority; otherwise they fail.
+ * Call periodically (health check, cron, or manual management trigger).
+ */
+function close_expired_voting(): void {
+  $stmt = db()->prepare("SELECT id FROM resolutions WHERE status = 'voting' AND voting_deadline IS NOT NULL AND voting_deadline < NOW()");
+  $stmt->execute();
+  foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $id) {
+    check_and_apply((int) $id);
   }
 }
 
@@ -358,12 +368,12 @@ function get_resolution(int $id): ?array {
   $res['changes'] = $stmt->fetchAll();
 
   // Get votes
-  $stmt = db()->prepare(`
+  $stmt = db()->prepare("
     SELECT v.*, u.name AS voter_name
     FROM votes v JOIN users u ON u.id = v.user_id
     WHERE v.resolution_id = ?
     ORDER BY v.cast_at
-  `);
+  ");
   $stmt->execute([$id]);
   $res['votes'] = $stmt->fetchAll();
 
