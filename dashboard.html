@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — UAS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <style>
+    .dash-header { padding: 1.5rem 0; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+    .dash-header h1 { font-size: 1.5rem; font-weight: 700; }
+    .dash-header p { color: var(--text-dim); font-size: 0.9rem; }
+    .dash-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; overflow-x: auto; }
+    .dash-tab {
+      padding: 0.6rem 1rem; border-bottom: 2px solid transparent; color: var(--text-dim);
+      cursor: pointer; font-size: 0.85rem; white-space: nowrap; background: none;
+      border-top: none; border-left: none; border-right: none; font-family: inherit;
+    }
+    .dash-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .dash-panel { display: none; }
+    .dash-panel.active { display: block; }
+    .health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .health-card { padding: 1rem; text-align: center; }
+    .health-card .value { font-size: 1.8rem; font-weight: 700; color: var(--accent); }
+    .health-card .label { font-size: 0.8rem; color: var(--text-dim); margin-top: 0.25rem; }
+    .section-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem; }
+    .role-badge {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      padding: 0.25rem 0.6rem; border-radius: 6px;
+      background: var(--accent-glow); color: var(--accent);
+      font-size: 0.8rem; font-weight: 500; margin: 0.2rem;
+    }
+    .cap-list { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+    .cap-tag { font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 4px; background: #1e293b; color: var(--text-dim); }
+    .resolution-card { padding: 1rem; margin-bottom: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); }
+    .resolution-card h4 { font-size: 0.95rem; margin-bottom: 0.25rem; }
+    .vote-bar { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem; }
+    .vote-bar .bar { flex: 1; height: 6px; background: #1e293b; border-radius: 3px; overflow: hidden; }
+    .vote-bar .bar-fill { height: 100%; background: var(--success); border-radius: 3px; transition: width 0.3s; }
+    .vote-bar .counts { font-size: 0.8rem; color: var(--text-dim); }
+    .btn-vote { padding: 0.3rem 0.6rem; font-size: 0.75rem; }
+    .create-form { max-width: 500px; }
+    .create-form .form-group { margin-bottom: 0.75rem; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="container" style="display:flex;align-items:center;width:100%">
+      <a href="/" class="nav-brand">UAS</a>
+      <div class="nav-links">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/about" class="nav-link">About</a>
+        <a href="/programmes" class="nav-link">Programmes</a>
+        <a href="/events" class="nav-link">Events</a>
+        <a href="/knowledge" class="nav-link">Knowledge</a>
+        <a href="/ecosystem" class="nav-link">Ecosystem</a>
+        <a href="/dashboard" class="nav-link active">Dashboard</a>
+      </div>
+      <div class="nav-user" id="navUser"></div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="dash-header">
+      <h1 id="dashTitle">Dashboard</h1>
+      <p id="dashSubtitle"></p>
+    </div>
+
+    <div class="dash-tabs" id="dashTabs">
+      <button class="dash-tab active" data-panel="overview">Overview</button>
+      <button class="dash-tab" data-panel="roles">My Roles</button>
+      <button class="dash-tab" data-panel="pending">Pending Items</button>
+      <button class="dash-tab" data-panel="resolutions">Resolutions</button>
+      <button class="dash-tab" data-panel="create">Create</button>
+    </div>
+
+    <!-- Overview Panel -->
+    <div class="dash-panel active" id="panel-overview">
+      <div class="health-grid" id="healthGrid"></div>
+      <h3 class="section-title">Recent Pending Items</h3>
+      <div id="recentPending"></div>
+    </div>
+
+    <!-- Roles Panel -->
+    <div class="dash-panel" id="panel-roles">
+      <h3 class="section-title">My Roles & Capabilities</h3>
+      <div id="myRoles"></div>
+      <h3 class="section-title mt-2">Authority Trace</h3>
+      <div id="authorityTrace"></div>
+    </div>
+
+    <!-- Pending Panel -->
+    <div class="dash-panel" id="panel-pending">
+      <h3 class="section-title">All Pending Items</h3>
+      <div id="allPending"></div>
+    </div>
+
+    <!-- Resolutions Panel -->
+    <div class="dash-panel" id="panel-resolutions">
+      <div class="flex-between mb-2">
+        <h3 class="section-title" style="margin:0">Resolutions</h3>
+        <button class="btn btn-primary btn-sm" onclick="showCreateResolution()" id="createResBtn" style="display:none">New Resolution</button>
+      </div>
+      <div id="resolutionsList"></div>
+    </div>
+
+    <!-- Create Panel -->
+    <div class="dash-panel" id="panel-create">
+      <h3 class="section-title">Create Content</h3>
+      <div class="grid-3">
+        <div class="card" style="cursor:pointer" onclick="showCreateForm('article')">
+          <h4 style="margin-bottom:0.25rem">📄 Article</h4>
+          <p class="text-sm text-dim">Submit an article, observing report, or educational piece</p>
+        </div>
+        <div class="card" style="cursor:pointer" onclick="showCreateForm('event')">
+          <h4 style="margin-bottom:0.2rem">📅 Event</h4>
+          <p class="text-sm text-dim">Create an event (requires approval)</p>
+        </div>
+        <div class="card" style="cursor:pointer" onclick="showCreateForm('programme')">
+          <h4 style="margin-bottom:0.25rem">🎯 Programme</h4>
+          <p class="text-sm text-dim">Propose a new programme (requires programmes.create)</p>
+        </div>
+      </div>
+      <div id="createForm" class="mt-2"></div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    let health = {};
+
+    async function load() {
+      try {
+        const data = await api.me();
+        const user = data.user;
+        document.getElementById('dashTitle').textContent = `Welcome, ${user.name}`;
+        document.getElementById('dashSubtitle').textContent = user.email;
+        updateNavUser();
+
+        // Show create resolution button if authorized
+        if (api.hasCap('resolutions.create')) {
+          document.getElementById('createResBtn').style.display = '';
+        }
+
+        // Load all data in parallel
+        const [healthData, pending, resolutions, roles] = await Promise.all([
+          api.getDashboard().catch(() => ({})),
+          api.getPending().catch(() => []),
+          api.getResolutions().catch(() => []),
+          api.getRoles().catch(() => []),
+        ]);
+
+        health = healthData;
+        renderOverview(pending);
+        renderRoles(data.roles || []);
+        renderPending(pending);
+        renderResolutions(resolutions);
+
+        setupTabs();
+      } catch(e) {
+        window.location.href = '/login';
+      }
+    }
+
+    function renderOverview(pending) {
+      const g = document.getElementById('healthGrid');
+      g.innerHTML = `
+        <div class="card health-card"><div class="value">${health.members?.active || 0}</div><div class="label">Active Members</div></div>
+        <div class="card health-card"><div class="value">${health.programmes?.active || 0}</div><div class="label">Programmes</div></div>
+        <div class="card health-card"><div class="value">${health.projects?.active || 0}</div><div class="label">Projects</div></div>
+        <div class="card health-card"><div class="value">${health.events?.upcoming || 0}</div><div class="label">Upcoming Events</div></div>
+        <div class="card health-card"><div class="value" style="color:${health.pending?.overdue > 0 ? 'var(--danger)' : 'var(--accent)'}">${health.pending?.total || 0}</div><div class="label">Pending Items</div></div>
+        <div class="card health-card"><div class="value">${health.governance?.total || 0}</div><div class="label">Active Resolutions</div></div>
+      `;
+
+      const rp = document.getElementById('recentPending');
+      if (pending.length) {
+        rp.innerHTML = pending.slice(0, 5).map(renderPendingItem).join('');
+      } else {
+        rp.innerHTML = '<p class="text-dim text-sm">No pending items.</p>';
+      }
+    }
+
+    function renderRoles(roles) {
+      const div = document.getElementById('myRoles');
+      if (roles.length) {
+        div.innerHTML = roles.map(r => `
+          <div class="role-badge">${esc(r.title)}</div>
+        `).join('');
+      } else {
+        div.innerHTML = '<p class="text-dim text-sm">No roles assigned yet.</p>';
+      }
+
+      const caps = api._capabilities || [];
+      const ct = document.getElementById('authorityTrace');
+      if (caps.length) {
+        ct.innerHTML = `<div class="cap-list">${caps.map(c => `<span class="cap-tag">${esc(c)}</span>`).join('')}</div>`;
+      } else {
+        ct.innerHTML = '<p class="text-dim text-sm">No capabilities.</p>';
+      }
+    }
+
+    function renderPending(pending) {
+      const div = document.getElementById('allPending');
+      if (pending.length) {
+        div.innerHTML = pending.map(renderPendingItem).join('');
+      } else {
+        div.innerHTML = '<p class="text-dim">No pending items.</p>';
+      }
+    }
+
+    function renderPendingItem(item) {
+      const age = item.created_at ? Math.floor((Date.now() - new Date(item.created_at)) / 86400000) : 0;
+      const overdue = age > 7;
+      return `
+        <div class="pending-item">
+          <span class="pending-item-type">${esc(item.item_type)}</span>
+          <span class="pending-item-title">${esc(item.title || item.name)}</span>
+          <span class="pending-item-meta">
+            by ${esc(item.author_name || 'Unknown')}
+            <span class="pending-item-age ${overdue ? 'overdue' : ''}">${age}d</span>
+          </span>
+        </div>
+      `;
+    }
+
+    function renderResolutions(resolutions) {
+      const div = document.getElementById('resolutionsList');
+      if (resolutions.length) {
+        div.innerHTML = resolutions.map(r => {
+          const total = r.votes_for + r.votes_against + r.votes_abstain;
+          const pct = total > 0 ? (r.votes_for / total * 100) : 0;
+          const canVote = r.status === 'voting' && api.hasCap('resolutions.vote');
+          return `
+            <div class="resolution-card">
+              <div class="flex-between">
+                <div>
+                  <h4>${esc(r.title)}</h4>
+                  <span class="badge badge-${esc(r.status)}">${esc(r.status)}</span>
+                  <span class="text-sm text-dim" style="margin-left:0.5rem">${esc(r.code)}</span>
+                </div>
+                <span class="text-sm text-dim">by ${esc(r.proposer_name || 'Unknown')}</span>
+              </div>
+              ${r.status === 'voting' ? `
+                <div class="vote-bar">
+                  <span class="counts">👍 ${r.votes_for} 👎 ${r.votes_against} ⏸ ${r.votes_abstain}</span>
+                  <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>
+                  ${canVote ? `
+                    <button class="btn btn-success btn-vote" onclick="vote(${r.id},'for')">For</button>
+                    <button class="btn btn-danger btn-vote" onclick="vote(${r.id},'against')">Against</button>
+                    <button class="btn btn-outline btn-vote" onclick="vote(${r.id},'abstain')">Abstain</button>
+                  ` : ''}
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('');
+      } else {
+        div.innerHTML = '<p class="text-dim">No resolutions yet.</p>';
+      }
+    }
+
+    async function vote(id, value) {
+      try {
+        await api.castVote(id, value);
+        const resolutions = await api.getResolutions();
+        renderResolutions(resolutions);
+      } catch(e) {
+        alert(e.error || 'Vote failed');
+      }
+    }
+
+    function showCreateForm(type) {
+      const div = document.getElementById('createForm');
+      if (type === 'article') {
+        div.innerHTML = `
+          <div class="card create-form">
+            <h4 class="mb-1">Submit Article</h4>
+            <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="artTitle"></div>
+            <div class="form-group"><label class="form-label">Category</label>
+              <select class="form-select" id="artCat"><option value="article">Article</option><option value="observing_report">Observing Report</option><option value="educational">Educational</option><option value="announcement">Announcement</option></select>
+            </div>
+            <div class="form-group"><label class="form-label">Body</label><textarea class="form-textarea" id="artBody" rows="6"></textarea></div>
+            <button class="btn btn-primary" onclick="submitArticle()">Submit</button>
+          </div>
+        `;
+      } else if (type === 'event') {
+        div.innerHTML = `
+          <div class="card create-form">
+            <h4 class="mb-1">Create Event</h4>
+            <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="evtTitle"></div>
+            <div class="form-group"><label class="form-label">Date & Time</label><input type="datetime-local" class="form-input" id="evtDate"></div>
+            <div class="form-group"><label class="form-label">Location</label><input class="form-input" id="evtLoc"></div>
+            <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="evtDesc" rows="4"></textarea></div>
+            <button class="btn btn-primary" onclick="submitEvent()">Submit for Approval</button>
+          </div>
+        `;
+      } else if (type === 'programme') {
+        div.innerHTML = `
+          <div class="card create-form">
+            <h4 class="mb-1">Propose Programme</h4>
+            <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="progTitle"></div>
+            <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="progDesc" rows="4"></textarea></div>
+            <div class="form-group"><label class="form-label">Objectives</label><textarea class="form-textarea" id="progObj" rows="3"></textarea></div>
+            <button class="btn btn-primary" onclick="submitProgramme()">Submit</button>
+          </div>
+        `;
+      }
+    }
+
+    async function submitArticle() {
+      try {
+        await api.createArticle({
+          title: document.getElementById('artTitle').value,
+          category: document.getElementById('artCat').value,
+          body: document.getElementById('artBody').value,
+        });
+        alert('Article submitted for review!');
+        document.getElementById('createForm').innerHTML = '';
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function submitEvent() {
+      try {
+        await api.createEvent({
+          title: document.getElementById('evtTitle').value,
+          date: document.getElementById('evtDate').value,
+          location: document.getElementById('evtLoc').value,
+          description: document.getElementById('evtDesc').value,
+        });
+        alert('Event submitted for approval!');
+        document.getElementById('createForm').innerHTML = '';
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function submitProgramme() {
+      try {
+        await api.createProgramme({
+          title: document.getElementById('progTitle').value,
+          description: document.getElementById('progDesc').value,
+          objectives: document.getElementById('progObj').value,
+        });
+        alert('Programme created!');
+        document.getElementById('createForm').innerHTML = '';
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    function showCreateResolution() {
+      const div = document.getElementById('createForm');
+      switchTab('create');
+      div.innerHTML = `
+        <div class="card create-form">
+          <h4 class="mb-1">Propose Governance Resolution</h4>
+          <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="resTitle"></div>
+          <div class="form-group"><label class="form-label">Type</label>
+            <select class="form-select" id="resType">
+              <option value="role_create">Create Role</option>
+              <option value="role_modify">Modify Role</option>
+              <option value="appointment">Appointment</option>
+              <option value="policy_adopt">Adopt Policy</option>
+              <option value="committee_create">Create Committee</option>
+              <option value="programme_create">Create Programme</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="resDesc" rows="4"></textarea></div>
+          <div class="form-group"><label class="form-label">Majority</label>
+            <select class="form-select" id="resMajority"><option value="simple">Simple Majority</option><option value="two_thirds">Two-Thirds</option><option value="unanimous">Unanimous</option></select>
+          </div>
+          <div class="form-group"><label class="form-label">Quorum (min votes, 0 = any)</label><input type="number" class="form-input" id="resQuorum" value="0"></div>
+          <button class="btn btn-primary" onclick="submitResolution()">Create Resolution</button>
+        </div>
+      `;
+    }
+
+    async function submitResolution() {
+      try {
+        await api.createResolution({
+          title: document.getElementById('resTitle').value,
+          type: document.getElementById('resType').value,
+          description: document.getElementById('resDesc').value,
+          majority: document.getElementById('resMajority').value,
+          quorum: parseInt(document.getElementById('resQuorum').value) || 0,
+          changes: [],
+        });
+        alert('Resolution created! Submit it to begin voting.');
+        const resolutions = await api.getResolutions();
+        renderResolutions(resolutions);
+        switchTab('resolutions');
+        document.getElementById('createForm').innerHTML = '';
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    function setupTabs() {
+      document.getElementById('dashTabs').addEventListener('click', e => {
+        const tab = e.target.closest('.dash-tab');
+        if (!tab) return;
+        switchTab(tab.dataset.panel);
+      });
+    }
+
+    function switchTab(panel) {
+      document.querySelectorAll('.dash-tab').forEach(t => t.classList.toggle('active', t.dataset.panel === panel));
+      document.querySelectorAll('.dash-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + panel));
+    }
+
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+    function updateNavUser() {
+      const el = document.getElementById('navUser');
+      el.innerHTML = api._user
+        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a> <button class="btn btn-outline btn-sm" onclick="api.logout();window.location.href='/'">Logout</button>`
+        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
+    }
+
+    load();
+  </script>
+</body>
+</html>

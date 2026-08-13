@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — UAS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <style>
+    .dash-header { padding: 1.5rem 0; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+    .dash-header h1 { font-size: 1.5rem; font-weight: 700; }
+    .dash-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; overflow-x: auto; }
+    .dash-tab {
+      padding: 0.6rem 1rem; border-bottom: 2px solid transparent; color: var(--text-dim);
+      cursor: pointer; font-size: 0.85rem; white-space: nowrap; background: none;
+      border-top: none; border-left: none; border-right: none; font-family: inherit;
+    }
+    .dash-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .dash-panel { display: none; }
+    .dash-panel.active { display: block; }
+    .audit-row { display: flex; gap: 0.75rem; padding: 0.6rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+    .audit-row .time { color: var(--text-faint); min-width: 140px; }
+    .audit-row .action { color: var(--accent); min-width: 120px; font-weight: 500; }
+    .audit-row .detail { color: var(--text-dim); flex: 1; }
+    .member-row { display: flex; gap: 1rem; align-items: center; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 0.5rem; }
+    .member-avatar {
+      width: 40px; height: 40px; border-radius: 50%; background: var(--accent-glow);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600; color: var(--accent); font-size: 0.85rem;
+    }
+    .member-info { flex: 1; }
+    .member-info h4 { font-size: 0.9rem; }
+    .member-info p { font-size: 0.8rem; color: var(--text-dim); }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="container" style="display:flex;align-items:center;width:100%">
+      <a href="/" class="nav-brand">UAS</a>
+      <div class="nav-links">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+        <a href="/admin" class="nav-link active">Admin</a>
+      </div>
+      <div class="nav-user" id="navUser"></div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="dash-header">
+      <h1>Administration</h1>
+    </div>
+
+    <div class="dash-tabs" id="adminTabs">
+      <button class="dash-tab active" data-panel="members">Members</button>
+      <button class="dash-tab" data-panel="roles">Roles</button>
+      <button class="dash-tab" data-panel="resolutions">Resolutions</button>
+      <button class="dash-tab" data-panel="audit">Audit Log</button>
+    </div>
+
+    <!-- Members -->
+    <div class="dash-panel active" id="panel-members">
+      <div id="membersList"></div>
+    </div>
+
+    <!-- Roles -->
+    <div class="dash-panel" id="panel-roles">
+      <div class="flex-between mb-2">
+        <h3 class="section-title" style="margin:0">Institutional Roles</h3>
+        <button class="btn btn-primary btn-sm" onclick="showRoleForm()" id="createRoleBtn" style="display:none">Create Role</button>
+      </div>
+      <div id="rolesList"></div>
+      <div id="roleForm" class="mt-2"></div>
+    </div>
+
+    <!-- Resolutions -->
+    <div class="dash-panel" id="panel-resolutions">
+      <div id="adminResolutions"></div>
+    </div>
+
+    <!-- Audit -->
+    <div class="dash-panel" id="panel-audit">
+      <div id="auditLog"></div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    async function load() {
+      try {
+        const data = await api.me();
+        if (!api.hasCap('admin.system') && !api.hasCap('members.approve')) {
+          document.getElementById('adminTabs').innerHTML = '<p class="text-dim">Insufficient permissions.</p>';
+          return;
+        }
+        updateNavUser();
+        if (api.hasCap('roles.create')) document.getElementById('createRoleBtn').style.display = '';
+
+        const [members, roles, resolutions, audit] = await Promise.all([
+          api.getMembers().catch(() => []),
+          api.getRoles().catch(() => []),
+          api.getResolutions().catch(() => []),
+          api.getAuditLog({ limit: 50 }).catch(() => []),
+        ]);
+
+        renderMembers(members);
+        renderRoles(roles);
+        renderResolutions(resolutions);
+        renderAudit(audit);
+        setupTabs();
+      } catch(e) { window.location.href = '/login'; }
+    }
+
+    function renderMembers(members) {
+      const div = document.getElementById('membersList');
+      if (!members.length) { div.innerHTML = '<p class="text-dim">No members.</p>'; return; }
+      div.innerHTML = members.map(m => {
+        const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        return `
+          <div class="member-row">
+            <div class="member-avatar">${initials}</div>
+            <div class="member-info">
+              <h4>${esc(m.name)}</h4>
+              <p>${esc(m.email)} &middot; ${esc(m.membership_number || '—')} &middot; ${esc(m.category)}</p>
+            </div>
+            <span class="badge badge-${m.status === 'active' ? 'active' : 'inactive'}">${esc(m.status)}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderRoles(roles) {
+      const div = document.getElementById('rolesList');
+      if (!roles.length) { div.innerHTML = '<p class="text-dim">No roles defined.</p>'; return; }
+      div.innerHTML = roles.map(r => `
+        <div class="card" style="margin-bottom:0.5rem;padding:1rem">
+          <div class="flex-between">
+            <div>
+              <strong>${esc(r.title)}</strong>
+              <span class="badge badge-${esc(r.status)}" style="margin-left:0.5rem">${esc(r.status)}</span>
+            </div>
+            <span class="text-sm text-dim">${esc(r.scope || 'institutional')}</span>
+          </div>
+          ${r.description ? `<p class="text-sm text-dim mt-1">${esc(r.description)}</p>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function renderResolutions(resolutions) {
+      const div = document.getElementById('adminResolutions');
+      if (!resolutions.length) { div.innerHTML = '<p class="text-dim">No resolutions.</p>'; return; }
+      div.innerHTML = resolutions.map(r => `
+        <div class="card" style="margin-bottom:0.5rem;padding:1rem">
+          <div class="flex-between">
+            <div>
+              <strong>${esc(r.title)}</strong>
+              <span class="badge badge-${esc(r.status)}" style="margin-left:0.5rem">${esc(r.status)}</span>
+              <span class="text-sm text-dim" style="margin-left:0.5rem">${esc(r.code)}</span>
+            </div>
+            <span class="text-sm text-dim">${esc(r.proposer_name || '—')}</span>
+          </div>
+          <div class="text-sm text-dim mt-1">
+            For: ${r.votes_for} &middot; Against: ${r.votes_against} &middot; Abstain: ${r.votes_abstain}
+            ${r.status === 'submitted' && api.hasCap('resolutions.manage') ? `
+              <button class="btn btn-primary btn-sm" style="margin-left:1rem" onclick="beginVoting(${r.id})">Begin Voting</button>
+            ` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderAudit(audit) {
+      const div = document.getElementById('auditLog');
+      if (!audit.length) { div.innerHTML = '<p class="text-dim">No audit entries.</p>'; return; }
+      div.innerHTML = audit.map(a => `
+        <div class="audit-row">
+          <span class="time">${esc(a.created_at || '')}</span>
+          <span class="action">${esc(a.action_type)}</span>
+          <span class="detail">${esc(a.target_type || '')} #${a.target_id || ''} ${a.user_name ? 'by ' + esc(a.user_name) : ''}</span>
+        </div>
+      `).join('');
+    }
+
+    async function beginVoting(id) {
+      try {
+        await api.beginVoting(id);
+        const resolutions = await api.getResolutions();
+        renderResolutions(resolutions);
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    function showRoleForm() {
+      const div = document.getElementById('roleForm');
+      div.innerHTML = `
+        <div class="card" style="max-width:500px">
+          <h4 class="mb-1">Create Role</h4>
+          <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="newRoleTitle"></div>
+          <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="newRoleDesc" rows="2"></textarea></div>
+          <button class="btn btn-primary" onclick="createRole()">Create</button>
+        </div>
+      `;
+    }
+
+    async function createRole() {
+      try {
+        await api.createRole({
+          title: document.getElementById('newRoleTitle').value,
+          description: document.getElementById('newRoleDesc').value,
+        });
+        const roles = await api.getRoles();
+        renderRoles(roles);
+        document.getElementById('roleForm').innerHTML = '';
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    function setupTabs() {
+      document.getElementById('adminTabs').addEventListener('click', e => {
+        const tab = e.target.closest('.dash-tab');
+        if (!tab) return;
+        document.querySelectorAll('.dash-tab').forEach(t => t.classList.toggle('active', t.dataset.panel === tab.dataset.panel));
+        document.querySelectorAll('.dash-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab.dataset.panel));
+      });
+    }
+
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+    function updateNavUser() {
+      const el = document.getElementById('navUser');
+      el.innerHTML = api._user
+        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
+        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
+    }
+    load();
+  </script>
+</body>
+</html>

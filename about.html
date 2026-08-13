@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About — Uganda Astronomical Society</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <style>
+    .page-header { padding: 3rem 0 2rem; text-align: center; }
+    .page-header h1 { font-size: 2.2rem; font-weight: 800; }
+    .page-header p { color: var(--text-dim); max-width: 600px; margin: 0.5rem auto 0; }
+    .content-section { padding: 2rem 0; }
+    .content-section h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem; }
+    .content-section p { color: var(--text-dim); margin-bottom: 1rem; line-height: 1.7; }
+    .values-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
+    .value-card { padding: 1.25rem; }
+    .value-card h3 { font-size: 1rem; margin-bottom: 0.5rem; color: var(--accent); }
+    .value-card p { font-size: 0.9rem; color: var(--text-dim); margin: 0; }
+    .leadership-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+    .leader-card { text-align: center; padding: 1.5rem; }
+    .leader-avatar {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      background: var(--accent-glow);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; font-weight: 700; color: var(--accent);
+      margin: 0 auto 0.75rem;
+    }
+    .leader-card h4 { font-size: 1rem; margin-bottom: 0.25rem; }
+    .leader-card .role { font-size: 0.85rem; color: var(--accent); }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="container" style="display:flex;align-items:center;width:100%">
+      <a href="/" class="nav-brand">UAS</a>
+      <div class="nav-links">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/about" class="nav-link active">About</a>
+        <a href="/programmes" class="nav-link">Programmes</a>
+        <a href="/events" class="nav-link">Events</a>
+        <a href="/knowledge" class="nav-link">Knowledge</a>
+        <a href="/ecosystem" class="nav-link">Ecosystem</a>
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+      </div>
+      <div class="nav-user" id="navUser"></div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>About UAS</h1>
+      <p>The Uganda Astronomical Society is the national body for astronomy education, research, and outreach in Uganda.</p>
+    </div>
+
+    <section class="content-section">
+      <h2>History</h2>
+      <p>The Uganda Astronomical Society was established to build a vibrant astronomy community in Uganda. From early star-gazing sessions at Makerere University to national outreach programmes reaching schools across the country, UAS has grown into the country's leading astronomical organisation.</p>
+      <p>UAS brings together amateur and professional astronomers, educators, students, and space enthusiasts under a shared vision: making astronomy accessible to every Ugandan.</p>
+    </section>
+
+    <section class="content-section">
+      <h2>Vision</h2>
+      <p>A Uganda where every citizen has the opportunity to explore, understand, and appreciate the universe — and where Ugandan scientists contribute meaningfully to global astronomical knowledge.</p>
+    </section>
+
+    <section class="content-section">
+      <h2>Mission</h2>
+      <p>To advance astronomical education, research, and public engagement in Uganda through community building, institutional partnerships, and accessible science communication.</p>
+    </section>
+
+    <section class="content-section">
+      <h2>Objectives</h2>
+      <div class="values-grid">
+        <div class="card value-card"><h3>Education</h3><p>Deliver astronomy education programmes in schools and universities across Uganda.</p></div>
+        <div class="card value-card"><h3>Research</h3><p>Support and promote astronomical research by Ugandan scientists and students.</p></div>
+        <div class="card value-card"><h3>Outreach</h3><p>Engage the public through observing events, talks, and media.</p></div>
+        <div class="card value-card"><h3>Community</h3><p>Build a connected network of astronomers, educators, and enthusiasts.</p></div>
+        <div class="card value-card"><h3>Advocacy</h3><p>Promote the value of astronomy and space science in national development.</p></div>
+        <div class="card value-card"><h3>Collaboration</h3><p>Partner with regional and international astronomical organisations.</p></div>
+      </div>
+    </section>
+
+    <section class="content-section">
+      <h2>Governance</h2>
+      <p>UAS is governed by a Board of Directors elected by the membership. The Board sets policy, approves programmes, and ensures the Society fulfils its mission. Day-to-day operations are managed through designated roles with specific capabilities — ensuring clear authority and accountability.</p>
+      <p>Board decisions are recorded as formal resolutions. When the Board resolves to create a role, assign capabilities, or approve a programme, those changes are applied transparently through the governance system.</p>
+    </section>
+
+    <section class="content-section">
+      <h2>Leadership</h2>
+      <div class="leadership-grid" id="leadershipGrid"></div>
+    </section>
+  </div>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2026 Uganda Astronomical Society. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="js/api.js"></script>
+  <script>
+    async function load() {
+      try { await api.me(); } catch(e) {}
+      updateNavUser();
+
+      const roles = await api.getRoles().catch(() => []);
+      const grid = document.getElementById('leadershipGrid');
+
+      // Get members with roles
+      const members = await api.getMembers().catch(() => []);
+      const activeMembers = members.filter(m => m.status === 'active');
+
+      if (activeMembers.length) {
+        grid.innerHTML = activeMembers.slice(0, 8).map(m => {
+          const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+          return `
+            <div class="card leader-card">
+              <div class="leader-avatar">${initials}</div>
+              <h4>${esc(m.name)}</h4>
+              <div class="role">${esc(m.institution || 'UAS Member')}</div>
+            </div>
+          `;
+        }).join('');
+      } else {
+        grid.innerHTML = '<p class="text-dim">Leadership information coming soon.</p>';
+      }
+    }
+
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+    function updateNavUser() {
+      const el = document.getElementById('navUser');
+      el.innerHTML = api._user
+        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
+        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
+    }
+
+    load();
+  </script>
+</body>
+</html>

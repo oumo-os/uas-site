@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Events — Uganda Astronomical Society</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <style>
+    .page-header { padding: 3rem 0 2rem; text-align: center; }
+    .page-header h1 { font-size: 2.2rem; font-weight: 800; }
+    .page-header p { color: var(--text-dim); max-width: 600px; margin: 0.5rem auto 0; }
+    .event-card {
+      display: flex;
+      gap: 1.25rem;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--bg-card);
+    }
+    .event-date-box {
+      min-width: 70px;
+      text-align: center;
+      padding: 0.75rem;
+      background: var(--accent-glow);
+      border-radius: var(--radius);
+      align-self: flex-start;
+    }
+    .event-date-box .day { font-size: 1.8rem; font-weight: 700; color: var(--accent); line-height: 1; }
+    .event-date-box .month { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; }
+    .event-date-box .year { font-size: 0.7rem; color: var(--text-faint); }
+    .event-body h3 { font-size: 1.1rem; margin-bottom: 0.35rem; }
+    .event-body p { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 0.5rem; }
+    .event-meta { display: flex; gap: 1rem; font-size: 0.8rem; color: var(--text-faint); flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="container" style="display:flex;align-items:center;width:100%">
+      <a href="/" class="nav-brand">UAS</a>
+      <div class="nav-links">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/about" class="nav-link">About</a>
+        <a href="/programmes" class="nav-link">Programmes</a>
+        <a href="/events" class="nav-link active">Events</a>
+        <a href="/knowledge" class="nav-link">Knowledge</a>
+        <a href="/ecosystem" class="nav-link">Ecosystem</a>
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+      </div>
+      <div class="nav-user" id="navUser"></div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Events</h1>
+      <p>Observing sessions, lectures, workshops, and community gatherings</p>
+    </div>
+    <div id="eventsList"></div>
+  </div>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2026 Uganda Astronomical Society. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="js/api.js"></script>
+  <script>
+    async function load() {
+      try { await api.me(); } catch(e) {}
+      updateNavUser();
+
+      const events = await api.getPublicEvents().catch(() => []);
+      const div = document.getElementById('eventsList');
+
+      if (events.length) {
+        div.innerHTML = events.map(e => {
+          const d = new Date(e.date);
+          return `
+            <div class="event-card">
+              <div class="event-date-box">
+                <div class="day">${d.getDate()}</div>
+                <div class="month">${d.toLocaleString('en',{month:'short'})}</div>
+                <div class="year">${d.getFullYear()}</div>
+              </div>
+              <div class="event-body">
+                <h3>${esc(e.title)}</h3>
+                <p>${esc(e.description || '').slice(0, 200)}</p>
+                <div class="event-meta">
+                  ${e.location ? `<span>📍 ${esc(e.location)}</span>` : ''}
+                  <span>🕐 ${d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}</span>
+                  ${e.end_date ? `<span>→ ${new Date(e.end_date).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}</span>` : ''}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } else {
+        div.innerHTML = '<p class="text-center text-dim" style="padding:3rem 0">No upcoming events. Check back soon!</p>';
+      }
+    }
+
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+    function updateNavUser() {
+      const el = document.getElementById('navUser');
+      el.innerHTML = api._user
+        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
+        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
+    }
+    load();
+  </script>
+</body>
+</html>

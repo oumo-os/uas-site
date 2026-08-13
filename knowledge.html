@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Knowledge — Uganda Astronomical Society</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <style>
+    .page-header { padding: 3rem 0 2rem; text-align: center; }
+    .page-header h1 { font-size: 2.2rem; font-weight: 800; }
+    .page-header p { color: var(--text-dim); max-width: 600px; margin: 0.5rem auto 0; }
+    .filter-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; justify-content: center; }
+    .filter-chip {
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .filter-chip:hover, .filter-chip.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+    .article-card { padding: 1.25rem; margin-bottom: 1rem; }
+    .article-card h3 { font-size: 1.05rem; margin-bottom: 0.35rem; }
+    .article-card h3 a { color: var(--text); text-decoration: none; }
+    .article-card h3 a:hover { color: var(--accent); }
+    .article-card p { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 0.5rem; }
+    .article-meta { display: flex; gap: 0.75rem; font-size: 0.8rem; color: var(--text-faint); flex-wrap: wrap; }
+    .article-tags { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.5rem; }
+    .tag { font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: 4px; background: #1e293b; color: var(--text-dim); }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="container" style="display:flex;align-items:center;width:100%">
+      <a href="/" class="nav-brand">UAS</a>
+      <div class="nav-links">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/about" class="nav-link">About</a>
+        <a href="/programmes" class="nav-link">Programmes</a>
+        <a href="/events" class="nav-link">Events</a>
+        <a href="/knowledge" class="nav-link active">Knowledge</a>
+        <a href="/ecosystem" class="nav-link">Ecosystem</a>
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+      </div>
+      <div class="nav-user" id="navUser"></div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Knowledge Base</h1>
+      <p>Articles, publications, observing reports, and educational resources</p>
+    </div>
+
+    <div class="filter-bar" id="filterBar">
+      <button class="filter-chip active" data-cat="all">All</button>
+      <button class="filter-chip" data-cat="article">Articles</button>
+      <button class="filter-chip" data-cat="observing_report">Observing Reports</button>
+      <button class="filter-chip" data-cat="educational">Educational</button>
+      <button class="filter-chip" data-cat="project_report">Project Reports</button>
+      <button class="filter-chip" data-cat="announcement">Announcements</button>
+      <button class="filter-chip" data-cat="paper">Papers</button>
+    </div>
+
+    <div id="articlesList"></div>
+  </div>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2026 Uganda Astronomical Society. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="js/api.js"></script>
+  <script>
+    let allArticles = [];
+    let currentCat = 'all';
+
+    async function load() {
+      try { await api.me(); } catch(e) {}
+      updateNavUser();
+
+      allArticles = await api.getPublicArticles().catch(() => []);
+      render();
+      setupFilters();
+    }
+
+    function render() {
+      const filtered = currentCat === 'all' ? allArticles : allArticles.filter(a => a.category === currentCat);
+      const div = document.getElementById('articlesList');
+
+      if (filtered.length) {
+        div.innerHTML = filtered.map(a => {
+          const d = a.published_at ? new Date(a.published_at) : null;
+          const tags = a.tags ? (typeof a.tags === 'string' ? JSON.parse(a.tags) : a.tags) : [];
+          return `
+            <div class="card article-card">
+              <h3><a href="#">${esc(a.title)}</a></h3>
+              <p>${esc(a.category || 'article').replace(/_/g, ' ')}</p>
+              <div class="article-meta">
+                ${a.author_name ? `<span>👤 ${esc(a.author_name)}</span>` : ''}
+                ${d ? `<span>📅 ${d.toLocaleDateString('en', {year:'numeric',month:'short',day:'numeric'})}</span>` : ''}
+              </div>
+              ${tags.length ? `<div class="article-tags">${tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
+            </div>
+          `;
+        }).join('');
+      } else {
+        div.innerHTML = '<p class="text-center text-dim" style="padding:3rem 0">No articles found.</p>';
+      }
+    }
+
+    function setupFilters() {
+      document.getElementById('filterBar').addEventListener('click', e => {
+        const chip = e.target.closest('.filter-chip');
+        if (!chip) return;
+        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        currentCat = chip.dataset.cat;
+        render();
+      });
+    }
+
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+    function updateNavUser() {
+      const el = document.getElementById('navUser');
+      el.innerHTML = api._user
+        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
+        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
+    }
+    load();
+  </script>
+</body>
+</html>
