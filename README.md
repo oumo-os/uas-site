@@ -1,0 +1,119 @@
+# UAS Institutional Platform
+
+**Uganda Astronomical Society** — [astronomy.ug](https://astronomy.ug)
+
+A governance-aware institutional management system for UAS. Not just a website — a platform where board resolutions automatically enact system changes.
+
+## Architecture
+
+```
+Governance Layer    →  Resolutions, votes, auto-apply on quorum
+Authority Layer    →  Users → Roles → Capabilities → Permissions
+Administration Layer → Backups, config, security, maintenance
+```
+
+**Core principle**: Titles do not equal authority. The Board determines which capabilities belong to which roles. Changing a person's role changes their effective authority without manual permission changes.
+
+## Tech Stack
+
+- **Frontend**: HTML5, vanilla CSS/JS, no frameworks
+- **Backend**: PHP 7.4+ / MySQL 5.7+
+- **Auth**: Session-based, capability-middleware
+- **Governance engine**: Resolutions with auto-apply when last vote meets quorum
+
+## Key Features
+
+- **Governance Engine**: Board resolutions that automatically create roles, assign capabilities, appoint members
+- **RBAC**: Granular capability-based access control (articles.approve, events.publish, finance.view, etc.)
+- **Workflow Engine**: Every institutional object follows Draft → Submit → Review → Approve → Publish → Archive
+- **Pending Items**: Centralized view of everything awaiting someone's action
+- **Institutional Dashboard**: Members, programmes, projects, events, pending items, financials
+- **Audit Trail**: Who did what, when, with governance context
+- **Public Website**: Database-driven pages for About, Programmes, Events, Knowledge, Gallery
+
+## Setup
+
+1. Create MySQL database `uas_platform`
+2. Run schema: `mysql -u root uas_platform < migrations/001_initial.sql`
+3. Configure `api/config.php` with DB credentials
+4. Seed dev data: `php api/seed.php`
+5. Point web root to project directory
+
+## API Endpoints
+
+All requests go through `api/index.php?route=...` or rewrite to `/api/...`
+
+### Auth
+- `POST /auth/login` — Login
+- `POST /auth/register` — Register (pending approval)
+- `POST /auth/logout` — Logout
+- `GET /auth/me` — Current user + capabilities
+
+### Governance
+- `GET /resolutions` — List resolutions
+- `POST /resolutions` — Create resolution
+- `GET /resolutions/:id` — Get resolution + votes + changes
+- `POST /resolutions/:id/submit` — Submit for voting
+- `POST /resolutions/:id/begin-voting` — Open voting
+- `POST /resolutions/:id/vote` — Cast vote (auto-applies on quorum)
+
+### Institutional Objects
+- `GET/POST /members` — List/create members
+- `GET/POST /programmes` — List/create programmes
+- `GET/POST /projects` — List/create projects
+- `GET/POST /events` — List/create events
+- `GET/POST /articles` — List/create articles
+- `POST /events/:id/approve` — Approve event
+- `POST /articles/:id/publish` — Publish article
+
+### Dashboard
+- `GET /dashboard` — Institutional health metrics
+- `GET /pending` — All pending items
+- `GET /audit` — Audit log
+
+## Governance Engine
+
+When a resolution passes (vote meets quorum), the system automatically applies all changes:
+
+1. Board creates resolution with changes (create role, assign caps, appoint member)
+2. Resolution enters voting
+3. Directors vote
+4. When last vote meets quorum → **auto-applies** (no admin gatekeeper)
+5. Changes take effect immediately, audit trail recorded
+6. "Why does John have this authority?" → Resolution UAS-BRD-2026-014
+
+## Roles & Capabilities
+
+Roles are configurable. Capabilities are granular:
+
+- `articles.submit`, `articles.review`, `articles.approve`, `articles.publish`
+- `events.create`, `events.approve`, `events.publish`
+- `programmes.create`, `programmes.manage`, `programmes.approve`
+- `resolutions.create`, `resolutions.vote`, `resolutions.manage`
+- `finance.view`, `finance.record`, `finance.approve`
+- `members.view`, `members.approve`, `members.manage`
+- `admin.system`
+
+## Directory Structure
+
+```
+uas-site/
+├── api/
+│   ├── index.php        # API router
+│   ├── config.php       # DB, session, helpers
+│   ├── auth.php         # Authentication
+│   ├── rbac.php         # Roles, capabilities, assignments
+│   ├── governance.php   # Resolutions, voting, auto-apply
+│   ├── workflow.php     # Lifecycle engine + pending items
+│   ├── audit.php        # Audit trail
+│   └── seed.php         # Dev seed data
+├── migrations/
+│   └── 001_initial.sql  # Full database schema
+├── js/
+│   └── api.js           # Frontend API client
+├── css/
+│   └── base.css         # Design system
+├── data/                # JSON data files (if any)
+├── img/uploads/         # User uploads
+└── index.html           # Landing page (to build)
+```
