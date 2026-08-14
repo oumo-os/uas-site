@@ -78,11 +78,16 @@
       try { await api.me(); } catch(e) {}
       updateNavUser();
 
-      allMembers = await api.getMembers().catch(() => []);
-      if (!allMembers.length && !api._user) {
-        document.getElementById('emptyMsg').innerHTML = 'Sign in to view the member directory.';
-        document.getElementById('emptyMsg').style.display = 'block';
-        return;
+      if (api._user) {
+        allMembers = await api.getMembers().catch(() => []);
+      } else {
+        const pub = await api.request('/members?public=1').catch(() => []);
+        if (!pub.length) {
+          document.getElementById('emptyMsg').innerHTML = 'No public member profiles yet. Sign in as a member to see the full directory.';
+          document.getElementById('emptyMsg').style.display = 'block';
+          return;
+        }
+        allMembers = pub;
       }
       renderMembers(allMembers);
     }

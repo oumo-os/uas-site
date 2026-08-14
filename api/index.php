@@ -96,6 +96,12 @@ try {
 
   // --- MEMBERS ---
   elseif ($path === '/members' && $method === 'GET') {
+    $isPublic = isset($_GET['public']) && $_GET['public'] === '1';
+    if ($isPublic) {
+      $stmt = db()->prepare("SELECT m.id, m.user_id, m.category, m.membership_number, m.interests, m.joined_date, u.name, u.institution, u.location, u.avatar_url FROM members m JOIN users u ON u.id = m.user_id WHERE m.profile_visible = 1 AND m.status = 'active' AND u.status = 'active' ORDER BY u.name");
+      $stmt->execute();
+      json_response($stmt->fetchAll());
+    }
     require_login();
     $stmt = db()->prepare('SELECT m.*, u.name, u.email, u.avatar_url, u.institution, u.location, u.status AS user_status FROM members m JOIN users u ON u.id = m.user_id ORDER BY m.joined_date DESC');
     $stmt->execute();
@@ -275,6 +281,27 @@ try {
     transition('event', (int) $m[1], 'published', $user['id']);
     json_response(['ok' => true]);
   }
+  elseif (preg_match('#^/events/(\d+)/cancel$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('events.cancel');
+    db()->prepare("UPDATE events SET status = 'cancelled' WHERE id = ?")->execute([(int) $m[1]]);
+    audit_log('event_cancel', 'event', (int) $m[1]);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/events/(\d+)/rsvps/(\d+)/attended$#', $path, $m) && $method === 'POST') {
+    $user = require_login();
+    $eventId = (int) $m[1];
+    $regId = (int) $m[2];
+    $stmt = db()->prepare('SELECT organizer_id FROM events WHERE id = ?');
+    $stmt->execute([$eventId]);
+    $event = $stmt->fetch();
+    if (!$event) json_error('Event not found', 404);
+    if (!user_has_cap($user['id'], 'events.manage_rsvps') && $event['organizer_id'] != $user['id']) {
+      json_error('Insufficient permissions: events.manage_rsvps', 403);
+    }
+    db()->prepare("UPDATE event_registrations SET status = 'attended' WHERE id = ? AND event_id = ?")->execute([$regId, $eventId]);
+    audit_log('rsvp_mark_attended', 'event', $eventId, ['registration_id' => $regId]);
+    json_response(['ok' => true]);
+  }
   elseif (preg_match('#^/events/(\d+)/rsvp$#', $path, $m) && $method === 'POST') {
     $user = require_cap('events.rsvp');
     $eventId = (int) $m[1];
@@ -285,9 +312,15 @@ try {
     if (!$event) json_error('Event not found', 404);
     if ($event['date'] < date('Y-m-d H:i:s')) json_error('Event has already taken place', 400);
 
-    $stmt = db()->prepare('SELECT id FROM event_registrations WHERE event_id = ? AND user_id = ?');
+    $stmt = db()->prepare('SELECT id, status FROM event_registrations WHERE event_id = ? AND user_id = ?');
     $stmt->execute([$eventId, $user['id']]);
-    if ($stmt->fetch()) json_error('Already registered for this event', 409);
+    $existing = $stmt->fetch();
+    if ($existing) {
+      if ($existing['status'] === 'registered') json_error('Already registered for this event', 409);
+      db()->prepare("UPDATE event_registrations SET status = 'registered', registered_at = NOW() WHERE id = ?")->execute([$existing['id']]);
+      audit_log('event_rsvp', 'event', $eventId, ['user_id' => $user['id']]);
+      json_response(['ok' => true], 201);
+    }
 
     if ($event['capacity']) {
       $stmt = db()->prepare("SELECT COUNT(*) FROM event_registrations WHERE event_id = ? AND status = 'registered'");
@@ -358,6 +391,16 @@ try {
     transition('article', (int) $m[1], 'published', $user['id']);
     json_response(['ok' => true]);
   }
+  elseif (preg_match('#^/articles/(\d+)/reject$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('articles.approve');
+    $data = input_json();
+    $reason = trim($data['reason'] ?? '');
+    if (!$reason) json_error('A rejection reason is required', 400);
+    db()->prepare("UPDATE articles SET status = 'rejected', rejection_reason = ?, approved_by = ?, approved_at = NOW() WHERE id = ?")
+      ->execute([$reason, $user['id'], (int) $m[1]]);
+    audit_log('article_reject', 'article', (int) $m[1], ['reason' => $reason]);
+    json_response(['ok' => true]);
+  }
 
   // --- DOCUMENTS ---
   elseif ($path === '/documents' && $method === 'GET') {
@@ -425,6 +468,21 @@ try {
     $stmt = db()->prepare('SELECT a.*, cr.name AS assigner_name FROM assignments a LEFT JOIN users cr ON cr.id = a.assigner_id WHERE a.assignee_id = ? ORDER BY a.due_date ASC');
     $stmt->execute([$user['id']]);
     json_response($stmt->fetchAll());
+  }
+  elseif ($path === '/submissions/mine' && $method === 'GET') {
+    $user = require_login();
+    $stmt = db()->prepare("SELECT id, title, 'article' AS kind, category AS extra, status, rejection_reason, created_at FROM articles WHERE author_id = ? ORDER BY created_at DESC");
+    $stmt->execute([$user['id']]);
+    $articles = $stmt->fetchAll();
+    $stmt = db()->prepare("SELECT id, title, 'event' AS kind, NULL AS extra, status, NULL AS rejection_reason, created_at FROM events WHERE organizer_id = ? ORDER BY created_at DESC");
+    $stmt->execute([$user['id']]);
+    $events = $stmt->fetchAll();
+    $stmt = db()->prepare("SELECT id, title, 'document' AS kind, category AS extra, status, NULL AS rejection_reason, created_at FROM documents WHERE owner_id = ? ORDER BY created_at DESC");
+    $stmt->execute([$user['id']]);
+    $documents = $stmt->fetchAll();
+    $all = array_merge($articles, $events, $documents);
+    usort($all, fn($a, $b) => strcmp($b['created_at'], $a['created_at']));
+    json_response($all);
   }
   elseif (preg_match('#^/assignments/(\d+)/start$#', $path, $m) && $method === 'POST') {
     $user = require_login();
@@ -552,7 +610,7 @@ try {
   elseif ($path === '/public/events' && $method === 'GET') {
     $stmt = db()->prepare("SELECT e.id, e.title, e.description, e.date, e.end_date, e.location, e.status, e.capacity,
       (SELECT COUNT(*) FROM event_registrations r WHERE r.event_id = e.id AND r.status = 'registered') AS rsvp_count
-      FROM events e WHERE e.status = 'published' AND e.date >= NOW() ORDER BY e.date ASC");
+      FROM events e WHERE (e.status = 'published' AND e.date >= NOW()) OR e.status = 'cancelled' ORDER BY e.date ASC");
     $stmt->execute();
     json_response($stmt->fetchAll());
   }

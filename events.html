@@ -89,6 +89,7 @@
         div.innerHTML = events.map(e => {
           const d = new Date(e.date);
           const full = e.capacity ? e.rsvp_count >= e.capacity : false;
+          const cancelled = e.status === 'cancelled';
           return `
             <div class="event-card">
               <div class="event-date-box">
@@ -97,7 +98,7 @@
                 <div class="year">${d.getFullYear()}</div>
               </div>
               <div class="event-body">
-                <h3>${esc(e.title)}</h3>
+                <h3>${esc(e.title)} ${cancelled ? '<span class="badge badge-inactive">cancelled</span>' : ''}</h3>
                 <p>${esc(e.description || '').slice(0, 200)}</p>
                 <div class="event-meta">
                   ${e.location ? `<span>📍 ${esc(e.location)}</span>` : ''}
@@ -106,6 +107,7 @@
                   <span>👥 ${e.rsvp_count || 0}${e.capacity ? ' / ' + e.capacity : ''} attending</span>
                 </div>
                 <div class="event-actions" style="margin-top:0.75rem">
+                  ${cancelled ? '' : `
                   ${e.capacity ? `
                     <div class="capacity-bar" style="background:#1e293b;border-radius:4px;height:6px;margin-bottom:0.5rem;overflow:hidden">
                       <div style="width:${Math.min(100, e.rsvp_count / e.capacity * 100)}%;height:100%;background:var(--success)"></div>
@@ -118,12 +120,12 @@
                     <button class="btn btn-primary btn-sm" onclick="rsvp(${e.id})">RSVP</button>
                   `)) : `
                     <a href="/login" class="btn btn-outline btn-sm">Sign in to RSVP</a>
-                  `}
-                  ${canManage(e) ? `
+                  `}`}
+                  ${canManage(e) && !cancelled ? `
                     <button class="btn btn-outline btn-sm" onclick="toggleAttendees(${e.id}, this)">View Attendees (${e.rsvp_count || 0})</button>
                   ` : ''}
                 </div>
-                <div class="attendee-list" id="attendees-${e.id}" style="display:none;margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem"></div>
+                ${canManage(e) ? `<div class="attendee-list" id="attendees-${e.id}" style="display:none;margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem"></div>` : ''}
               </div>
             </div>
           `;
@@ -140,16 +142,30 @@
     async function toggleAttendees(id, btn) {
       const box = document.getElementById('attendees-' + id);
       if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+      await renderAttendees(id, box);
+    }
+
+    async function renderAttendees(id, box) {
       try {
         const list = await api.getEventRsvps(id);
         box.innerHTML = list.length ? list.map(r => `
           <div class="flex-between" style="padding:0.25rem 0;font-size:0.85rem">
             <span>${esc(r.name)} <span class="text-dim">${esc(r.email)}</span></span>
-            <span class="badge badge-${r.status === 'registered' ? 'active' : 'inactive'}">${esc(r.status)}</span>
+            <span class="flex gap-2" style="align-items:center">
+              <span class="badge badge-${r.status === 'registered' ? 'active' : (r.status === 'attended' ? 'active' : 'inactive')}">${esc(r.status)}</span>
+              ${r.status === 'registered' ? `<button class="btn btn-outline btn-xs" onclick="markAttended(${id}, ${r.id})">Attended</button>` : ''}
+            </span>
           </div>`).join('')
         : '<p class="text-dim" style="font-size:0.85rem">No attendees yet.</p>';
         box.style.display = 'block';
       } catch(e) { alert(e.error || 'Failed to load attendees'); }
+    }
+
+    async function markAttended(eventId, regId) {
+      try {
+        await api.request(`/events/${eventId}/rsvps/${regId}/attended`, { method: 'POST' });
+        await renderAttendees(eventId, document.getElementById('attendees-' + eventId));
+      } catch(e) { alert(e.error || 'Failed'); }
     }
 
     async function rsvp(id) {

@@ -84,6 +84,8 @@
       <div id="recentPending"></div>
       <h3 class="section-title">My Assignments</h3>
       <div id="myAssignments"></div>
+      <h3 class="section-title">My Submissions</h3>
+      <div id="mySubmissions"></div>
     </div>
 
     <!-- Roles Panel -->
@@ -152,12 +154,13 @@
         }
 
         // Load all data in parallel
-        const [healthData, pending, resolutions, roles, myAsg] = await Promise.all([
+        const [healthData, pending, resolutions, roles, myAsg, mySubs] = await Promise.all([
           api.getDashboard().catch(() => ({})),
           api.getPending().catch(() => []),
           api.getResolutions().catch(() => []),
           api.getRoles().catch(() => []),
           api.getMyAssignments().catch(() => []),
+          api.request('/submissions/mine').catch(() => []),
         ]);
 
         health = healthData;
@@ -166,6 +169,7 @@
         renderPending(pending);
         renderResolutions(resolutions);
         renderMyAssignments(myAsg);
+        renderMySubmissions(mySubs);
 
         setupTabs();
       } catch(e) {
@@ -226,6 +230,21 @@
       catch(e) { alert(e.error || 'Failed'); }
     }
 
+    function renderMySubmissions(list) {
+      const div = document.getElementById('mySubmissions');
+      if (!list.length) { div.innerHTML = '<p class="text-dim text-sm">You have not submitted any content yet.</p>'; return; }
+      div.innerHTML = list.slice(0, 8).map(s => `
+        <div class="flex-between" style="padding:0.45rem 0;border-bottom:1px solid var(--border)">
+          <span class="text-sm">
+            <span class="badge badge-pending">${esc(s.kind)}</span>
+            ${esc(s.title)}
+            ${s.rejection_reason ? `<span class="text-danger text-sm"> — ${esc(s.rejection_reason)}</span>` : ''}
+          </span>
+          <span class="badge badge-${s.status === 'published' || s.status === 'approved' ? 'active' : (s.status === 'rejected' ? 'inactive' : 'pending')}">${esc(s.status)}</span>
+        </div>
+      `).join('');
+    }
+
     function renderRoles(roles) {
       const div = document.getElementById('myRoles');
       if (roles.length) {
@@ -276,6 +295,7 @@
       if (item.item_type === 'article' && (item.status === 'submitted' || item.status === 'under_review')) {
         if (api.hasCap('articles.approve')) out.push(`<button class="btn btn-primary btn-sm" onclick="actOnItem('article', 'approve', ${item.id})">Approve</button>`);
         if (api.hasCap('articles.publish') && item.status !== 'approved') out.push(`<button class="btn btn-outline btn-sm" onclick="actOnItem('article', 'publish', ${item.id})">Publish</button>`);
+        if (api.hasCap('articles.approve')) out.push(`<button class="btn btn-outline btn-sm" onclick="rejectArticle(${item.id})">Reject</button>`);
       }
       if (item.item_type === 'event' && item.status === 'submitted') {
         if (api.hasCap('events.approve')) out.push(`<button class="btn btn-primary btn-sm" onclick="actOnItem('event', 'approve', ${item.id})">Approve</button>`);
@@ -290,6 +310,17 @@
         out.push(`<button class="btn btn-outline btn-sm" onclick="actOnItem('resolution', 'against', ${item.id})">Against</button>`);
       }
       return out.join('');
+    }
+
+    async function rejectArticle(id) {
+      const reason = prompt('Rejection reason (shown to the author):');
+      if (reason === null || !reason.trim()) return alert('A reason is required');
+      try {
+        await api.request('/articles/' + id + '/reject', { method: 'POST', body: { reason: reason.trim() } });
+        const pending = await api.getPending();
+        renderOverview(pending);
+        renderPending(pending);
+      } catch(e) { alert(e.error || 'Failed'); }
     }
 
     async function actOnItem(type, action, id) {

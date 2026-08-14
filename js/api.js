@@ -109,6 +109,7 @@ const api = {
   async getArticles() { return this.request('/articles'); },
   async createArticle(data) { return this.request('/articles', { method: 'POST', body: data }); },
   async approveArticle(id) { return this.request('/articles/' + id + '/approve', { method: 'POST' }); },
+  async rejectArticle(id, reason) { return this.request('/articles/' + id + '/reject', { method: 'POST', body: { reason } }); },
   async publishArticle(id) { return this.request('/articles/' + id + '/publish', { method: 'POST' }); },
 
   // Documents
