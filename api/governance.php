@@ -215,7 +215,7 @@ function apply_resolution(int $resolutionId): void {
           $roleId = create_role(
             $payload['title'],
             $payload['description'] ?? '',
-            $payload['capability_ids'] ?? [],
+            $payload['capabilities'] ?? $payload['capability_ids'] ?? [],
             $res['proposed_by'],
             $resolutionId
           );
@@ -270,9 +270,15 @@ function apply_resolution(int $resolutionId): void {
           break;
 
         case 'appoint':
-          if (!empty($payload['role_id']) && !empty($payload['user_id'])) {
+          $targetRoleId = $payload['role_id'] ?? null;
+          if (!$targetRoleId && !empty($payload['role_title'])) {
+            $stmt = db()->prepare('SELECT id FROM roles WHERE title = ?');
+            $stmt->execute([$payload['role_title']]);
+            $targetRoleId = (int) $stmt->fetchColumn() ?: null;
+          }
+          if ($targetRoleId && !empty($payload['user_id'])) {
             assign_role(
-              $payload['role_id'],
+              $targetRoleId,
               $payload['user_id'],
               $res['proposed_by'],
               $resolutionId,
@@ -292,7 +298,7 @@ function apply_resolution(int $resolutionId): void {
           $roleId = create_role(
             $payload['title'] . ' Committee',
             $payload['description'] ?? '',
-            $payload['capability_ids'] ?? [],
+            $payload['capabilities'] ?? $payload['capability_ids'] ?? [],
             $res['proposed_by'],
             $resolutionId
           );

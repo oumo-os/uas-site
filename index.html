@@ -183,6 +183,16 @@
     </div>
   </section>
 
+  <!-- Latest Articles -->
+  <section class="section">
+    <div class="container">
+      <h2 class="section-title">Latest Articles</h2>
+      <p class="section-subtitle">News, reports, and knowledge from the society</p>
+      <div class="grid-3" id="articlesList"></div>
+      <p class="text-center mt-2"><a href="/knowledge" class="btn btn-outline btn-sm">Browse all knowledge</a></p>
+    </div>
+  </section>
+
   <!-- Links -->
   <section class="section">
     <div class="container">
@@ -251,6 +261,23 @@
           }).join('');
         } else {
           eDiv.innerHTML = '<p class="text-center text-dim">No upcoming events.</p>';
+        }
+
+        // Articles
+        const aDiv = document.getElementById('articlesList');
+        if (articles.length) {
+          aDiv.innerHTML = articles.slice(0, 3).map(a => {
+            const d = a.published_at ? new Date(a.published_at) : null;
+            return `
+              <div class="card programme-card" style="cursor:pointer" onclick="location.href='/article/${a.id}'">
+                <h3>${esc(a.title)}</h3>
+                <p>${esc((a.category || 'article').replace(/_/g, ' '))} · ${esc(a.author_name || '')}</p>
+                <div class="text-sm text-dim">${d ? d.toLocaleDateString('en', {year:'numeric',month:'short',day:'numeric'}) : ''} →</div>
+              </div>
+            `;
+          }).join('');
+        } else {
+          aDiv.innerHTML = '<p class="text-center text-dim">Articles coming soon.</p>';
         }
 
         // Links

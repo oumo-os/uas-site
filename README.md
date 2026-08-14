@@ -31,15 +31,19 @@ Administration Layer → Backups, config, security, maintenance
 - **Operations Console**: Finance records, documents, assignments, calendar in one admin panel
 - **Institutional Dashboard**: Members, programmes, projects, events, pending items, financials
 - **Audit Trail**: Who did what, when, with governance context
-- **Public Website**: Database-driven pages for About, Programmes, Events, Knowledge, Ecosystem, Member Directory
+- **Public Website**: Database-driven pages for About, Programmes, Events, Knowledge, Library, Ecosystem, Member Directory, Article & Programme detail pages
+- **Event RSVPs**: Capacity-aware registration with attendee management for organizers
+- **Assignment Workflow**: Assignee start → submit with evidence → assigner/manager completes
+- **Member Profiles**: Editable profile, interests, profile visibility, password change
 
 ## Setup
 
 1. Create MySQL database `uas_platform`
-2. Run schema: `mysql -u root uas_platform < migrations/001_initial.sql`
+2. Run schema: `mysql -u root uas_platform < migrations/001_initial.sql` then `migrations/002_event_rsvps.sql`
 3. Configure `api/config.php` with DB credentials
-4. Seed dev data: `php api/seed.php`
-5. Point web root to project directory (e.g. `htdocs\uas` junction for XAMPP)
+4. Seed dev data: `php api/seed.php` (admin + board + roles + capabilities)
+5. Seed sample content: `php api/seed-content.php` (idempotent — members, articles, events, programmes, projects, documents, finance, assignments, calendar, partners, links, one applied resolution)
+6. Point web root to project directory (e.g. `htdocs\uas` junction for XAMPP)
 
 **XAMPP local run**: junction `M:\Dev\xampp\htdocs\uas` → project dir, start Apache + MySQL, visit `http://localhost/uas`. Login: `admin@astronomy.ug` / `admin123` (board: `cosmus@astronomy.ug` etc., all `/password123`).
 
