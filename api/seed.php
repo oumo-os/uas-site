@@ -66,7 +66,7 @@ foreach ($boardMembers as $i => $bm) {
         'members.view', 'members.approve', 'members.manage',
         'admin.system',
         'resolutions.create', 'resolutions.vote', 'resolutions.manage',
-        'events.approve', 'events.publish', 'events.cancel',
+        'events.approve', 'events.publish', 'events.cancel', 'events.rsvp', 'events.manage_rsvps',
         'articles.review', 'articles.approve', 'articles.publish',
         'programmes.approve', 'projects.approve',
         'finance.view', 'finance.record', 'finance.approve',
@@ -122,7 +122,7 @@ foreach ($sampleRoles as $sr) {
 $stmt = db()->prepare('SELECT id FROM roles WHERE title = ?');
 $stmt->execute(['Member']);
 if (!$stmt->fetch()) {
-  $memberCaps = ['articles.submit', 'events.create', 'documents.upload', 'reports.create'];
+  $memberCaps = ['articles.submit', 'events.create', 'events.rsvp', 'documents.upload', 'reports.create'];
   $capIds = [];
   foreach ($memberCaps as $slug) {
     $stmt = db()->prepare('SELECT id FROM capabilities WHERE slug = ?');

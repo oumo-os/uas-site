@@ -69,16 +69,24 @@
 
   <script src="js/api.js"></script>
   <script>
+    let myRsvps = {};
+
     async function load() {
       try { await api.me(); } catch(e) {}
       updateNavUser();
 
-      const events = await api.getPublicEvents().catch(() => []);
+      const [events, myEvents] = await Promise.all([
+        api.getPublicEvents().catch(() => []),
+        api._user ? api.getEvents().catch(() => []) : Promise.resolve([]),
+      ]);
+      myEvents.forEach(e => { if (e.status === 'published') myRsvps[e.id] = true; });
+
       const div = document.getElementById('eventsList');
 
       if (events.length) {
         div.innerHTML = events.map(e => {
           const d = new Date(e.date);
+          const full = e.capacity ? e.rsvp_count >= e.capacity : false;
           return `
             <div class="event-card">
               <div class="event-date-box">
@@ -93,6 +101,22 @@
                   ${e.location ? `<span>📍 ${esc(e.location)}</span>` : ''}
                   <span>🕐 ${d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}</span>
                   ${e.end_date ? `<span>→ ${new Date(e.end_date).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}</span>` : ''}
+                  <span>👥 ${e.rsvp_count || 0}${e.capacity ? ' / ' + e.capacity : ''} attending</span>
+                </div>
+                <div class="event-actions" style="margin-top:0.75rem">
+                  ${e.capacity ? `
+                    <div class="capacity-bar" style="background:#1e293b;border-radius:4px;height:6px;margin-bottom:0.5rem;overflow:hidden">
+                      <div style="width:${Math.min(100, e.rsvp_count / e.capacity * 100)}%;height:100%;background:var(--success)"></div>
+                    </div>` : ''}
+                  ${api._user ? (myRsvps[e.id] ? `
+                    <button class="btn btn-outline btn-sm" onclick="cancelRsvp(${e.id})">Cancel RSVP</button>
+                  ` : (full ? `
+                    <button class="btn btn-sm" disabled style="opacity:0.6">Event Full</button>
+                  ` : `
+                    <button class="btn btn-primary btn-sm" onclick="rsvp(${e.id})">RSVP</button>
+                  `)) : `
+                    <a href="/login" class="btn btn-outline btn-sm">Sign in to RSVP</a>
+                  `}
                 </div>
               </div>
             </div>
@@ -101,6 +125,16 @@
       } else {
         div.innerHTML = '<p class="text-center text-dim" style="padding:3rem 0">No upcoming events. Check back soon!</p>';
       }
+    }
+
+    async function rsvp(id) {
+      try { await api.rsvpEvent(id); alert('You are registered!'); load(); }
+      catch(e) { alert(e.error || 'RSVP failed'); }
+    }
+
+    async function cancelRsvp(id) {
+      try { await api.cancelRsvp(id); alert('Registration cancelled.'); load(); }
+      catch(e) { alert(e.error || 'Failed'); }
     }
 
     function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }

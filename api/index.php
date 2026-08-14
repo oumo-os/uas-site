@@ -71,7 +71,7 @@ try {
       $stmt->execute(['Member']);
       $memberRoleId = $stmt->fetchColumn();
       if (!$memberRoleId) {
-        $baseline = [1, 7, 27, 34]; // articles.submit, events.create, documents.upload, reports.create
+        $baseline = [1, 7, 40, 27, 34]; // articles.submit, events.create, events.rsvp, documents.upload, reports.create
         $memberRoleId = create_role('Member', 'Baseline membership role', $baseline, $user['id']);
       }
       $stmt = db()->prepare('SELECT id FROM role_assignments WHERE role_id = ? AND user_id = ? AND status = "active"');
@@ -230,6 +230,52 @@ try {
     transition('event', (int) $m[1], 'published', $user['id']);
     json_response(['ok' => true]);
   }
+  elseif (preg_match('#^/events/(\d+)/rsvp$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('events.rsvp');
+    $eventId = (int) $m[1];
+
+    $stmt = db()->prepare('SELECT id, capacity, date FROM events WHERE id = ?');
+    $stmt->execute([$eventId]);
+    $event = $stmt->fetch();
+    if (!$event) json_error('Event not found', 404);
+    if ($event['date'] < date('Y-m-d H:i:s')) json_error('Event has already taken place', 400);
+
+    $stmt = db()->prepare('SELECT id FROM event_registrations WHERE event_id = ? AND user_id = ?');
+    $stmt->execute([$eventId, $user['id']]);
+    if ($stmt->fetch()) json_error('Already registered for this event', 409);
+
+    if ($event['capacity']) {
+      $stmt = db()->prepare("SELECT COUNT(*) FROM event_registrations WHERE event_id = ? AND status = 'registered'");
+      $stmt->execute([$eventId]);
+      if ((int) $stmt->fetchColumn() >= (int) $event['capacity']) json_error('Event is full', 400);
+    }
+
+    db()->prepare('INSERT INTO event_registrations (event_id, user_id, status) VALUES (?, ?, ?)')
+      ->execute([$eventId, $user['id'], 'registered']);
+    audit_log('event_rsvp', 'event', $eventId, ['user_id' => $user['id']]);
+    json_response(['ok' => true], 201);
+  }
+  elseif (preg_match('#^/events/(\d+)/rsvp$#', $path, $m) && $method === 'DELETE') {
+    $user = require_login();
+    db()->prepare("UPDATE event_registrations SET status = 'cancelled' WHERE event_id = ? AND user_id = ? AND status = 'registered'")
+      ->execute([(int) $m[1], $user['id']]);
+    audit_log('event_rsvp_cancel', 'event', (int) $m[1], ['user_id' => $user['id']]);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/events/(\d+)/rsvps$#', $path, $m) && $method === 'GET') {
+    $user = require_login();
+    $eventId = (int) $m[1];
+    $stmt = db()->prepare('SELECT organizer_id FROM events WHERE id = ?');
+    $stmt->execute([$eventId]);
+    $event = $stmt->fetch();
+    if (!$event) json_error('Event not found', 404);
+    if (!user_has_cap($user['id'], 'events.manage_rsvps') && $event['organizer_id'] != $user['id']) {
+      json_error('Insufficient permissions: events.manage_rsvps', 403);
+    }
+    $stmt = db()->prepare("SELECT r.*, u.name, u.email FROM event_registrations r JOIN users u ON u.id = r.user_id WHERE r.event_id = ? ORDER BY r.registered_at");
+    $stmt->execute([$eventId]);
+    json_response($stmt->fetchAll());
+  }
 
   // --- ARTICLES ---
   elseif ($path === '/articles' && $method === 'GET') {
@@ -386,7 +432,9 @@ try {
     json_response($stmt->fetchAll());
   }
   elseif ($path === '/public/events' && $method === 'GET') {
-    $stmt = db()->prepare('SELECT e.id, e.title, e.description, e.date, e.end_date, e.location, e.status FROM events e WHERE e.status = "published" AND e.date >= NOW() ORDER BY e.date ASC');
+    $stmt = db()->prepare("SELECT e.id, e.title, e.description, e.date, e.end_date, e.location, e.status, e.capacity,
+      (SELECT COUNT(*) FROM event_registrations r WHERE r.event_id = e.id AND r.status = 'registered') AS rsvp_count
+      FROM events e WHERE e.status = 'published' AND e.date >= NOW() ORDER BY e.date ASC");
     $stmt->execute();
     json_response($stmt->fetchAll());
   }

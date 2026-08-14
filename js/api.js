@@ -101,6 +101,9 @@ const api = {
   async createEvent(data) { return this.request('/events', { method: 'POST', body: data }); },
   async approveEvent(id) { return this.request('/events/' + id + '/approve', { method: 'POST' }); },
   async publishEvent(id) { return this.request('/events/' + id + '/publish', { method: 'POST' }); },
+  async rsvpEvent(id) { return this.request('/events/' + id + '/rsvp', { method: 'POST' }); },
+  async cancelRsvp(id) { return this.request('/events/' + id + '/rsvp', { method: 'DELETE' }); },
+  async getEventRsvps(id) { return this.request('/events/' + id + '/rsvps'); },
 
   // Articles
   async getArticles() { return this.request('/articles'); },
