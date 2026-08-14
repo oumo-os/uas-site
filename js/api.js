@@ -207,16 +207,10 @@ const api = {
   else addToggle();
 })();
 
-// --- Brand emblem + favicon ---
-// Adds the UAS emblem to every .nav-brand and registers the site favicon.
+// --- Brand emblem ---
+// Adds the UAS emblem to every .nav-brand (favicon is declared statically per page).
 (function () {
   function init() {
-    const link = document.createElement('link');
-    link.rel = 'icon';
-    link.type = 'image/png';
-    link.href = ua('/img/uas-emblem.png');
-    document.head.appendChild(link);
-
     const brand = document.querySelector('.nav-brand');
     if (brand && !brand.querySelector('img')) {
       const img = document.createElement('img');
