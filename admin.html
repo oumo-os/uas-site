@@ -223,6 +223,9 @@
               <button class="btn btn-primary btn-sm" onclick="setMemberStatus(${m.user_id}, 'active')">Approve</button>
               <button class="btn btn-outline btn-sm" onclick="setMemberStatus(${m.user_id}, 'pending')">Reject</button>
             ` : ''}
+            ${api.hasCap('members.manage') ? `
+              <button class="btn btn-outline btn-sm" onclick="resetPassword(${m.user_id}, '${esc(m.name)}')">Reset Password</button>
+            ` : ''}
           </div>
         `;
       }).join('');
@@ -233,6 +236,14 @@
         await api.approveMember(userId, status);
         const members = await api.getMembers();
         renderMembers(members);
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function resetPassword(userId, name) {
+      if (!confirm('Reset password for ' + name + '?')) return;
+      try {
+        const r = await api.request('/members/' + userId + '/reset-password', { method: 'POST' });
+        alert('Temporary password for ' + name + ': ' + r.temp_password + '\nShare it securely — they should change it after logging in.');
       } catch(e) { alert(e.error || 'Failed'); }
     }
 

@@ -49,6 +49,7 @@
         <a href="/ecosystem" class="nav-link">Ecosystem</a>
         <a href="/members" class="nav-link">Members</a>
         <a href="/contact" class="nav-link">Contact</a>
+        <a href="/search" class="nav-link">Search</a>
         <a href="/dashboard" class="nav-link">Dashboard</a>
         <a href="/profile" class="nav-link">Profile</a>
         </div>
@@ -125,6 +126,7 @@
                   ${canManage(e) && !cancelled ? `
                     <button class="btn btn-outline btn-sm" onclick="toggleAttendees(${e.id}, this)">View Attendees (${e.rsvp_count || 0})</button>
                   ` : ''}
+                  <a class="btn btn-outline btn-sm" href="/event/${e.id}">Details</a>
                 </div>
                 ${canManage(e) ? `<div class="attendee-list" id="attendees-${e.id}" style="display:none;margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem"></div>` : ''}
               </div>

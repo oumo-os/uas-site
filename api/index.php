@@ -146,6 +146,17 @@ try {
     if (!$member) json_error('Member not found', 404);
     json_response($member);
   }
+  elseif (preg_match('#^/members/(\d+)/reset-password$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('members.manage');
+    $userId = (int) $m[1];
+    $stmt = db()->prepare('SELECT id, email FROM users WHERE id = ?');
+    $stmt->execute([$userId]);
+    if (!$stmt->fetch()) json_error('User not found', 404);
+    $temp = bin2hex(random_bytes(4));
+    db()->prepare('UPDATE users SET password = ? WHERE id = ?')->execute([password_hash($temp, PASSWORD_DEFAULT), $userId]);
+    audit_log('member_password_reset', 'user', $userId, ['by' => $user['id']]);
+    json_response(['temp_password' => $temp]);
+  }
 
   // --- ROLES ---
   elseif ($path === '/roles' && $method === 'GET') {
@@ -302,6 +313,45 @@ try {
     audit_log('rsvp_mark_attended', 'event', $eventId, ['registration_id' => $regId]);
     json_response(['ok' => true]);
   }
+  // --- PUBLIC EVENT DETAIL ---
+  elseif (preg_match('#^/events/(\d+)$#', $path, $m) && $method === 'GET') {
+    $eventId = (int) $m[1];
+    $stmt = db()->prepare('SELECT e.*, u.name AS organiser_name FROM events e JOIN users u ON u.id = e.organizer_id WHERE e.id = ? AND e.status IN ("published", "cancelled", "completed")');
+    $stmt->execute([$eventId]);
+    $event = $stmt->fetch();
+    if (!$event) json_error('Event not found', 404);
+
+    $stmt = db()->prepare('SELECT COUNT(*) AS total, SUM(IF(status="attended",1,0)) AS attended FROM event_registrations WHERE event_id = ? AND status != "cancelled"');
+    $stmt->execute([$eventId]);
+    $regs = $stmt->fetch();
+
+    $is_manager = false;
+    $my_rsvp = null;
+    $registrations = [];
+    $user = current_user();
+    if ($user && $user['status'] === 'active') {
+      if (user_has_cap($user['id'], 'events.rsvp')) {
+        $stmt = db()->prepare('SELECT * FROM event_registrations WHERE event_id = ? AND user_id = ?');
+        $stmt->execute([$eventId, $user['id']]);
+        $my_rsvp = $stmt->fetch() ?: null;
+      }
+      $is_manager = user_has_cap($user['id'], 'events.manage_rsvps');
+      if ($is_manager) {
+        $stmt = db()->prepare('SELECT er.*, u.name, u.email FROM event_registrations er JOIN users u ON u.id = er.user_id WHERE er.event_id = ? ORDER BY er.registered_at');
+        $stmt->execute([$eventId]);
+        $registrations = $stmt->fetchAll();
+      }
+    }
+
+    json_response([
+      'event' => $event,
+      'stats' => ['total' => (int)$regs['total'], 'attended' => (int)$regs['attended']],
+      'my_rsvp' => $my_rsvp ? ['status' => $my_rsvp['status'], 'created_at' => $my_rsvp['registered_at']] : null,
+      'is_manager' => $is_manager,
+      'registrations' => $registrations,
+    ]);
+  }
+
   elseif (preg_match('#^/events/(\d+)/rsvp$#', $path, $m) && $method === 'POST') {
     $user = require_cap('events.rsvp');
     $eventId = (int) $m[1];
@@ -613,6 +663,45 @@ try {
     $user = require_cap('admin.system');
     db()->prepare("UPDATE contact_messages SET status = 'read' WHERE status = 'new'")->execute();
     json_response(['ok' => true]);
+  }
+
+  // --- SEARCH ---
+  elseif ($path === '/search' && $method === 'GET') {
+    $q = trim($_GET['q'] ?? '');
+    if (mb_strlen($q) < 2) json_error('Search term must be at least 2 characters', 400);
+    $like = '%' . $q . '%';
+    $user = current_user();
+    $loggedIn = !empty($user) && ($user['status'] ?? '') === 'active';
+
+    $stmt = db()->prepare('SELECT a.id, a.title, a.category, a.published_at, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.status = "published" AND (a.title LIKE ? OR a.body LIKE ? OR a.tags LIKE ?) ORDER BY a.published_at DESC LIMIT 10');
+    $stmt->execute([$like, $like, $like]);
+    $articles = $stmt->fetchAll();
+
+    $stmt = db()->prepare('SELECT id, title, description, date, location, status FROM events WHERE status IN ("published", "cancelled") AND (title LIKE ? OR description LIKE ?) ORDER BY date LIMIT 10');
+    $stmt->execute([$like, $like]);
+    $events = $stmt->fetchAll();
+
+    $stmt = db()->prepare('SELECT id, title, description, status FROM programmes WHERE status = "active" AND (title LIKE ? OR description LIKE ?) LIMIT 10');
+    $stmt->execute([$like, $like]);
+    $programmes = $stmt->fetchAll();
+
+    $stmt = db()->prepare('SELECT id, title, description, status FROM projects WHERE status = "active" AND (title LIKE ? OR description LIKE ?) LIMIT 10');
+    $stmt->execute([$like, $like]);
+    $projects = $stmt->fetchAll();
+
+    $stmt = db()->prepare('SELECT id, title, category, file_path FROM documents WHERE status = "published" AND visibility = "public" AND (title LIKE ?) LIMIT 10');
+    $stmt->execute([$like]);
+    $documents = $stmt->fetchAll();
+
+    if ($loggedIn) {
+      $stmt = db()->prepare("SELECT m.user_id, u.name, u.institution, m.category, m.membership_number FROM members m JOIN users u ON u.id = m.user_id WHERE m.status = 'active' AND (u.name LIKE ? OR u.institution LIKE ?) LIMIT 10");
+    } else {
+      $stmt = db()->prepare("SELECT m.user_id, u.name, u.institution, m.category FROM members m JOIN users u ON u.id = m.user_id WHERE m.status = 'active' AND m.profile_visible = 1 AND (u.name LIKE ? OR u.institution LIKE ?) LIMIT 10");
+    }
+    $stmt->execute([$like, $like]);
+    $members = $stmt->fetchAll();
+
+    json_response(compact('articles', 'events', 'programmes', 'projects', 'documents', 'members'));
   }
 
   // --- EXPORTS (CSV) ---

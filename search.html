@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Search — Uganda Astronomical Society</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <style>
+    .search-hero { padding: 3rem 0 1.5rem; text-align: center; }
+    .search-hero h1 { font-size: 2rem; font-weight: 800; }
+    .search-box { display: flex; gap: 0.5rem; max-width: 560px; margin: 1.25rem auto 0; }
+    .search-box input { flex: 1; }
+    .result-group { margin-bottom: 1.75rem; }
+    .result-group h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); margin-bottom: 0.6rem; }
+    .result-row {
+      display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+      padding: 0.75rem 1rem; margin-bottom: 0.4rem;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--bg-card); cursor: pointer; transition: border-color 0.15s;
+    }
+    .result-row:hover { border-color: var(--accent); }
+    .result-row .title { font-weight: 600; font-size: 0.92rem; }
+    .result-row .sub { font-size: 0.78rem; color: var(--text-dim); }
+    .hint { color: var(--text-faint); font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="container" style="display:flex;align-items:center;width:100%">
+      <a href="/" class="nav-brand">UAS</a>
+      <div class="nav-links">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/about" class="nav-link">About</a>
+        <a href="/programmes" class="nav-link">Programmes</a>
+        <a href="/events" class="nav-link">Events</a>
+        <a href="/knowledge" class="nav-link">Knowledge</a>
+        <a href="/library" class="nav-link">Library</a>
+        <a href="/ecosystem" class="nav-link">Ecosystem</a>
+        <a href="/members" class="nav-link">Members</a>
+        <a href="/contact" class="nav-link">Contact</a>
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+      </div>
+      <div class="nav-user" id="navUser"></div>
+    </div>
+  </nav>
+
+  <div class="container" style="max-width:780px">
+    <div class="search-hero">
+      <h1>Search the Society</h1>
+      <div class="search-box">
+        <input class="form-input" id="q" placeholder="Try 'eclipse', 'telescope', 'workshop'..." value="">
+        <button class="btn btn-primary" onclick="doSearch()">Search</button>
+      </div>
+    </div>
+    <div id="results"><p class="hint text-center" style="padding:2rem 0">Search articles, events, programmes, projects, documents, and members.</p></div>
+  </div>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2026 Uganda Astronomical Society. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="js/api.js"></script>
+  <script>
+    async function load() {
+      try { await api.me(); } catch(e) {}
+      updateNavUser();
+      const p = new URLSearchParams(location.search).get('q');
+      if (p) { document.getElementById('q').value = p; doSearch(); }
+    }
+
+    async function doSearch() {
+      const q = document.getElementById('q').value.trim();
+      if (q.length < 2) return;
+      history.replaceState(null, '', '/search?q=' + encodeURIComponent(q));
+      const div = document.getElementById('results');
+      div.innerHTML = '<p class="hint text-center">Searching…</p>';
+      let data;
+      try { data = await api.request('/search?q=' + encodeURIComponent(q)); }
+      catch(e) { div.innerHTML = '<p class="hint text-center">' + esc(e.error || 'Search failed') + '</p>'; return; }
+
+      const total = data.articles.length + data.events.length + data.programmes.length + data.projects.length + data.documents.length + data.members.length;
+      if (!total) { div.innerHTML = `<p class="hint text-center" style="padding:2rem 0">No results for "${esc(q)}".</p>`; return; }
+
+      let html = `<p class="hint">${total} result${total === 1 ? '' : 's'} for "${esc(q)}"</p>`;
+      if (data.articles.length) html += group('Articles', data.articles.map(a => row(`/article/${a.id}`, a.title, `${a.category} · by ${a.author_name || ''}`)));
+      if (data.events.length) html += group('Events', data.events.map(e => row('/events', e.title, `${e.date} · ${e.location || ''}${e.status === 'cancelled' ? ' · cancelled' : ''}`)));
+      if (data.programmes.length) html += group('Programmes', data.programmes.map(p => row(`/programmes/${p.id}`, p.title, p.description || '')));
+      if (data.projects.length) html += group('Projects', data.projects.map(p => row(`/programmes/${p.programme_id || ''}`, p.title, p.description || '')));
+      if (data.documents.length) html += group('Documents', data.documents.map(d => row('/library', d.title, d.category)));
+      if (data.members.length) html += group('Members', data.members.map(m => row('/members', m.name, `${m.institution || ''} · ${m.category}`)));
+      div.innerHTML = html;
+    }
+
+    function group(label, rows) {
+      return `<div class="result-group"><h3>${label}</h3>${rows.join('')}</div>`;
+    }
+    function row(url, title, sub) {
+      return `<div class="result-row" onclick="location.href='${esc(url)}'">
+        <div><div class="title">${esc(title)}</div>${sub ? `<div class="sub">${esc(sub)}</div>` : ''}</div>
+        <span class="hint">→</span>
+      </div>`;
+    }
+
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+    function updateNavUser() {
+      const el = document.getElementById('navUser');
+      el.innerHTML = api._user
+        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
+        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
+    }
+    document.getElementById('q').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+    load();
+  </script>
+</body>
+</html>

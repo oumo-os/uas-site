@@ -35,6 +35,11 @@ Administration Layer → Backups, config, security, maintenance
 - **Event RSVPs**: Capacity-aware registration with attendee management for organizers
 - **Assignment Workflow**: Assignee start → submit with evidence → assigner/manager completes
 - **Member Profiles**: Editable profile, interests, profile visibility, password change
+- **Public Contact Form**: Honeypot-protected contact page feeding an admin inbox (mark read)
+- **CSV Exports**: Members, finance, and audit log one-click downloads (RBAC-guarded)
+- **Site-wide Search**: Cross-content search (articles, events, programmes, projects, documents, members) with public-safe member results
+- **Event Detail Pages**: Full event view with RSVP/re-register/cancel, capacity stats, and attendee management for organizers
+- **Password Reset (admin)**: Generate a one-time temporary password for any member, audit-logged
 
 ## Setup
 
@@ -80,6 +85,12 @@ All requests go through `api/index.php?route=...` or rewrite to `/api/...`
 - `POST /documents/:id/approve` / `/publish` — Approve / publish document
 - `GET /authority/:userId` — Governance trace ("why does this user have this authority")
 - `POST /governance/close-expired` — Deadline sweep for stale voting resolutions
+- `GET /events/:id` — Public event detail (+ my RSVP state, attendee list for managers)
+- `GET /search?q=` — Cross-content public search
+- `POST /contact` — Public contact form (honeypot-filtered)
+- `GET /contact-messages` / `POST /contact-messages/read-all` — Admin inbox
+- `GET /export/members.csv` / `finance.csv` / `audit.csv` — CSV downloads
+- `POST /members/:id/reset-password` — Admin temp-password reset
 
 ### Dashboard
 - `GET /dashboard` — Institutional health metrics
