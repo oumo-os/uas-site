@@ -82,6 +82,8 @@
       <div class="health-grid" id="healthGrid"></div>
       <h3 class="section-title">Recent Pending Items</h3>
       <div id="recentPending"></div>
+      <h3 class="section-title">My Assignments</h3>
+      <div id="myAssignments"></div>
     </div>
 
     <!-- Roles Panel -->
@@ -150,11 +152,12 @@
         }
 
         // Load all data in parallel
-        const [healthData, pending, resolutions, roles] = await Promise.all([
+        const [healthData, pending, resolutions, roles, myAsg] = await Promise.all([
           api.getDashboard().catch(() => ({})),
           api.getPending().catch(() => []),
           api.getResolutions().catch(() => []),
           api.getRoles().catch(() => []),
+          api.getMyAssignments().catch(() => []),
         ]);
 
         health = healthData;
@@ -162,6 +165,7 @@
         renderRoles(data.roles || []);
         renderPending(pending);
         renderResolutions(resolutions);
+        renderMyAssignments(myAsg);
 
         setupTabs();
       } catch(e) {
@@ -186,6 +190,40 @@
       } else {
         rp.innerHTML = '<p class="text-dim text-sm">No pending items.</p>';
       }
+    }
+
+    function renderMyAssignments(list) {
+      const div = document.getElementById('myAssignments');
+      if (!list.length) { div.innerHTML = '<p class="text-dim text-sm">No assignments for you yet.</p>'; return; }
+      div.innerHTML = list.map(a => `
+        <div class="card" style="padding:0.9rem 1rem;margin-bottom:0.5rem">
+          <div class="flex-between">
+            <div>
+              <strong>${esc(a.title)}</strong>
+              <div class="text-dim text-sm">${a.description ? esc(a.description).slice(0, 120) : ''}${a.due_date ? ` · due ${esc(a.due_date)}` : ''}</div>
+              ${a.completion_evidence ? `<div class="text-sm mt-1"><em>Evidence: ${esc(a.completion_evidence)}</em></div>` : ''}
+            </div>
+            <div class="flex gap-2" style="align-items:center">
+              <span class="badge badge-${a.status === 'completed' ? 'active' : (a.status === 'overdue' ? 'inactive' : 'pending')}">${esc(a.status)}</span>
+              ${a.status === 'not_started' ? `<button class="btn btn-outline btn-xs" onclick="asgAction(${a.id}, 'start')">Start</button>` : ''}
+              ${a.status === 'in_progress' ? `<button class="btn btn-primary btn-xs" onclick="asgSubmit(${a.id})">Submit</button>` : ''}
+              ${a.status === 'submitted' && api.hasCap('assignments.manage') ? `<button class="btn btn-success btn-xs" onclick="asgAction(${a.id}, 'complete')">Mark Complete</button>` : ''}
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function asgAction(id, action) {
+      try { await api[action === 'start' ? 'startAssignment' : 'completeAssignment'](id); load(); }
+      catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function asgSubmit(id) {
+      const evidence = prompt('Describe what was done / link evidence:');
+      if (evidence === null) return;
+      try { await api.submitAssignment(id, evidence); load(); }
+      catch(e) { alert(e.error || 'Failed'); }
     }
 
     function renderRoles(roles) {

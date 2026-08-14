@@ -122,6 +122,11 @@ const api = {
   // Assignments
   async getAssignments() { return this.request('/assignments'); },
   async createAssignment(data) { return this.request('/assignments', { method: 'POST', body: data }); },
+  async getMyAssignments() { return this.request('/assignments/mine'); },
+  async startAssignment(id) { return this.request('/assignments/' + id + '/start', { method: 'POST' }); },
+  async submitAssignment(id, evidence) { return this.request('/assignments/' + id + '/submit', { method: 'POST', body: { evidence } }); },
+  async completeAssignment(id) { return this.request('/assignments/' + id + '/complete', { method: 'POST' }); },
+  async changePassword(data) { return this.request('/auth/password', { method: 'PUT', body: data }); },
 
   // Calendar
   async getCalendar() { return this.request('/calendar'); },

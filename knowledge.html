@@ -102,7 +102,7 @@
           const tags = a.tags ? (typeof a.tags === 'string' ? JSON.parse(a.tags) : a.tags) : [];
           return `
             <div class="card article-card">
-              <h3><a href="#">${esc(a.title)}</a></h3>
+              <h3><a href="/article/${a.id}" style="color:inherit">${esc(a.title)}</a></h3>
               <p>${esc(a.category || 'article').replace(/_/g, ' ')}</p>
               <div class="article-meta">
                 ${a.author_name ? `<span>👤 ${esc(a.author_name)}</span>` : ''}

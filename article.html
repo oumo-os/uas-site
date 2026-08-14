@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="docTitle">Article — Uganda Astronomical Society</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <style>
+    .article-hero { padding: 3rem 0 1.5rem; border-bottom: 1px solid var(--border); margin-bottom: 2rem; }
+    .article-hero h1 { font-size: 2.1rem; font-weight: 800; line-height: 1.25; margin: 0 0 0.75rem; }
+    .article-body { font-size: 1.02rem; line-height: 1.85; color: #dbe6f5; }
+    .article-body p { margin-bottom: 1.1rem; }
+    .article-body h2, .article-body h3 { color: #fff; margin: 1.5rem 0 0.75rem; }
+    .article-body img { max-width: 100%; border-radius: var(--radius-lg); margin: 1rem 0; }
+    .article-body blockquote { border-left: 3px solid var(--accent); margin: 1rem 0; padding: 0.5rem 1rem; background: var(--bg-card); border-radius: 0 var(--radius) var(--radius) 0; }
+    .article-body a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="container" style="display:flex;align-items:center;width:100%">
+      <a href="/" class="nav-brand">UAS</a>
+      <div class="nav-links">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/about" class="nav-link">About</a>
+        <a href="/programmes" class="nav-link">Programmes</a>
+        <a href="/events" class="nav-link">Events</a>
+        <a href="/knowledge" class="nav-link">Knowledge</a>
+        <a href="/library" class="nav-link">Library</a>
+        <a href="/ecosystem" class="nav-link">Ecosystem</a>
+        <a href="/members" class="nav-link">Members</a>
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+      </div>
+      <div class="nav-user" id="navUser"></div>
+    </div>
+  </nav>
+
+  <div class="container" style="max-width:780px">
+    <div class="article-hero">
+      <a href="/" class="text-dim" style="font-size:0.85rem;text-decoration:none">← Home</a>
+      <h1 id="aTitle"></h1>
+      <div class="text-dim" id="aMeta"></div>
+    </div>
+    <div class="article-body" id="aBody"></div>
+  </div>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2026 Uganda Astronomical Society. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="js/api.js"></script>
+  <script>
+    async function load() {
+      try { await api.me(); } catch(e) {}
+      updateNavUser();
+
+      const id = new URLSearchParams(location.search).get('id');
+      if (!id) { document.getElementById('aTitle').textContent = 'Article not found'; return; }
+      const a = await api.request('/public/articles/' + id).catch(() => null);
+      if (!a) { document.getElementById('aTitle').textContent = 'Article not found'; return; }
+
+      document.title = a.title + ' — Uganda Astronomical Society';
+      document.getElementById('aTitle').textContent = a.title;
+      document.getElementById('aMeta').innerHTML = `
+        By <strong>${esc(a.author_name)}</strong> · ${esc(a.category)} ·
+        ${new Date(a.published_at).toLocaleDateString('en', { year: 'numeric', month: 'long', day: 'numeric' })}
+      `;
+      document.getElementById('aBody').innerHTML = a.body || '<p class="text-dim">No content.</p>';
+      window.scrollTo(0, 0);
+    }
+
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+    function updateNavUser() {
+      const el = document.getElementById('navUser');
+      el.innerHTML = api._user
+        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
+        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
+    }
+    load();
+  </script>
+</body>
+</html>

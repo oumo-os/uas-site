@@ -221,7 +221,7 @@
         const pDiv = document.getElementById('programmesList');
         if (programmes.length) {
           pDiv.innerHTML = programmes.slice(0, 6).map(p => `
-            <div class="card programme-card">
+            <div class="card programme-card" style="cursor:pointer" onclick="location.href='/programmes/${p.id}'">
               <h3>${esc(p.title)}</h3>
               <p>${esc(p.description || '').slice(0, 150)}</p>
               ${p.lead_name ? `<div class="mt-1 text-sm text-dim">Lead: ${esc(p.lead_name)}</div>` : ''}

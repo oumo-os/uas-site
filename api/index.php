@@ -48,6 +48,16 @@ try {
     $user = require_login();
     json_response(['user' => public_user($user), 'capabilities' => user_capabilities($user['id']), 'roles' => user_roles($user['id'])]);
   }
+  elseif ($path === '/auth/password' && $method === 'PUT') {
+    $user = require_login();
+    $data = input_json();
+    if (!password_verify($data['current_password'] ?? '', $user['password'])) json_error('Current password is incorrect', 400);
+    $new = $data['new_password'] ?? '';
+    if (strlen($new) < 8) json_error('New password must be at least 8 characters', 400);
+    db()->prepare('UPDATE users SET password = ? WHERE id = ?')->execute([password_hash($new, PASSWORD_DEFAULT), $user['id']]);
+    audit_log('password_change', 'user', $user['id']);
+    json_response(['ok' => true]);
+  }
   elseif ($path === '/profile' && $method === 'GET') {
     $user = require_login();
     $stmt = db()->prepare('SELECT m.interests, m.contributions, m.profile_visible, m.membership_number, m.category FROM members m WHERE m.user_id = ?');
@@ -410,6 +420,42 @@ try {
     audit_log('assignment_create', 'assignment', $id);
     json_response(['id' => $id], 201);
   }
+  elseif ($path === '/assignments/mine' && $method === 'GET') {
+    $user = require_login();
+    $stmt = db()->prepare('SELECT a.*, cr.name AS assigner_name FROM assignments a LEFT JOIN users cr ON cr.id = a.assigner_id WHERE a.assignee_id = ? ORDER BY a.due_date ASC');
+    $stmt->execute([$user['id']]);
+    json_response($stmt->fetchAll());
+  }
+  elseif (preg_match('#^/assignments/(\d+)/start$#', $path, $m) && $method === 'POST') {
+    $user = require_login();
+    $stmt = db()->prepare('UPDATE assignments SET status = "in_progress" WHERE id = ? AND assignee_id = ? AND status = "not_started"');
+    $stmt->execute([(int) $m[1], $user['id']]);
+    if (!$stmt->rowCount()) json_error('Assignment not found or already started', 404);
+    audit_log('assignment_start', 'assignment', (int) $m[1]);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/assignments/(\d+)/submit$#', $path, $m) && $method === 'POST') {
+    $user = require_login();
+    $data = input_json();
+    $stmt = db()->prepare('UPDATE assignments SET status = "submitted", completion_evidence = ? WHERE id = ? AND assignee_id = ?');
+    $stmt->execute([$data['evidence'] ?? null, (int) $m[1], $user['id']]);
+    if (!$stmt->rowCount()) json_error('Assignment not found or not assigned to you', 404);
+    audit_log('assignment_submit', 'assignment', (int) $m[1]);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/assignments/(\d+)/complete$#', $path, $m) && $method === 'POST') {
+    $user = require_login();
+    $stmt = db()->prepare('SELECT assignee_id, assigner_id FROM assignments WHERE id = ?');
+    $stmt->execute([(int) $m[1]]);
+    $asg = $stmt->fetch();
+    if (!$asg) json_error('Assignment not found', 404);
+    if ($asg['assigner_id'] != $user['id'] && !user_has_cap($user['id'], 'assignments.manage')) {
+      json_error('Only the assigner or a manager can complete this assignment', 403);
+    }
+    db()->prepare("UPDATE assignments SET status = 'completed', completed_at = NOW() WHERE id = ?")->execute([(int) $m[1]]);
+    audit_log('assignment_complete', 'assignment', (int) $m[1]);
+    json_response(['ok' => true]);
+  }
 
   // --- CALENDAR ---
   elseif ($path === '/calendar' && $method === 'GET') {
@@ -495,6 +541,13 @@ try {
     $stmt = db()->prepare('SELECT a.id, a.title, a.category, a.tags, a.image_url, a.published_at, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.status = "published" ORDER BY a.published_at DESC');
     $stmt->execute();
     json_response($stmt->fetchAll());
+  }
+  elseif (preg_match('#^/public/articles/(\d+)$#', $path, $m) && $method === 'GET') {
+    $stmt = db()->prepare('SELECT a.id, a.title, a.body, a.category, a.tags, a.image_url, a.published_at, a.approved_by, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.id = ? AND a.status = "published"');
+    $stmt->execute([(int) $m[1]]);
+    $article = $stmt->fetch();
+    if (!$article) json_error('Article not found', 404);
+    json_response($article);
   }
   elseif ($path === '/public/events' && $method === 'GET') {
     $stmt = db()->prepare("SELECT e.id, e.title, e.description, e.date, e.end_date, e.location, e.status, e.capacity,

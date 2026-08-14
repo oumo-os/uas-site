@@ -78,6 +78,24 @@
           <span id="saveMsg" class="text-success" style="margin-left:0.75rem;font-size:0.85rem"></span>
         </div>
       </div>
+
+      <div class="card mt-3" style="padding:1.5rem">
+        <h3 class="section-title" style="margin-top:0">Change Password</h3>
+        <div class="grid-3 gap-3">
+          <div>
+            <label class="form-label">Current password</label>
+            <input class="form-input" id="pwCurrent" type="password" style="width:100%">
+          </div>
+          <div>
+            <label class="form-label">New password</label>
+            <input class="form-input" id="pwNew" type="password" style="width:100%">
+          </div>
+          <div style="align-self:flex-end">
+            <button class="btn btn-outline" onclick="changePassword()">Update password</button>
+          </div>
+        </div>
+        <span id="pwMsg" class="text-success" style="font-size:0.85rem"></span>
+      </div>
     </div>
   </div>
 
@@ -130,6 +148,20 @@
         document.getElementById('pvAvatar').textContent = api._user.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
         updateNavUser();
       } catch(e) { alert(e.error || 'Failed to save'); }
+    }
+
+    async function changePassword() {
+      const msg = document.getElementById('pwMsg');
+      msg.textContent = '';
+      const current = document.getElementById('pwCurrent').value;
+      const next = document.getElementById('pwNew').value;
+      if (!current || !next) { alert('Fill in both fields'); return; }
+      try {
+        await api.changePassword({ current_password: current, new_password: next });
+        msg.textContent = 'Password updated ✓';
+        document.getElementById('pwCurrent').value = '';
+        document.getElementById('pwNew').value = '';
+      } catch(e) { alert(e.error || 'Failed'); }
     }
 
     function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
