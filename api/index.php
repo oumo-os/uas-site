@@ -390,6 +390,8 @@ try {
 
     $is_manager = false;
     $my_rsvp = null;
+    $my_waitlist = null;
+    $waitlist_count = 0;
     $registrations = [];
     $user = current_user();
     if ($user && $user['status'] === 'active') {
@@ -397,14 +399,24 @@ try {
         $stmt = db()->prepare('SELECT * FROM event_registrations WHERE event_id = ? AND user_id = ?');
         $stmt->execute([$eventId, $user['id']]);
         $my_rsvp = $stmt->fetch() ?: null;
+        $stmt = db()->prepare('SELECT id, created_at FROM event_waitlist WHERE event_id = ? AND user_id = ?');
+        $stmt->execute([$eventId, $user['id']]);
+        $my_waitlist = $stmt->fetch() ?: null;
       }
       $is_manager = user_has_cap($user['id'], 'events.manage_rsvps');
       if ($is_manager) {
         $stmt = db()->prepare('SELECT er.*, u.name, u.email FROM event_registrations er JOIN users u ON u.id = er.user_id WHERE er.event_id = ? ORDER BY er.registered_at');
         $stmt->execute([$eventId]);
         $registrations = $stmt->fetchAll();
+        $stmt = db()->prepare('SELECT w.id, w.created_at, u.name, u.email FROM event_waitlist w JOIN users u ON u.id = w.user_id WHERE w.event_id = ? ORDER BY w.created_at ASC, w.id ASC');
+        $stmt->execute([$eventId]);
+        $waitlist = $stmt->fetchAll();
       }
     }
+
+    $stmt = db()->prepare('SELECT COUNT(*) FROM event_waitlist WHERE event_id = ?');
+    $stmt->execute([$eventId]);
+    $waitlist_count = (int) $stmt->fetchColumn();
 
     json_response([
       'event' => $event,
@@ -412,7 +424,79 @@ try {
       'my_rsvp' => $my_rsvp ? ['status' => $my_rsvp['status'], 'created_at' => $my_rsvp['registered_at']] : null,
       'is_manager' => $is_manager,
       'registrations' => $registrations,
+      'waitlist_count' => $waitlist_count,
+      'my_waitlist' => $my_waitlist ? ['id' => $my_waitlist['id'], 'created_at' => $my_waitlist['created_at']] : null,
+      'waitlist' => $waitlist ?? [],
     ]);
+  }
+
+  elseif (preg_match('#^/events/(\d+)/waitlist$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('events.rsvp');
+    $eventId = (int) $m[1];
+
+    $stmt = db()->prepare('SELECT id, capacity, date FROM events WHERE id = ?');
+    $stmt->execute([$eventId]);
+    $event = $stmt->fetch();
+    if (!$event) json_error('Event not found', 404);
+    if ($event['date'] < date('Y-m-d H:i:s')) json_error('Event has already taken place', 400);
+    if (!$event['capacity']) json_error('This event has no capacity limit', 400);
+
+    $stmt = db()->prepare("SELECT status FROM event_registrations WHERE event_id = ? AND user_id = ?");
+    $stmt->execute([$eventId, $user['id']]);
+    $reg = $stmt->fetch();
+    if ($reg && $reg['status'] === 'registered') json_error('You are already registered', 409);
+
+    $stmt = db()->prepare("SELECT COUNT(*) FROM event_registrations WHERE event_id = ? AND status = 'registered'");
+    $stmt->execute([$eventId]);
+    if ((int) $stmt->fetchColumn() < (int) $event['capacity']) json_error('Event has space — RSVP directly instead', 400);
+
+    try {
+      db()->prepare('INSERT INTO event_waitlist (event_id, user_id) VALUES (?, ?)')->execute([$eventId, $user['id']]);
+    } catch (PDOException $e) {
+      json_error('You are already on the waitlist', 409);
+    }
+    audit_log('waitlist_join', 'event', $eventId, ['user_id' => $user['id']]);
+    json_response(['ok' => true], 201);
+  }
+  elseif (preg_match('#^/events/(\d+)/waitlist$#', $path, $m) && $method === 'DELETE') {
+    $user = require_login();
+    db()->prepare('DELETE FROM event_waitlist WHERE event_id = ? AND user_id = ?')->execute([(int) $m[1], $user['id']]);
+    audit_log('waitlist_leave', 'event', (int) $m[1], ['user_id' => $user['id']]);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/events/(\d+)/waitlist/(\d+)/promote$#', $path, $m) && $method === 'POST') {
+    $user = require_login();
+    $eventId = (int) $m[1];
+    $wlId = (int) $m[2];
+
+    $stmt = db()->prepare('SELECT organizer_id, capacity FROM events WHERE id = ?');
+    $stmt->execute([$eventId]);
+    $event = $stmt->fetch();
+    if (!$event) json_error('Event not found', 404);
+    if (!user_has_cap($user['id'], 'events.manage_rsvps') && $event['organizer_id'] != $user['id']) {
+      json_error('Insufficient permissions: events.manage_rsvps', 403);
+    }
+
+    $stmt = db()->prepare('SELECT * FROM event_waitlist WHERE id = ? AND event_id = ?');
+    $stmt->execute([$wlId, $eventId]);
+    $wl = $stmt->fetch();
+    if (!$wl) json_error('Waitlist entry not found', 404);
+
+    $stmt = db()->prepare("SELECT COUNT(*) FROM event_registrations WHERE event_id = ? AND status = 'registered'");
+    $stmt->execute([$eventId]);
+    if ((int) $stmt->fetchColumn() >= (int) $event['capacity']) json_error('Event is at capacity', 400);
+
+    db()->prepare('DELETE FROM event_waitlist WHERE id = ?')->execute([$wlId]);
+    $stmt = db()->prepare("SELECT id FROM event_registrations WHERE event_id = ? AND user_id = ?");
+    $stmt->execute([$eventId, $wl['user_id']]);
+    $existingReg = $stmt->fetch();
+    if ($existingReg) {
+      db()->prepare("UPDATE event_registrations SET status = 'registered', registered_at = NOW() WHERE id = ?")->execute([$existingReg['id']]);
+    } else {
+      db()->prepare('INSERT INTO event_registrations (event_id, user_id, status) VALUES (?, ?, "registered")')->execute([$eventId, $wl['user_id']]);
+    }
+    audit_log('waitlist_promote', 'event', $eventId, ['user_id' => $wl['user_id']]);
+    json_response(['ok' => true]);
   }
 
   elseif (preg_match('#^/events/(\d+)/rsvp$#', $path, $m) && $method === 'POST') {
@@ -430,6 +514,11 @@ try {
     $existing = $stmt->fetch();
     if ($existing) {
       if ($existing['status'] === 'registered') json_error('Already registered for this event', 409);
+      if ($event['capacity']) {
+        $stmt = db()->prepare("SELECT COUNT(*) FROM event_registrations WHERE event_id = ? AND status = 'registered'");
+        $stmt->execute([$eventId]);
+        if ((int) $stmt->fetchColumn() >= (int) $event['capacity']) json_error('Event is full — join the waitlist instead', 400);
+      }
       db()->prepare("UPDATE event_registrations SET status = 'registered', registered_at = NOW() WHERE id = ?")->execute([$existing['id']]);
       audit_log('event_rsvp', 'event', $eventId, ['user_id' => $user['id']]);
       json_response(['ok' => true], 201);
@@ -448,9 +537,11 @@ try {
   }
   elseif (preg_match('#^/events/(\d+)/rsvp$#', $path, $m) && $method === 'DELETE') {
     $user = require_login();
+    $eventId = (int) $m[1];
     db()->prepare("UPDATE event_registrations SET status = 'cancelled' WHERE event_id = ? AND user_id = ? AND status = 'registered'")
-      ->execute([(int) $m[1], $user['id']]);
-    audit_log('event_rsvp_cancel', 'event', (int) $m[1], ['user_id' => $user['id']]);
+      ->execute([$eventId, $user['id']]);
+    audit_log('event_rsvp_cancel', 'event', $eventId, ['user_id' => $user['id']]);
+    promote_from_waitlist($eventId);
     json_response(['ok' => true]);
   }
   elseif (preg_match('#^/events/(\d+)/rsvps$#', $path, $m) && $method === 'GET') {

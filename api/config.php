@@ -62,3 +62,33 @@ function db(): PDO {
   }
   return $pdo;
 }
+
+// Event waitlist: promote the earliest waitlisted member when capacity frees up.
+// Reuses a cancelled registration row if one exists; otherwise inserts a new one.
+function promote_from_waitlist(int $eventId): ?array {
+  $stmt = db()->prepare('SELECT id, capacity, date FROM events WHERE id = ?');
+  $stmt->execute([$eventId]);
+  $event = $stmt->fetch();
+  if (!$event || !$event['capacity'] || $event['date'] < date('Y-m-d H:i:s')) return null;
+
+  $stmt = db()->prepare("SELECT COUNT(*) FROM event_registrations WHERE event_id = ? AND status = 'registered'");
+  $stmt->execute([$eventId]);
+  if ((int) $stmt->fetchColumn() >= (int) $event['capacity']) return null;
+
+  $stmt = db()->prepare('SELECT * FROM event_waitlist WHERE event_id = ? ORDER BY created_at ASC, id ASC LIMIT 1');
+  $stmt->execute([$eventId]);
+  $next = $stmt->fetch();
+  if (!$next) return null;
+
+  $stmt = db()->prepare("SELECT id FROM event_registrations WHERE event_id = ? AND user_id = ?");
+  $stmt->execute([$eventId, $next['user_id']]);
+  $existingReg = $stmt->fetch();
+  if ($existingReg) {
+    db()->prepare("UPDATE event_registrations SET status = 'registered', registered_at = NOW() WHERE id = ?")->execute([$existingReg['id']]);
+  } else {
+    db()->prepare('INSERT INTO event_registrations (event_id, user_id, status) VALUES (?, ?, "registered")')->execute([$eventId, $next['user_id']]);
+  }
+  db()->prepare('DELETE FROM event_waitlist WHERE id = ?')->execute([$next['id']]);
+  audit_log('waitlist_promote', 'event', $eventId, ['user_id' => $next['user_id']]);
+  return $next;
+}

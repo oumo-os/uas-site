@@ -33,6 +33,7 @@ Administration Layer → Backups, config, security, maintenance
 - **Audit Trail**: Who did what, when, with governance context
 - **Public Website**: Database-driven pages for About, Programmes, Events, Knowledge, Library, Ecosystem, Member Directory, Article & Programme detail pages
 - **Event RSVPs**: Capacity-aware registration with attendee management for organizers
+- **Event Waitlist**: Join when full, auto-promotion on cancellation, manual promote for organizers
 - **Assignment Workflow**: Assignee start → submit with evidence → assigner/manager completes
 - **Member Profiles**: Editable profile, interests, profile visibility, password change
 - **Public Contact Form**: Honeypot-protected contact page feeding an admin inbox (mark read)
@@ -86,6 +87,8 @@ All requests go through `api/index.php?route=...` or rewrite to `/api/...`
 - `GET /authority/:userId` — Governance trace ("why does this user have this authority")
 - `POST /governance/close-expired` — Deadline sweep for stale voting resolutions
 - `GET /events/:id` — Public event detail (+ my RSVP state, attendee list for managers)
+- `POST /events/:id/waitlist` / `DELETE` — Join / leave the waitlist when full
+- `POST /events/:id/waitlist/:wlId/promote` — Manager-promote a waitlisted member
 - `GET /search?q=` — Cross-content public search
 - `POST /contact` — Public contact form (honeypot-filtered)
 - `GET /contact-messages` / `POST /contact-messages/read-all` — Admin inbox
