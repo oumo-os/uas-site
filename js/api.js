@@ -207,6 +207,28 @@ const api = {
   else addToggle();
 })();
 
+// --- Mobile nav (hamburger) ---
+// Injects a burger button into every .nav on small screens; no per-page edits.
+(function () {
+  function init() {
+    const nav = document.querySelector('.nav');
+    if (!nav) return;
+    const container = nav.querySelector('.container');
+    const links = nav.querySelector('.nav-links');
+    const target = container || nav;
+    if (!links || target.querySelector('.nav-burger')) return;
+    const burger = document.createElement('button');
+    burger.className = 'nav-burger';
+    burger.type = 'button';
+    burger.setAttribute('aria-label', 'Toggle navigation');
+    burger.innerHTML = '&#9776;';
+    burger.onclick = () => nav.classList.toggle('open');
+    target.appendChild(burger);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+
 // --- Base-path link rewriting ---
 // Prefixes internal absolute URLs ("/programmes") with the app base ("/uas").
 // Watches the DOM so links added later by scripts are rewritten too.
