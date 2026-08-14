@@ -1,7 +1,21 @@
 // UAS Institutional Platform — API Client
 // Thin wrapper around fetch with auth, JSON, and error handling
 
-const API_BASE = window.location.origin + '/uas/api';
+// App base path: "/uas" when served under a subdirectory, "" at domain root.
+// Derived from the script's own URL so it works anywhere.
+(function () {
+  let base = '';
+  try {
+    const src = (document.currentScript && document.currentScript.src) || '';
+    const m = src.match(/^https?:\/\/[^/]+(\/[^?]*)?\/js\/api\.js/);
+    if (m) base = (m[1] || '').replace(/\/$/, '');
+  } catch (e) {}
+  window.UAS_BASE = base;
+  window.API_BASE = window.location.origin + base + '/api';
+  window.ua = function (path) { return base + path; };
+})();
+
+const API_BASE = window.API_BASE;
 
 const api = {
   _token: null,
@@ -191,4 +205,35 @@ const api = {
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addToggle);
   else addToggle();
+})();
+
+// --- Base-path link rewriting ---
+// Prefixes internal absolute URLs ("/programmes") with the app base ("/uas").
+// Watches the DOM so links added later by scripts are rewritten too.
+(function () {
+  if (!window.UAS_BASE) return;
+
+  function rewrite(el) {
+    const attr = el.tagName === 'A' ? 'href' : el.tagName === 'FORM' ? 'action' : null;
+    if (!attr) return;
+    const v = el.getAttribute(attr);
+    if (!v || v.indexOf('://') !== -1 || v.startsWith('//') || v.startsWith('#')
+      || v.startsWith('mailto:') || v.startsWith('tel:') || v.startsWith('javascript:')) return;
+    if (v.startsWith('/')) {
+      if (v === window.UAS_BASE || v.startsWith(window.UAS_BASE + '/')) return;
+      el.setAttribute(attr, window.UAS_BASE + v);
+    }
+  }
+
+  function scan(root) {
+    (root.querySelectorAll ? root.querySelectorAll('a[href], form[action]') : []).forEach(rewrite);
+  }
+
+  scan(document);
+  if (window.MutationObserver) {
+    const mo = new MutationObserver(muts => {
+      muts.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1) scan(n); }));
+    });
+    mo.observe(document.documentElement, { childList: true, subtree: true });
+  }
 })();

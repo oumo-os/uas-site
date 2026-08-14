@@ -233,7 +233,7 @@
         const pDiv = document.getElementById('programmesList');
         if (programmes.length) {
           pDiv.innerHTML = programmes.slice(0, 6).map(p => `
-            <div class="card programme-card" style="cursor:pointer" onclick="location.href='/programmes/${p.id}'">
+            <div class="card programme-card" style="cursor:pointer" onclick="location.href=ua('/programmes/${p.id}')">
               <h3>${esc(p.title)}</h3>
               <p>${esc(p.description || '').slice(0, 150)}</p>
               ${p.lead_name ? `<div class="mt-1 text-sm text-dim">Lead: ${esc(p.lead_name)}</div>` : ''}
@@ -271,7 +271,7 @@
           aDiv.innerHTML = articles.slice(0, 3).map(a => {
             const d = a.published_at ? new Date(a.published_at) : null;
             return `
-              <div class="card programme-card" style="cursor:pointer" onclick="location.href='/article/${a.id}'">
+              <div class="card programme-card" style="cursor:pointer" onclick="location.href=ua('/article/${a.id}')">
                 <h3>${esc(a.title)}</h3>
                 <p>${esc((a.category || 'article').replace(/_/g, ' '))} · ${esc(a.author_name || '')}</p>
                 <div class="text-sm text-dim">${d ? d.toLocaleDateString('en', {year:'numeric',month:'short',day:'numeric'}) : ''} →</div>

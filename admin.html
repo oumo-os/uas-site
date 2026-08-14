@@ -219,7 +219,7 @@
         renderAudit(audit);
         loadOperations();
         setupTabs();
-      } catch(e) { window.location.href = '/login'; }
+      } catch(e) { window.location.href = ua('/login'); }
     }
 
     function renderMembers(members) {

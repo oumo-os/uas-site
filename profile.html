@@ -113,7 +113,7 @@
       let prof;
       try {
         prof = await api.getProfile();
-      } catch(e) { window.location.href = '/login'; return; }
+      } catch(e) { window.location.href = ua('/login'); return; }
       updateNavUser();
       const p = api._user;
       const m = prof.member || {};

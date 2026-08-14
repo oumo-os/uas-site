@@ -74,7 +74,7 @@
     async function doSearch() {
       const q = document.getElementById('q').value.trim();
       if (q.length < 2) return;
-      history.replaceState(null, '', '/search?q=' + encodeURIComponent(q));
+      history.replaceState(null, '', ua('/search?q=') + encodeURIComponent(q));
       const div = document.getElementById('results');
       div.innerHTML = '<p class="hint text-center">Searching…</p>';
       let data;
@@ -98,7 +98,7 @@
       return `<div class="result-group"><h3>${label}</h3>${rows.join('')}</div>`;
     }
     function row(url, title, sub) {
-      return `<div class="result-row" onclick="location.href='${esc(url)}'">
+      return `<div class="result-row" onclick="location.href=ua('${esc(url)}')">
         <div><div class="title">${esc(title)}</div>${sub ? `<div class="sub">${esc(sub)}</div>` : ''}</div>
         <span class="hint">→</span>
       </div>`;

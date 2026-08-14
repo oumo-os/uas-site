@@ -179,7 +179,7 @@
 
         setupTabs();
       } catch(e) {
-        window.location.href = '/login';
+        window.location.href = ua('/login');
       }
     }
 
@@ -580,7 +580,7 @@
     function updateNavUser() {
       const el = document.getElementById('navUser');
       el.innerHTML = api._user
-        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a> <button class="btn btn-outline btn-sm" onclick="api.logout();window.location.href='/'">Logout</button>`
+        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a> <button class="btn btn-outline btn-sm" onclick="api.logout();window.location.href=ua('/')">Logout</button>`
         : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
     }
 

@@ -117,7 +117,7 @@
           document.getElementById('loginEmail').value,
           document.getElementById('loginPass').value
         );
-        window.location.href = '/dashboard';
+        window.location.href = ua('/dashboard');
       } catch(e) {
         err.textContent = e.error || 'Login failed';
         err.style.display = 'block';
@@ -141,7 +141,7 @@
             category: document.getElementById('regCategory').value,
           }
         );
-        window.location.href = '/dashboard';
+        window.location.href = ua('/dashboard');
       } catch(e) {
         err.textContent = e.error || 'Registration failed';
         err.style.display = 'block';
@@ -152,7 +152,7 @@
 
     // Auto-redirect if already logged in
     (async () => {
-      try { await api.me(); window.location.href = '/dashboard'; } catch(e) {}
+      try { await api.me(); window.location.href = ua('/dashboard'); } catch(e) {}
     })();
   </script>
 </body>
