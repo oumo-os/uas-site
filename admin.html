@@ -63,6 +63,24 @@
 
     <!-- Members -->
     <div class="dash-panel active" id="panel-members">
+      <div id="importCard" style="display:none;margin-bottom:1rem" class="card">
+        <div class="flex-between" style="padding:1rem">
+          <div>
+            <h3 class="section-title" style="margin:0">Import Members (CSV)</h3>
+            <p class="text-sm text-dim mt-1">Format: <code>name,email,category,institution</code> — one per line, header row required. New accounts start active with temp password <code>firstname2026</code>. Duplicate emails are skipped.</p>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="toggleImport()">Close</button>
+        </div>
+        <div style="padding:0 1rem 1rem">
+          <textarea id="importCsv" class="form-input" rows="6" style="width:100%;font-family:monospace;font-size:0.8rem" placeholder="name,email,category,institution&#10;Sarah Kato,sarah.kato@gmail.com,student,Makerere University"></textarea>
+          <button class="btn btn-primary btn-sm mt-2" onclick="importMembers()">Import</button>
+          <span class="text-sm text-dim" id="importResult" style="margin-left:0.75rem"></span>
+        </div>
+      </div>
+      <div class="flex-between mb-2">
+        <h3 class="section-title" style="margin:0">Members</h3>
+        <button class="btn btn-outline btn-sm" onclick="toggleImport()" id="importBtn">Import CSV</button>
+      </div>
       <div id="membersList"></div>
     </div>
 
@@ -245,6 +263,24 @@
         const r = await api.request('/members/' + userId + '/reset-password', { method: 'POST' });
         alert('Temporary password for ' + name + ': ' + r.temp_password + '\nShare it securely — they should change it after logging in.');
       } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    function toggleImport() {
+      const card = document.getElementById('importCard');
+      card.style.display = card.style.display === 'none' ? '' : 'none';
+    }
+
+    async function importMembers() {
+      const csv = document.getElementById('importCsv').value;
+      const out = document.getElementById('importResult');
+      out.textContent = 'Importing…';
+      try {
+        const r = await api.request('/members/import', { method: 'POST', body: { csv } });
+        out.textContent = `Created ${r.created} · skipped ${r.skipped.length} · failed ${r.failed.length}. ${r.failed.length ? r.failed.join('; ') : ''}`;
+        document.getElementById('importCsv').value = '';
+        const members = await api.getMembers();
+        renderMembers(members);
+      } catch(e) { out.textContent = 'Error: ' + (e.error || 'unknown'); }
     }
 
     function renderRoles(roles) {

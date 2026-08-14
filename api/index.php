@@ -158,6 +158,69 @@ try {
     json_response(['temp_password' => $temp]);
   }
 
+  // --- MEMBER CSV IMPORT ---
+  elseif ($path === '/members/import' && $method === 'POST') {
+    $user = require_cap('members.manage');
+    $data = input_json();
+    $csv = $data['csv'] ?? '';
+    if (!trim($csv)) json_error('CSV data is required', 400);
+    $lines = array_filter(array_map('trim', explode("\n", str_replace("\r", '', $csv))));
+    if (count($lines) < 2) json_error('CSV must contain a header row and at least one member', 400);
+
+    $created = 0; $skipped = []; $failed = [];
+    $year = date('Y');
+
+    try {
+      db()->beginTransaction();
+      foreach (array_slice($lines, 1) as $i => $line) {
+        $fields = str_getcsv($line);
+        $name = trim($fields[0] ?? '');
+        $email = strtolower(trim($fields[1] ?? ''));
+        $category = trim($fields[2] ?? '') ?: 'regular';
+        $institution = trim($fields[3] ?? '');
+
+        if (!$name || !filter_var($email, FILTER_VALIDATE_EMAIL)) { $failed[] = "Row " . ($i + 2) . ": missing name or invalid email"; continue; }
+
+        $stmt = db()->prepare('SELECT id FROM users WHERE email = ?');
+        $stmt->execute([$email]);
+        if ($stmt->fetch()) { $skipped[] = $email; continue; }
+
+        $temp = strtolower(strtok($name, ' ')) . '2026';
+        db()->prepare('INSERT INTO users (name, email, password, institution, status) VALUES (?, ?, ?, ?, "active")')
+          ->execute([$name, $email, password_hash($temp, PASSWORD_DEFAULT), $institution ?: null]);
+        $userId = (int) db()->lastInsertId();
+
+        $stmt = db()->prepare("SELECT COALESCE(MAX(CAST(SUBSTRING(membership_number, -4) AS UNSIGNED)), 0) + 1 FROM members WHERE membership_number LIKE 'UAS-{$year}-%'");
+        $stmt->execute();
+        $memberNum = 'UAS-' . $year . '-' . str_pad($stmt->fetchColumn(), 4, '0', STR_PAD_LEFT);
+
+        db()->prepare('INSERT INTO members (user_id, membership_number, category, status, joined_date) VALUES (?, ?, ?, "active", ?)')
+          ->execute([$userId, $memberNum, $category, date('Y-m-d')]);
+
+        $stmt = db()->prepare('SELECT id FROM roles WHERE title = ?');
+        $stmt->execute(['Member']);
+        $memberRoleId = $stmt->fetchColumn();
+        if (!$memberRoleId) {
+          $memberRoleId = create_role('Member', 'Baseline membership role', [1, 7, 40, 27, 34], $user['id']);
+        }
+        assign_role($memberRoleId, $userId, $user['id']);
+        $created++;
+      }
+      db()->commit();
+    } catch (Exception $e) {
+      db()->rollBack();
+      json_error('Import failed: ' . $e->getMessage(), 500);
+    }
+
+    audit_log('members_import', 'system', $user['id'], ['created' => $created, 'skipped' => count($skipped)]);
+    json_response([
+      'created' => $created,
+      'skipped' => $skipped,
+      'failed' => $failed,
+      'note' => 'Temporary passwords are firstname + 2026 (e.g. sarah2026).'
+    ], 201);
+  }
+
   // --- ROLES ---
   elseif ($path === '/roles' && $method === 'GET') {
     require_login();

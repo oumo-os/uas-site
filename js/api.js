@@ -164,3 +164,31 @@ const api = {
     return this.request('/audit' + (qs ? '?' + qs : ''));
   },
 };
+
+// --- Theme toggle (dark/light) ---
+(function () {
+  const saved = localStorage.getItem('uas-theme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+
+  function addToggle() {
+    const hosts = [document.querySelector('.nav-user')];
+    hosts.forEach(host => {
+      if (!host || host.querySelector('.theme-toggle')) return;
+      const btn = document.createElement('button');
+      btn.className = 'theme-toggle btn btn-outline btn-sm';
+      btn.type = 'button';
+      btn.title = 'Toggle light/dark mode';
+      btn.textContent = document.documentElement.getAttribute('data-theme') === 'light' ? '☀️' : '🌙';
+      btn.onclick = () => {
+        const next = document.documentElement.getAttribute('data-theme') === 'light' ? '' : 'light';
+        if (next) document.documentElement.setAttribute('data-theme', next);
+        else document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('uas-theme', next);
+        btn.textContent = next === 'light' ? '☀️' : '🌙';
+      };
+      host.appendChild(btn);
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addToggle);
+  else addToggle();
+})();
