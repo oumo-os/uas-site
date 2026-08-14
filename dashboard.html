@@ -212,6 +212,7 @@
     function renderPendingItem(item) {
       const age = item.created_at ? Math.floor((Date.now() - new Date(item.created_at)) / 86400000) : 0;
       const overdue = age > 7;
+      const actions = pendingActions(item);
       return `
         <div class="pending-item">
           <span class="pending-item-type">${esc(item.item_type)}</span>
@@ -220,8 +221,59 @@
             by ${esc(item.author_name || 'Unknown')}
             <span class="pending-item-age ${overdue ? 'overdue' : ''}">${age}d</span>
           </span>
+          ${actions ? `<span class="pending-item-actions">${actions}</span>` : ''}
         </div>
       `;
+    }
+
+    function pendingActions(item) {
+      const out = [];
+      if (item.item_type === 'article' && (item.status === 'submitted' || item.status === 'under_review')) {
+        if (api.hasCap('articles.approve')) out.push(`<button class="btn btn-primary btn-sm" onclick="actOnItem('article', 'approve', ${item.id})">Approve</button>`);
+        if (api.hasCap('articles.publish') && item.status !== 'approved') out.push(`<button class="btn btn-outline btn-sm" onclick="actOnItem('article', 'publish', ${item.id})">Publish</button>`);
+      }
+      if (item.item_type === 'event' && item.status === 'submitted') {
+        if (api.hasCap('events.approve')) out.push(`<button class="btn btn-primary btn-sm" onclick="actOnItem('event', 'approve', ${item.id})">Approve</button>`);
+        if (api.hasCap('events.publish')) out.push(`<button class="btn btn-outline btn-sm" onclick="actOnItem('event', 'publish', ${item.id})">Publish</button>`);
+      }
+      if (item.item_type === 'document' && (item.status === 'submitted' || item.status === 'draft')) {
+        if (api.hasCap('documents.approve')) out.push(`<button class="btn btn-primary btn-sm" onclick="actOnItem('document', 'approve', ${item.id})">Approve</button>`);
+        if (api.hasCap('documents.publish')) out.push(`<button class="btn btn-outline btn-sm" onclick="actOnItem('document', 'publish', ${item.id})">Publish</button>`);
+      }
+      if (item.item_type === 'resolution' && item.status === 'voting' && api.hasCap('resolutions.vote')) {
+        out.push(`<button class="btn btn-success btn-sm" onclick="actOnItem('resolution', 'for', ${item.id})">For</button>`);
+        out.push(`<button class="btn btn-outline btn-sm" onclick="actOnItem('resolution', 'against', ${item.id})">Against</button>`);
+      }
+      return out.join('');
+    }
+
+    async function actOnItem(type, action, id) {
+      try {
+        switch (type) {
+          case 'article':
+            if (action === 'approve') await api.approveArticle(id);
+            if (action === 'publish') await api.publishArticle(id);
+            break;
+          case 'event':
+            if (action === 'approve') await api.approveEvent(id);
+            if (action === 'publish') await api.publishEvent(id);
+            break;
+          case 'document':
+            if (action === 'approve') await api.request('/documents/' + id + '/approve', { method: 'POST' });
+            if (action === 'publish') await api.request('/documents/' + id + '/publish', { method: 'POST' });
+            break;
+          case 'resolution':
+            await api.castVote(id, action);
+            break;
+        }
+        const pending = await api.getPending();
+        renderOverview(pending);
+        renderPending(pending);
+        if (type === 'resolution') {
+          const resolutions = await api.getResolutions();
+          renderResolutions(resolutions);
+        }
+      } catch(e) { alert(e.error || 'Action failed'); }
     }
 
     function renderResolutions(resolutions) {

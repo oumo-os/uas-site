@@ -55,6 +55,7 @@
       <button class="dash-tab active" data-panel="members">Members</button>
       <button class="dash-tab" data-panel="roles">Roles</button>
       <button class="dash-tab" data-panel="resolutions">Resolutions</button>
+      <button class="dash-tab" data-panel="operations">Operations</button>
       <button class="dash-tab" data-panel="audit">Audit Log</button>
     </div>
 
@@ -76,6 +77,54 @@
     <!-- Resolutions -->
     <div class="dash-panel" id="panel-resolutions">
       <div id="adminResolutions"></div>
+    </div>
+
+    <!-- Operations -->
+    <div class="dash-panel" id="panel-operations">
+      <div class="grid-2 gap-3" style="align-items:start">
+        <div class="card" style="padding:1rem">
+          <h3 class="section-title" style="margin:0 0 0.75rem">Finance</h3>
+          <div class="flex gap-2" style="flex-wrap:wrap">
+            <input class="form-input" id="finAmount" type="number" step="0.01" placeholder="Amount" style="width:110px">
+            <select class="form-select" id="finType" style="width:110px"><option value="income">Income</option><option value="expense">Expense</option></select>
+            <input class="form-input" id="finCat" placeholder="Category" style="flex:1">
+            <input class="form-input" id="finDesc" placeholder="Description" style="flex:1.5">
+            <button class="btn btn-primary btn-sm" onclick="recordFinance()">Record</button>
+          </div>
+          <div id="financeList" class="mt-2 small"></div>
+        </div>
+        <div class="card" style="padding:1rem">
+          <h3 class="section-title" style="margin:0 0 0.75rem">Documents</h3>
+          <div class="flex gap-2" style="flex-wrap:wrap">
+            <input class="form-input" id="docTitle" placeholder="Title" style="flex:1.5">
+            <input class="form-input" id="docPath" placeholder="File path" style="flex:1.5">
+            <select class="form-select" id="docCat" style="width:120px"><option>report</option><option>policy</option><option>guide</option><option>other</option></select>
+            <button class="btn btn-primary btn-sm" onclick="uploadDoc()">Upload</button>
+          </div>
+          <div id="docList" class="mt-2 small"></div>
+        </div>
+      </div>
+      <div class="grid-2 gap-3 mt-2" style="align-items:start">
+        <div class="card" style="padding:1rem">
+          <h3 class="section-title" style="margin:0 0 0.75rem">Assignments</h3>
+          <div class="flex gap-2" style="flex-wrap:wrap">
+            <input class="form-input" id="asgTitle" placeholder="Task title" style="flex:2">
+            <input class="form-input" id="asgDue" type="date" style="width:150px">
+            <button class="btn btn-primary btn-sm" onclick="createAssignment()">Assign</button>
+          </div>
+          <div id="asgList" class="mt-2 small"></div>
+        </div>
+        <div class="card" style="padding:1rem">
+          <h3 class="section-title" style="margin:0 0 0.75rem">Calendar</h3>
+          <div class="flex gap-2" style="flex-wrap:wrap">
+            <input class="form-input" id="calTitle" placeholder="Item title" style="flex:2">
+            <input class="form-input" id="calDeadline" type="datetime-local" style="width:170px">
+            <select class="form-select" id="calType" style="width:120px"><option>meeting</option><option>deadline</option><option>milestone</option></select>
+            <button class="btn btn-primary btn-sm" onclick="createCalendarItem()">Add</button>
+          </div>
+          <div id="calList" class="mt-2 small"></div>
+        </div>
+      </div>
     </div>
 
     <!-- Audit -->
@@ -107,6 +156,7 @@
         renderRoles(roles);
         renderResolutions(resolutions);
         renderAudit(audit);
+        loadOperations();
         setupTabs();
       } catch(e) { window.location.href = '/login'; }
     }
@@ -200,6 +250,115 @@
         await api.beginVoting(id);
         const resolutions = await api.getResolutions();
         renderResolutions(resolutions);
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function loadOperations() {
+      const [finance, docs, assignments, calendar] = await Promise.all([
+        api.getFinance().catch(() => []),
+        api.getDocuments().catch(() => []),
+        api.getAssignments().catch(() => []),
+        api.getCalendar().catch(() => []),
+      ]);
+      renderFinance(finance);
+      renderDocs(docs);
+      renderAssignments(assignments);
+      renderCalendar(calendar);
+    }
+
+    function renderFinance(rows) {
+      const div = document.getElementById('financeList');
+      if (!rows.length) { div.innerHTML = '<p class="text-dim">No records.</p>'; return; }
+      const total = rows.reduce((s, r) => s + (r.type === 'income' ? parseFloat(r.amount) : -parseFloat(r.amount)), 0);
+      div.innerHTML = rows.slice(0, 6).map(r => `
+        <div class="flex-between" style="padding:0.3rem 0;border-bottom:1px solid var(--border)">
+          <span>${esc(r.description || r.category || '—')} <span class="text-dim">(${esc(r.recorded_by_name || '')})</span></span>
+          <span class="${r.type === 'income' ? 'text-success' : 'text-danger'}">${r.type === 'income' ? '+' : '-'}${parseFloat(r.amount).toLocaleString()}</span>
+        </div>
+      `).join('') + `<div class="flex-between mt-1"><strong>Balance</strong><strong class="${total >= 0 ? 'text-success' : 'text-danger'}">${total >= 0 ? '+' : ''}${total.toLocaleString()}</strong></div>`;
+    }
+
+    function renderDocs(rows) {
+      const div = document.getElementById('docList');
+      if (!rows.length) { div.innerHTML = '<p class="text-dim">No documents.</p>'; return; }
+      div.innerHTML = rows.slice(0, 6).map(d => `
+        <div class="flex-between" style="padding:0.3rem 0;border-bottom:1px solid var(--border)">
+          <span>${esc(d.title)} <span class="text-dim">(${esc(d.category)})</span></span>
+          <span class="badge badge-${esc(d.status)}">${esc(d.status)}</span>
+        </div>
+      `).join('');
+    }
+
+    function renderAssignments(rows) {
+      const div = document.getElementById('asgList');
+      if (!rows.length) { div.innerHTML = '<p class="text-dim">No assignments.</p>'; return; }
+      div.innerHTML = rows.slice(0, 6).map(a => `
+        <div class="flex-between" style="padding:0.3rem 0;border-bottom:1px solid var(--border)">
+          <span>${esc(a.title)} <span class="text-dim">→ ${esc(a.assignee_name || a.role_title || 'unassigned')}</span></span>
+          <span class="text-dim">${a.due_date ? esc(String(a.due_date).slice(0, 10)) : '—'} · ${esc(a.status)}</span>
+        </div>
+      `).join('');
+    }
+
+    function renderCalendar(rows) {
+      const div = document.getElementById('calList');
+      if (!rows.length) { div.innerHTML = '<p class="text-dim">No calendar items.</p>'; return; }
+      div.innerHTML = rows.slice(0, 6).map(c => `
+        <div class="flex-between" style="padding:0.3rem 0;border-bottom:1px solid var(--border)">
+          <span>${esc(c.title)} <span class="text-dim">(${esc(c.type)})</span></span>
+          <span class="text-dim">${c.deadline ? esc(String(c.deadline).slice(0, 16)) : '—'}</span>
+        </div>
+      `).join('');
+    }
+
+    async function recordFinance() {
+      try {
+        await api.recordFinance({
+          type: document.getElementById('finType').value,
+          amount: parseFloat(document.getElementById('finAmount').value),
+          category: document.getElementById('finCat').value || 'other',
+          description: document.getElementById('finDesc').value,
+          record_date: new Date().toISOString().slice(0, 19).replace('T', ' '),
+        });
+        document.getElementById('finAmount').value = '';
+        document.getElementById('finDesc').value = '';
+        await loadOperations();
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function uploadDoc() {
+      try {
+        await api.uploadDocument({
+          title: document.getElementById('docTitle').value,
+          file_path: document.getElementById('docPath').value,
+          category: document.getElementById('docCat').value,
+        });
+        document.getElementById('docTitle').value = '';
+        document.getElementById('docPath').value = '';
+        await loadOperations();
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function createAssignment() {
+      try {
+        await api.createAssignment({
+          title: document.getElementById('asgTitle').value,
+          due_date: document.getElementById('asgDue').value,
+        });
+        document.getElementById('asgTitle').value = '';
+        await loadOperations();
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function createCalendarItem() {
+      try {
+        await api.createCalendarItem({
+          title: document.getElementById('calTitle').value,
+          type: document.getElementById('calType').value,
+          deadline: document.getElementById('calDeadline').value,
+        });
+        document.getElementById('calTitle').value = '';
+        await loadOperations();
       } catch(e) { alert(e.error || 'Failed'); }
     }
 

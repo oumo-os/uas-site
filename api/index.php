@@ -281,8 +281,19 @@ try {
     db()->prepare('INSERT INTO documents (title, file_path, category, visibility, owner_id) VALUES (?, ?, ?, ?, ?)')
       ->execute([$data['title'], $data['file_path'], $data['category'], $data['visibility'] ?? 'public', $user['id']]);
     $id = (int) db()->lastInsertId();
+    transition('document', $id, 'submitted', $user['id']);
     audit_log('document_upload', 'document', $id);
     json_response(['id' => $id], 201);
+  }
+  elseif (preg_match('#^/documents/(\d+)/approve$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('documents.approve');
+    transition('document', (int) $m[1], 'approved', $user['id']);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/documents/(\d+)/publish$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('documents.publish');
+    transition('document', (int) $m[1], 'published', $user['id']);
+    json_response(['ok' => true]);
   }
 
   // --- FINANCE ---

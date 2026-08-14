@@ -1,5 +1,8 @@
 RewriteEngine On
 
+# /admin -> admin.html (must precede the directory check below)
+RewriteRule ^admin/?$ admin.html [L]
+
 # Clean URLs: /about -> about.html, etc.
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d

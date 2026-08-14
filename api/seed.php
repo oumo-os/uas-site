@@ -61,7 +61,26 @@ foreach ($boardMembers as $i => $bm) {
     $roleRow = $stmt->fetch();
     if (!$roleRow) {
       $boardRoleId = create_role('Board Director', 'Member of the UAS Board of Directors', [], $adminId);
-      echo "Created role: Board Director (id={$boardRoleId})\n";
+      // Constitutional bootstrap: board holds the full approval + governance suite
+      $boardCaps = [
+        'members.view', 'members.approve', 'members.manage',
+        'admin.system',
+        'resolutions.create', 'resolutions.vote', 'resolutions.manage',
+        'events.approve', 'events.publish', 'events.cancel',
+        'articles.review', 'articles.approve', 'articles.publish',
+        'programmes.approve', 'projects.approve',
+        'finance.view', 'finance.record', 'finance.approve',
+        'documents.review', 'documents.approve', 'documents.publish',
+        'roles.create', 'roles.manage',
+        'reports.review', 'reports.approve', 'reports.publish',
+      ];
+      foreach ($boardCaps as $slug) {
+        $stmt = db()->prepare('SELECT id FROM capabilities WHERE slug = ?');
+        $stmt->execute([$slug]);
+        $capRow = $stmt->fetch();
+        if ($capRow) assign_capability($boardRoleId, $capRow['id'], $adminId);
+      }
+      echo "Created role: Board Director (id={$boardRoleId}, caps=" . count($boardCaps) . ")\n";
     } else {
       $boardRoleId = $roleRow['id'];
     }
@@ -99,7 +118,23 @@ foreach ($sampleRoles as $sr) {
   }
 }
 
-// 4. Create sample programme
+// 4. Baseline Member role (auto-granted on membership approval)
+$stmt = db()->prepare('SELECT id FROM roles WHERE title = ?');
+$stmt->execute(['Member']);
+if (!$stmt->fetch()) {
+  $memberCaps = ['articles.submit', 'events.create', 'documents.upload', 'reports.create'];
+  $capIds = [];
+  foreach ($memberCaps as $slug) {
+    $stmt = db()->prepare('SELECT id FROM capabilities WHERE slug = ?');
+    $stmt->execute([$slug]);
+    $capRow = $stmt->fetch();
+    if ($capRow) $capIds[] = $capRow['id'];
+  }
+  create_role('Member', 'Baseline membership role', $capIds, $adminId);
+  echo "Created role: Member (caps=" . count($capIds) . ")\n";
+}
+
+// 5. Create sample programme
 $stmt = db()->prepare('SELECT id FROM programmes WHERE title = ?');
 $stmt->execute(['Astronomy Education Programme']);
 if (!$stmt->fetch()) {
