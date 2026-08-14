@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Profile — Uganda Astronomical Society</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="container" style="display:flex;align-items:center;width:100%">
+      <a href="/" class="nav-brand">UAS</a>
+      <div class="nav-links">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/about" class="nav-link">About</a>
+        <a href="/programmes" class="nav-link">Programmes</a>
+        <a href="/events" class="nav-link">Events</a>
+        <a href="/knowledge" class="nav-link">Knowledge</a>
+        <a href="/library" class="nav-link">Library</a>
+        <a href="/ecosystem" class="nav-link">Ecosystem</a>
+        <a href="/members" class="nav-link">Members</a>
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+        <a href="/profile" class="nav-link active">Profile</a>
+      </div>
+      <div class="nav-user" id="navUser"></div>
+    </div>
+  </nav>
+
+  <div class="container" style="max-width:720px;padding:2.5rem 1rem 4rem">
+    <h1 style="font-weight:800;margin-bottom:1.5rem">My Profile</h1>
+
+    <div id="profileCard">
+      <div class="card" style="padding:1.5rem">
+        <div class="flex gap-3" style="align-items:center;margin-bottom:1.25rem">
+          <div class="member-avatar" id="pvAvatar" style="width:64px;height:64px;font-size:1.4rem"></div>
+          <div>
+            <h2 style="margin:0" id="pvName"></h2>
+            <p class="text-dim" style="margin:0" id="pvMeta"></p>
+          </div>
+        </div>
+        <div class="grid-2 gap-3">
+          <div>
+            <label class="form-label">Full name</label>
+            <input class="form-input" id="fName" style="width:100%">
+          </div>
+          <div>
+            <label class="form-label">Phone</label>
+            <input class="form-input" id="fPhone" style="width:100%">
+          </div>
+          <div>
+            <label class="form-label">Institution</label>
+            <input class="form-input" id="fInstitution" style="width:100%">
+          </div>
+          <div>
+            <label class="form-label">Location</label>
+            <input class="form-input" id="fLocation" style="width:100%">
+          </div>
+        </div>
+        <div class="mt-2">
+          <label class="form-label">Bio</label>
+          <textarea class="form-input" id="fBio" rows="3" style="width:100%;resize:vertical"></textarea>
+        </div>
+        <div class="mt-2">
+          <label class="form-label">Interests</label>
+          <textarea class="form-input" id="fInterests" rows="2" placeholder="e.g. observing, astrophotography, education outreach" style="width:100%;resize:vertical"></textarea>
+        </div>
+        <div class="mt-2">
+          <label class="form-label">Contributions</label>
+          <textarea class="form-input" id="fContributions" rows="2" style="width:100%;resize:vertical"></textarea>
+        </div>
+        <label class="flex gap-2 mt-2" style="align-items:center">
+          <input type="checkbox" id="fVisible" style="width:18px;height:18px">
+          <span style="font-size:0.85rem">Show my profile on the public member directory</span>
+        </label>
+        <div class="mt-3">
+          <button class="btn btn-primary" onclick="saveProfile()">Save changes</button>
+          <span id="saveMsg" class="text-success" style="margin-left:0.75rem;font-size:0.85rem"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2026 Uganda Astronomical Society. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="js/api.js"></script>
+  <script>
+    async function load() {
+      let prof;
+      try {
+        prof = await api.getProfile();
+      } catch(e) { window.location.href = '/login'; return; }
+      updateNavUser();
+      const p = api._user;
+      const m = prof.member || {};
+      document.getElementById('pvAvatar').textContent = (p.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+      document.getElementById('pvName').textContent = p.name;
+      document.getElementById('pvMeta').textContent = (m.membership_number || '') + ' · ' + (m.category || 'regular');
+      document.getElementById('fName').value = p.name || '';
+      document.getElementById('fPhone').value = p.phone || '';
+      document.getElementById('fInstitution').value = p.institution || '';
+      document.getElementById('fLocation').value = p.location || '';
+      document.getElementById('fBio').value = p.bio || '';
+      document.getElementById('fInterests').value = m.interests || '';
+      document.getElementById('fContributions').value = m.contributions || '';
+      document.getElementById('fVisible').checked = !!m.profile_visible;
+    }
+
+    async function saveProfile() {
+      const msg = document.getElementById('saveMsg');
+      msg.textContent = '';
+      try {
+        await api.updateProfile({
+          name: document.getElementById('fName').value.trim(),
+          phone: document.getElementById('fPhone').value.trim(),
+          institution: document.getElementById('fInstitution').value.trim(),
+          location: document.getElementById('fLocation').value.trim(),
+          bio: document.getElementById('fBio').value.trim(),
+          interests: document.getElementById('fInterests').value.trim(),
+          contributions: document.getElementById('fContributions').value.trim(),
+          profile_visible: document.getElementById('fVisible').checked,
+        });
+        msg.textContent = 'Saved ✓';
+        api._user.name = document.getElementById('fName').value.trim() || api._user.name;
+        document.getElementById('pvName').textContent = api._user.name;
+        document.getElementById('pvAvatar').textContent = api._user.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        updateNavUser();
+      } catch(e) { alert(e.error || 'Failed to save'); }
+    }
+
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+    function updateNavUser() {
+      const el = document.getElementById('navUser');
+      el.innerHTML = api._user
+        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
+        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
+    }
+    load();
+  </script>
+</body>
+</html>

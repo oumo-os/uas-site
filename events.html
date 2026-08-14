@@ -49,7 +49,8 @@
         <a href="/ecosystem" class="nav-link">Ecosystem</a>
         <a href="/members" class="nav-link">Members</a>
         <a href="/dashboard" class="nav-link">Dashboard</a>
-      </div>
+        <a href="/profile" class="nav-link">Profile</a>
+        </div>
       <div class="nav-user" id="navUser"></div>
     </div>
   </nav>
@@ -118,7 +119,11 @@
                   `)) : `
                     <a href="/login" class="btn btn-outline btn-sm">Sign in to RSVP</a>
                   `}
+                  ${canManage(e) ? `
+                    <button class="btn btn-outline btn-sm" onclick="toggleAttendees(${e.id}, this)">View Attendees (${e.rsvp_count || 0})</button>
+                  ` : ''}
                 </div>
+                <div class="attendee-list" id="attendees-${e.id}" style="display:none;margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem"></div>
               </div>
             </div>
           `;
@@ -126,6 +131,25 @@
       } else {
         div.innerHTML = '<p class="text-center text-dim" style="padding:3rem 0">No upcoming events. Check back soon!</p>';
       }
+    }
+
+    function canManage(e) {
+      return api.hasCap('events.manage_rsvps') || (e.organizer_id && api._user && e.organizer_id === api._user.id);
+    }
+
+    async function toggleAttendees(id, btn) {
+      const box = document.getElementById('attendees-' + id);
+      if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+      try {
+        const list = await api.getEventRsvps(id);
+        box.innerHTML = list.length ? list.map(r => `
+          <div class="flex-between" style="padding:0.25rem 0;font-size:0.85rem">
+            <span>${esc(r.name)} <span class="text-dim">${esc(r.email)}</span></span>
+            <span class="badge badge-${r.status === 'registered' ? 'active' : 'inactive'}">${esc(r.status)}</span>
+          </div>`).join('')
+        : '<p class="text-dim" style="font-size:0.85rem">No attendees yet.</p>';
+        box.style.display = 'block';
+      } catch(e) { alert(e.error || 'Failed to load attendees'); }
     }
 
     async function rsvp(id) {

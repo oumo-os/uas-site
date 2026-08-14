@@ -31,7 +31,8 @@
         <a href="/ecosystem" class="nav-link">Ecosystem</a>
         <a href="/members" class="nav-link">Members</a>
         <a href="/dashboard" class="nav-link">Dashboard</a>
-      </div>
+        <a href="/profile" class="nav-link">Profile</a>
+        </div>
       <div class="nav-user" id="navUser"></div>
     </div>
   </nav>
@@ -61,7 +62,7 @@
 
       if (programmes.length) {
         div.innerHTML = programmes.map(p => `
-          <div class="card programme-card">
+          <div class="card programme-card" style="cursor:pointer" onclick="location.href='/programmes/${p.id}'">
             <div class="flex-between mb-1">
               <h3>${esc(p.title)}</h3>
               <span class="badge badge-${esc(p.status)}">${esc(p.status)}</span>
@@ -70,6 +71,7 @@
             <div class="programme-meta">
               ${p.lead_name ? `<span>👤 ${esc(p.lead_name)}</span>` : ''}
               ${p.start_date ? `<span>📅 Started ${esc(p.start_date)}</span>` : ''}
+              <span class="text-dim" style="margin-left:auto">View details →</span>
             </div>
           </div>
         `).join('');

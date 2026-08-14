@@ -48,6 +48,41 @@ try {
     $user = require_login();
     json_response(['user' => public_user($user), 'capabilities' => user_capabilities($user['id']), 'roles' => user_roles($user['id'])]);
   }
+  elseif ($path === '/profile' && $method === 'GET') {
+    $user = require_login();
+    $stmt = db()->prepare('SELECT m.interests, m.contributions, m.profile_visible, m.membership_number, m.category FROM members m WHERE m.user_id = ?');
+    $stmt->execute([$user['id']]);
+    $member = $stmt->fetch() ?: [];
+    json_response(['user' => public_user($user), 'member' => $member]);
+  }
+  elseif ($path === '/profile' && $method === 'PUT') {
+    $user = require_login();
+    $data = input_json();
+    $allowed = ['name', 'phone', 'institution', 'location', 'bio', 'avatar_url'];
+    $sets = [];
+    $args = [];
+    foreach ($allowed as $f) {
+      if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = $data[$f]; }
+    }
+    if ($sets) {
+      $args[] = $user['id'];
+      db()->prepare('UPDATE users SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($args);
+    }
+    $mSets = [];
+    $mArgs = [];
+    foreach (['interests', 'contributions', 'profile_visible'] as $f) {
+      if (array_key_exists($f, $data)) {
+        $mSets[] = "$f = ?";
+        $mArgs[] = $f === 'profile_visible' ? ($data[$f] ? 1 : 0) : $data[$f];
+      }
+    }
+    if ($mSets) {
+      $mArgs[] = $user['id'];
+      db()->prepare('UPDATE members SET ' . implode(', ', $mSets) . ' WHERE user_id = ?')->execute($mArgs);
+    }
+    audit_log('profile_update', 'user', $user['id']);
+    json_response(['ok' => true]);
+  }
 
   // --- MEMBERS ---
   elseif ($path === '/members' && $method === 'GET') {
@@ -472,6 +507,16 @@ try {
     $stmt = db()->prepare('SELECT p.id, p.title, p.description, p.status, u.name AS lead_name FROM programmes p LEFT JOIN users u ON u.id = p.lead_id WHERE p.status = "active" ORDER BY p.title');
     $stmt->execute();
     json_response($stmt->fetchAll());
+  }
+  elseif (preg_match('#^/public/programmes/(\d+)$#', $path, $m) && $method === 'GET') {
+    $stmt = db()->prepare('SELECT p.*, u.name AS lead_name, u.email AS lead_email FROM programmes p LEFT JOIN users u ON u.id = p.lead_id WHERE p.id = ?');
+    $stmt->execute([(int) $m[1]]);
+    $programme = $stmt->fetch();
+    if (!$programme) json_error('Programme not found', 404);
+    $stmt = db()->prepare('SELECT id, title, description, status, deadline, budget, spent FROM projects WHERE programme_id = ? ORDER BY title');
+    $stmt->execute([(int) $m[1]]);
+    $programme['projects'] = $stmt->fetchAll();
+    json_response($programme);
   }
   elseif ($path === '/public/documents' && $method === 'GET') {
     $stmt = db()->prepare('SELECT d.id, d.title, d.category, d.file_path, d.visibility, d.updated_at AS published_at, u.name AS owner_name FROM documents d JOIN users u ON u.id = d.owner_id WHERE d.status = "published" AND d.visibility = "public" ORDER BY d.updated_at DESC');

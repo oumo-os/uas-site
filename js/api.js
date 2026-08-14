@@ -133,10 +133,16 @@ const api = {
   // Pending
   async getPending() { return this.request('/pending'); },
 
+  // Profile
+  async getProfile() { return this.request('/profile'); },
+  async updateProfile(data) { return this.request('/profile', { method: 'PUT', body: data }); },
+
   // Public
   async getPublicArticles() { return this.request('/public/articles'); },
   async getPublicEvents() { return this.request('/public/events'); },
   async getPublicProgrammes() { return this.request('/public/programmes'); },
+  async getPublicProgramme(id) { return this.request('/public/programmes/' + id); },
+  async getPublicDocuments() { return this.request('/public/documents'); },
 
   // Partners & Links
   async getPartners() { return this.request('/partners'); },

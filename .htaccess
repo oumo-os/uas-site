@@ -8,5 +8,8 @@ RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^([a-z0-9-]+)$ $1.html [QSA,L]
 
+# Programme detail: /programmes/3 -> programme.html?id=3
+RewriteRule ^programmes/(\d+)/?$ programme.html?id=$1 [QSA,L]
+
 # API: /api/... -> api/index.php
 RewriteRule ^api/(.*)$ api/index.php?route=$1 [QSA,L]
