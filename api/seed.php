@@ -65,6 +65,7 @@ foreach ($boardMembers as $i => $bm) {
       $boardCaps = [
         'members.view', 'members.approve', 'members.manage',
         'admin.system',
+        'partners.manage', 'links.manage',
         'resolutions.create', 'resolutions.vote', 'resolutions.manage',
         'events.approve', 'events.publish', 'events.cancel', 'events.rsvp', 'events.manage_rsvps',
         'articles.review', 'articles.approve', 'articles.publish',

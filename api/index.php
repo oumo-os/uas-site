@@ -411,12 +411,42 @@ try {
     $stmt->execute();
     json_response($stmt->fetchAll());
   }
+  elseif ($path === '/partners' && $method === 'POST') {
+    $user = require_cap('partners.manage');
+    $data = input_json();
+    db()->prepare('INSERT INTO partners (organization, website, logo_url, description, relationship_type, status) VALUES (?, ?, ?, ?, ?, ?)')
+      ->execute([$data['organization'], $data['website'] ?? null, $data['logo_url'] ?? null, $data['description'] ?? null, $data['relationship_type'] ?? 'partner', $data['status'] ?? 'active']);
+    $id = (int) db()->lastInsertId();
+    audit_log('partner_create', 'partner', $id);
+    json_response(['id' => $id], 201);
+  }
+  elseif (preg_match('#^/partners/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    $user = require_cap('partners.manage');
+    db()->prepare('UPDATE partners SET status = "inactive" WHERE id = ?')->execute([(int) $m[1]]);
+    audit_log('partner_deactivate', 'partner', (int) $m[1]);
+    json_response(['ok' => true]);
+  }
 
   // --- USEFUL LINKS ---
   elseif ($path === '/links' && $method === 'GET') {
     $stmt = db()->prepare('SELECT * FROM useful_links WHERE status = "active" ORDER BY category, title');
     $stmt->execute();
     json_response($stmt->fetchAll());
+  }
+  elseif ($path === '/links' && $method === 'POST') {
+    $user = require_cap('links.manage');
+    $data = input_json();
+    db()->prepare('INSERT INTO useful_links (title, url, category, description, status) VALUES (?, ?, ?, ?, ?)')
+      ->execute([$data['title'], $data['url'], $data['category'] ?? null, $data['description'] ?? null, $data['status'] ?? 'active']);
+    $id = (int) db()->lastInsertId();
+    audit_log('link_create', 'link', $id);
+    json_response(['id' => $id], 201);
+  }
+  elseif (preg_match('#^/links/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    $user = require_cap('links.manage');
+    db()->prepare('UPDATE useful_links SET status = "inactive" WHERE id = ?')->execute([(int) $m[1]]);
+    audit_log('link_deactivate', 'link', (int) $m[1]);
+    json_response(['ok' => true]);
   }
 
   // --- AUDIT LOG ---
@@ -440,6 +470,11 @@ try {
   }
   elseif ($path === '/public/programmes' && $method === 'GET') {
     $stmt = db()->prepare('SELECT p.id, p.title, p.description, p.status, u.name AS lead_name FROM programmes p LEFT JOIN users u ON u.id = p.lead_id WHERE p.status = "active" ORDER BY p.title');
+    $stmt->execute();
+    json_response($stmt->fetchAll());
+  }
+  elseif ($path === '/public/documents' && $method === 'GET') {
+    $stmt = db()->prepare('SELECT d.id, d.title, d.category, d.file_path, d.visibility, d.updated_at AS published_at, u.name AS owner_name FROM documents d JOIN users u ON u.id = d.owner_id WHERE d.status = "published" AND d.visibility = "public" ORDER BY d.updated_at DESC');
     $stmt->execute();
     json_response($stmt->fetchAll());
   }

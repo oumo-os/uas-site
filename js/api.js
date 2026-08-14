@@ -140,7 +140,11 @@ const api = {
 
   // Partners & Links
   async getPartners() { return this.request('/partners'); },
+  async createPartner(data) { return this.request('/partners', { method: 'POST', body: data }); },
+  async deletePartner(id) { return this.request('/partners/' + id, { method: 'DELETE' }); },
   async getLinks() { return this.request('/links'); },
+  async createLink(data) { return this.request('/links', { method: 'POST', body: data }); },
+  async deleteLink(id) { return this.request('/links/' + id, { method: 'DELETE' }); },
 
   // Audit
   async getAuditLog(filters = {}) {

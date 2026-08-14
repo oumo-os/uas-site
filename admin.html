@@ -125,6 +125,28 @@
           <div id="calList" class="mt-2 small"></div>
         </div>
       </div>
+      <div class="grid-2 gap-3 mt-2" style="align-items:start">
+        <div class="card" style="padding:1rem">
+          <h3 class="section-title" style="margin:0 0 0.75rem">Partners</h3>
+          <div class="flex gap-2" style="flex-wrap:wrap">
+            <input class="form-input" id="pOrg" placeholder="Organization" style="flex:2">
+            <input class="form-input" id="pWebsite" placeholder="Website" style="flex:2">
+            <select class="form-select" id="pType" style="width:120px"><option>partner</option><option>affiliate</option><option>sponsor</option><option>institutional</option></select>
+            <button class="btn btn-primary btn-sm" onclick="addPartner()">Add</button>
+          </div>
+          <div id="partnerList" class="mt-2 small"></div>
+        </div>
+        <div class="card" style="padding:1rem">
+          <h3 class="section-title" style="margin:0 0 0.75rem">Useful Links</h3>
+          <div class="flex gap-2" style="flex-wrap:wrap">
+            <input class="form-input" id="lTitle" placeholder="Title" style="flex:2">
+            <input class="form-input" id="lUrl" placeholder="URL" style="flex:2">
+            <input class="form-input" id="lCat" placeholder="Category" style="width:120px">
+            <button class="btn btn-primary btn-sm" onclick="addLink()">Add</button>
+          </div>
+          <div id="linkList" class="mt-2 small"></div>
+        </div>
+      </div>
     </div>
 
     <!-- Audit -->
@@ -254,16 +276,70 @@
     }
 
     async function loadOperations() {
-      const [finance, docs, assignments, calendar] = await Promise.all([
+      const [finance, docs, assignments, calendar, partners, links] = await Promise.all([
         api.getFinance().catch(() => []),
         api.getDocuments().catch(() => []),
         api.getAssignments().catch(() => []),
         api.getCalendar().catch(() => []),
+        api.getPartners().catch(() => []),
+        api.getLinks().catch(() => []),
       ]);
       renderFinance(finance);
       renderDocs(docs);
       renderAssignments(assignments);
       renderCalendar(calendar);
+      renderPartners(partners);
+      renderLinks(links);
+    }
+
+    function renderPartners(rows) {
+      const div = document.getElementById('partnerList');
+      if (!rows.length) { div.innerHTML = '<p class="text-dim">No partners.</p>'; return; }
+      div.innerHTML = rows.map(p => `
+        <div class="flex-between" style="padding:0.3rem 0;border-bottom:1px solid var(--border)">
+          <span>${esc(p.organization)} <span class="badge badge-active">${esc(p.relationship_type)}</span></span>
+          <button class="btn btn-outline btn-xs" onclick="removePartner(${p.id})">Remove</button>
+        </div>
+      `).join('');
+    }
+
+    async function addPartner() {
+      const organization = document.getElementById('pOrg').value.trim();
+      if (!organization) return alert('Organization name required');
+      try {
+        await api.createPartner({ organization, website: document.getElementById('pWebsite').value.trim(), relationship_type: document.getElementById('pType').value });
+        document.getElementById('pOrg').value = ''; document.getElementById('pWebsite').value = '';
+        loadOperations();
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function removePartner(id) {
+      try { await api.deletePartner(id); loadOperations(); } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    function renderLinks(rows) {
+      const div = document.getElementById('linkList');
+      if (!rows.length) { div.innerHTML = '<p class="text-dim">No links.</p>'; return; }
+      div.innerHTML = rows.map(l => `
+        <div class="flex-between" style="padding:0.3rem 0;border-bottom:1px solid var(--border)">
+          <span>${esc(l.title)} <span class="text-dim">(${esc(l.category || '')})</span></span>
+          <button class="btn btn-outline btn-xs" onclick="removeLink(${l.id})">Remove</button>
+        </div>
+      `).join('');
+    }
+
+    async function addLink() {
+      const title = document.getElementById('lTitle').value.trim();
+      if (!title) return alert('Title required');
+      try {
+        await api.createLink({ title, url: document.getElementById('lUrl').value.trim(), category: document.getElementById('lCat').value.trim() });
+        document.getElementById('lTitle').value = ''; document.getElementById('lUrl').value = ''; document.getElementById('lCat').value = '';
+        loadOperations();
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function removeLink(id) {
+      try { await api.deleteLink(id); loadOperations(); } catch(e) { alert(e.error || 'Failed'); }
     }
 
     function renderFinance(rows) {

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Library — Uganda Astronomical Society</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <style>
+    .page-header { padding: 3rem 0 2rem; text-align: center; }
+    .page-header h1 { font-size: 2.2rem; font-weight: 800; }
+    .page-header p { color: var(--text-dim); max-width: 600px; margin: 0.5rem auto 0; }
+    .doc-row {
+      display: flex; align-items: center; gap: 1rem;
+      padding: 1rem 1.25rem; margin-bottom: 0.75rem;
+      border: 1px solid var(--border); border-radius: var(--radius-lg);
+      background: var(--bg-card);
+      transition: border-color 0.15s;
+    }
+    .doc-row:hover { border-color: var(--accent); }
+    .doc-icon { font-size: 1.4rem; }
+    .doc-info { flex: 1; }
+    .doc-info h3 { font-size: 0.95rem; margin-bottom: 0.2rem; }
+    .doc-info p { font-size: 0.8rem; color: var(--text-dim); }
+    .doc-meta { font-size: 0.72rem; color: var(--text-faint); }
+    .cat-filter { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-bottom: 2rem; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="container" style="display:flex;align-items:center;width:100%">
+      <a href="/" class="nav-brand">UAS</a>
+      <div class="nav-links">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/about" class="nav-link">About</a>
+        <a href="/programmes" class="nav-link">Programmes</a>
+        <a href="/events" class="nav-link">Events</a>
+        <a href="/knowledge" class="nav-link">Knowledge</a>
+        <a href="/library" class="nav-link active">Library</a>
+        <a href="/ecosystem" class="nav-link">Ecosystem</a>
+        <a href="/members" class="nav-link">Members</a>
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+      </div>
+      <div class="nav-user" id="navUser"></div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Document Library</h1>
+      <p>Reports, policies, guides, and resources from the society</p>
+    </div>
+
+    <div class="cat-filter" id="catFilter"></div>
+    <div id="docsList"></div>
+  </div>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2026 Uganda Astronomical Society. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="js/api.js"></script>
+  <script>
+    let allDocs = [];
+    let activeCat = '';
+
+    async function load() {
+      try { await api.me(); } catch(e) {}
+      updateNavUser();
+
+      allDocs = await api.request('/public/documents').catch(() => []);
+      const cats = [...new Set(allDocs.map(d => d.category).filter(Boolean))];
+      document.getElementById('catFilter').innerHTML = `
+        <button class="btn btn-sm ${!activeCat ? 'btn-primary' : 'btn-outline'}" onclick="filterCat('')">All</button>
+        ${cats.map(c => `<button class="btn btn-sm ${activeCat === c ? 'btn-primary' : 'btn-outline'}" onclick="filterCat('${esc(c)}')">${esc(c)}</button>`).join('')}
+      `;
+      renderDocs(allDocs);
+    }
+
+    function filterCat(cat) {
+      activeCat = cat;
+      const cats = [...new Set(allDocs.map(d => d.category).filter(Boolean))];
+      document.getElementById('catFilter').innerHTML = `
+        <button class="btn btn-sm ${!activeCat ? 'btn-primary' : 'btn-outline'}" onclick="filterCat('')">All</button>
+        ${cats.map(c => `<button class="btn btn-sm ${activeCat === c ? 'btn-primary' : 'btn-outline'}" onclick="filterCat('${esc(c)}')">${esc(c)}</button>`).join('')}
+      `;
+      renderDocs(activeCat ? allDocs.filter(d => d.category === activeCat) : allDocs);
+    }
+
+    function renderDocs(list) {
+      const div = document.getElementById('docsList');
+      if (!list.length) { div.innerHTML = '<p class="text-center text-dim" style="padding:3rem 0">No documents published yet.</p>'; return; }
+      div.innerHTML = list.map(d => `
+        <div class="doc-row">
+          <span class="doc-icon">📄</span>
+          <div class="doc-info">
+            <h3>${esc(d.title)}</h3>
+            <p>${esc(d.category || 'document')} ${d.owner_name ? `&middot; ${esc(d.owner_name)}` : ''}</p>
+          </div>
+          <a class="btn btn-outline btn-sm" href="${esc(d.file_path || '#')}" target="_blank" rel="noopener">Open</a>
+        </div>
+      `).join('');
+    }
+
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+    function updateNavUser() {
+      const el = document.getElementById('navUser');
+      el.innerHTML = api._user
+        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
+        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
+    }
+    load();
+  </script>
+</body>
+</html>
