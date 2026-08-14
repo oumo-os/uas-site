@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact Us — Uganda Astronomical Society</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <style>
+    .contact-wrap { display: grid; grid-template-columns: 1fr 1.4fr; gap: 2rem; padding: 3rem 1rem 4rem; max-width: 960px; margin: 0 auto; }
+    @media (max-width: 760px) { .contact-wrap { grid-template-columns: 1fr; } }
+    .contact-info h1 { font-size: 2rem; font-weight: 800; margin-bottom: 0.5rem; }
+    .contact-info p { color: var(--text-dim); }
+    .info-row { display: flex; gap: 0.75rem; margin-top: 1.25rem; align-items: flex-start; }
+    .info-row .icon { font-size: 1.3rem; }
+    .form-note { font-size: 0.8rem; color: var(--text-faint); margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="container" style="display:flex;align-items:center;width:100%">
+      <a href="/" class="nav-brand">UAS</a>
+      <div class="nav-links">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/about" class="nav-link">About</a>
+        <a href="/programmes" class="nav-link">Programmes</a>
+        <a href="/events" class="nav-link">Events</a>
+        <a href="/knowledge" class="nav-link">Knowledge</a>
+        <a href="/library" class="nav-link">Library</a>
+        <a href="/ecosystem" class="nav-link">Ecosystem</a>
+        <a href="/members" class="nav-link">Members</a>
+        <a href="/contact" class="nav-link active">Contact</a>
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+      </div>
+      <div class="nav-user" id="navUser"></div>
+    </div>
+  </nav>
+
+  <div class="contact-wrap">
+    <div class="contact-info">
+      <h1>Get in touch</h1>
+      <p>Questions about membership, observing events, partnerships, or the Society? Send us a message and we'll get back to you.</p>
+      <div class="info-row"><span class="icon">📧</span><div><strong>Email</strong><br><span class="text-dim">contact@astronomy.ug</span></div></div>
+      <div class="info-row"><span class="icon">📍</span><div><strong>Location</strong><br><span class="text-dim">Kampala, Uganda</span></div></div>
+      <div class="info-row"><span class="icon">🔭</span><div><strong>Public observing</strong><br><span class="text-dim">First Friday monthly at Kololo Airstrip</span></div></div>
+    </div>
+
+    <div class="card" style="padding:1.5rem">
+      <h2 style="font-weight:700;margin:0 0 1rem">Send a message</h2>
+      <div class="grid-2 gap-3">
+        <div>
+          <label class="form-label">Your name *</label>
+          <input class="form-input" id="cName" style="width:100%">
+        </div>
+        <div>
+          <label class="form-label">Email *</label>
+          <input class="form-input" id="cEmail" type="email" style="width:100%">
+        </div>
+      </div>
+      <div class="mt-2">
+        <label class="form-label">Subject</label>
+        <input class="form-input" id="cSubject" style="width:100%">
+      </div>
+      <div class="mt-2">
+        <label class="form-label">Message *</label>
+        <textarea class="form-input" id="cMessage" rows="5" style="width:100%;resize:vertical"></textarea>
+      </div>
+      <input id="cWebsite" style="display:none" tabindex="-1" autocomplete="off">
+      <button class="btn btn-primary mt-3" onclick="sendMsg()">Send message</button>
+      <p id="cMsg" class="text-success mt-2" style="font-size:0.9rem"></p>
+      <p class="form-note">Fields marked * are required.</p>
+    </div>
+  </div>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2026 Uganda Astronomical Society. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="js/api.js"></script>
+  <script>
+    async function load() {
+      try { await api.me(); } catch(e) {}
+      updateNavUser();
+    }
+
+    async function sendMsg() {
+      const msg = document.getElementById('cMsg');
+      msg.textContent = '';
+      const payload = {
+        name: document.getElementById('cName').value.trim(),
+        email: document.getElementById('cEmail').value.trim(),
+        subject: document.getElementById('cSubject').value.trim(),
+        message: document.getElementById('cMessage').value.trim(),
+        website: document.getElementById('cWebsite').value.trim(),
+      };
+      try {
+        await api.request('/contact', { method: 'POST', body: payload });
+        msg.textContent = 'Thank you! Your message has been sent.';
+        ['cName','cEmail','cSubject','cMessage'].forEach(id => document.getElementById(id).value = '');
+      } catch(e) { alert(e.error || 'Could not send message'); }
+    }
+
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+    function updateNavUser() {
+      const el = document.getElementById('navUser');
+      el.innerHTML = api._user
+        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
+        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
+    }
+    load();
+  </script>
+</body>
+</html>

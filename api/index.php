@@ -588,6 +588,80 @@ try {
     json_response(['ok' => true]);
   }
 
+  // --- CONTACT ---
+  elseif ($path === '/contact' && $method === 'POST') {
+    $data = input_json();
+    if (!empty($data['website'])) json_response(['ok' => true]); // honeypot — pretend success
+    $name = trim($data['name'] ?? '');
+    $email = trim($data['email'] ?? '');
+    $message = trim($data['message'] ?? '');
+    if (!$name || !$email || !filter_var($email, FILTER_VALIDATE_EMAIL) || !$message) {
+      json_error('Name, valid email, and message are required', 400);
+    }
+    if (mb_strlen($message) > 5000) json_error('Message too long', 400);
+    db()->prepare('INSERT INTO contact_messages (name, email, subject, message) VALUES (?, ?, ?, ?)')
+      ->execute([$name, $email, trim($data['subject'] ?? ''), $message]);
+    json_response(['ok' => true], 201);
+  }
+  elseif ($path === '/contact-messages' && $method === 'GET') {
+    $user = require_cap('admin.system');
+    $stmt = db()->prepare('SELECT * FROM contact_messages ORDER BY created_at DESC');
+    $stmt->execute();
+    json_response($stmt->fetchAll());
+  }
+  elseif ($path === '/contact-messages/read-all' && $method === 'POST') {
+    $user = require_cap('admin.system');
+    db()->prepare("UPDATE contact_messages SET status = 'read' WHERE status = 'new'")->execute();
+    json_response(['ok' => true]);
+  }
+
+  // --- EXPORTS (CSV) ---
+  elseif ($path === '/export/members.csv' && $method === 'GET') {
+    $user = require_cap('members.view');
+    $stmt = db()->prepare("SELECT m.membership_number, u.name, u.email, m.category, m.status, m.joined_date, u.institution, u.location, m.interests FROM members m JOIN users u ON u.id = m.user_id ORDER BY m.joined_date");
+    $stmt->execute();
+    $rows = $stmt->fetchAll();
+    $csv = "membership_number,name,email,category,status,joined_date,institution,location,interests\n";
+    foreach ($rows as $r) {
+      $cols = array_map(fn($v) => '"' . str_replace('"', '""', (string) ($v ?? '')) . '"', array_values($r));
+      $csv .= implode(',', $cols) . "\n";
+    }
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="members.csv"');
+    echo $csv;
+    exit;
+  }
+  elseif ($path === '/export/finance.csv' && $method === 'GET') {
+    $user = require_cap('finance.view');
+    $stmt = db()->prepare('SELECT f.record_date, f.type, f.amount, f.category, f.description, u.name AS recorded_by FROM financial_records f JOIN users u ON u.id = f.recorded_by ORDER BY f.record_date');
+    $stmt->execute();
+    $rows = $stmt->fetchAll();
+    $csv = "record_date,type,amount,category,description,recorded_by\n";
+    foreach ($rows as $r) {
+      $cols = array_map(fn($v) => '"' . str_replace('"', '""', (string) ($v ?? '')) . '"', array_values($r));
+      $csv .= implode(',', $cols) . "\n";
+    }
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="finance.csv"');
+    echo $csv;
+    exit;
+  }
+  elseif ($path === '/export/audit.csv' && $method === 'GET') {
+    $user = require_cap('admin.system');
+    $stmt = db()->prepare('SELECT created_at, user_name, action_type, target_type, target_id, details FROM audit_log ORDER BY created_at DESC');
+    $stmt->execute();
+    $rows = $stmt->fetchAll();
+    $csv = "created_at,user,action,target_type,target_id,details\n";
+    foreach ($rows as $r) {
+      $cols = array_map(fn($v) => '"' . str_replace('"', '""', (string) ($v ?? '')) . '"', array_values($r));
+      $csv .= implode(',', $cols) . "\n";
+    }
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="audit.csv"');
+    echo $csv;
+    exit;
+  }
+
   // --- AUDIT LOG ---
   elseif ($path === '/audit' && $method === 'GET') {
     require_cap('admin.system');

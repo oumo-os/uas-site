@@ -57,6 +57,7 @@
       <button class="dash-tab" data-panel="roles">Roles</button>
       <button class="dash-tab" data-panel="resolutions">Resolutions</button>
       <button class="dash-tab" data-panel="operations">Operations</button>
+      <button class="dash-tab" data-panel="inbox">Inbox</button>
       <button class="dash-tab" data-panel="audit">Audit Log</button>
     </div>
 
@@ -82,6 +83,14 @@
 
     <!-- Operations -->
     <div class="dash-panel" id="panel-operations">
+      <div class="flex-between mb-2">
+        <h3 class="section-title" style="margin:0">Operations</h3>
+        <div class="flex gap-2">
+          <a class="btn btn-outline btn-sm" href="/api/export/members.csv" download>Export Members</a>
+          <a class="btn btn-outline btn-sm" href="/api/export/finance.csv" download>Export Finance</a>
+          <a class="btn btn-outline btn-sm" href="/api/export/audit.csv" download>Export Audit</a>
+        </div>
+      </div>
       <div class="grid-2 gap-3" style="align-items:start">
         <div class="card" style="padding:1rem">
           <h3 class="section-title" style="margin:0 0 0.75rem">Finance</h3>
@@ -150,6 +159,15 @@
       </div>
     </div>
 
+    <!-- Inbox -->
+    <div class="dash-panel" id="panel-inbox">
+      <div class="flex-between mb-2">
+        <h3 class="section-title" style="margin:0">Contact Messages</h3>
+        <button class="btn btn-outline btn-sm" onclick="markAllRead()">Mark all read</button>
+      </div>
+      <div id="inboxList"></div>
+    </div>
+
     <!-- Audit -->
     <div class="dash-panel" id="panel-audit">
       <div id="auditLog"></div>
@@ -168,15 +186,17 @@
         updateNavUser();
         if (api.hasCap('roles.create')) document.getElementById('createRoleBtn').style.display = '';
 
-        const [members, roles, resolutions, audit] = await Promise.all([
+        const [members, roles, resolutions, audit, inbox] = await Promise.all([
           api.getMembers().catch(() => []),
           api.getRoles().catch(() => []),
           api.getResolutions().catch(() => []),
           api.getAuditLog({ limit: 50 }).catch(() => []),
+          api.hasCap('admin.system') ? api.request('/contact-messages').catch(() => []) : [],
         ]);
 
         renderMembers(members);
         renderRoles(roles);
+        renderInbox(inbox);
         renderResolutions(resolutions);
         renderAudit(audit);
         loadOperations();
@@ -273,6 +293,31 @@
         await api.beginVoting(id);
         const resolutions = await api.getResolutions();
         renderResolutions(resolutions);
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    function renderInbox(list) {
+      const div = document.getElementById('inboxList');
+      if (!list.length) { div.innerHTML = '<p class="text-dim">No messages yet.</p>'; return; }
+      div.innerHTML = list.map(m => `
+        <div class="card" style="padding:0.9rem 1rem;margin-bottom:0.5rem">
+          <div class="flex-between">
+            <div>
+              <strong>${esc(m.subject || '(no subject)')}</strong>
+              <div class="text-dim text-sm">${esc(m.name)} &lt;${esc(m.email)}&gt; · ${esc(m.created_at)}</div>
+              <div class="text-sm mt-1">${esc(m.message)}</div>
+            </div>
+            <span class="badge ${m.status === 'new' ? 'badge-active' : 'badge-inactive'}">${esc(m.status)}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function markAllRead() {
+      try {
+        await api.request('/contact-messages/read-all', { method: 'POST' });
+        const inbox = await api.request('/contact-messages');
+        renderInbox(inbox);
       } catch(e) { alert(e.error || 'Failed'); }
     }
 

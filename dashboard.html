@@ -56,6 +56,7 @@
         <a href="/library" class="nav-link">Library</a>
         <a href="/ecosystem" class="nav-link">Ecosystem</a>
         <a href="/members" class="nav-link">Members</a>
+        <a href="/contact" class="nav-link">Contact</a>
         <a href="/dashboard" class="nav-link active">Dashboard</a>
         <a href="/profile" class="nav-link">Profile</a>
         </div>
@@ -80,6 +81,8 @@
     <!-- Overview Panel -->
     <div class="dash-panel active" id="panel-overview">
       <div class="health-grid" id="healthGrid"></div>
+      <h3 class="section-title">Upcoming Calendar</h3>
+      <div id="upcomingCal"></div>
       <h3 class="section-title">Recent Pending Items</h3>
       <div id="recentPending"></div>
       <h3 class="section-title">My Assignments</h3>
@@ -154,13 +157,14 @@
         }
 
         // Load all data in parallel
-        const [healthData, pending, resolutions, roles, myAsg, mySubs] = await Promise.all([
+        const [healthData, pending, resolutions, roles, myAsg, mySubs, calItems] = await Promise.all([
           api.getDashboard().catch(() => ({})),
           api.getPending().catch(() => []),
           api.getResolutions().catch(() => []),
           api.getRoles().catch(() => []),
           api.getMyAssignments().catch(() => []),
           api.request('/submissions/mine').catch(() => []),
+          api.getCalendar().catch(() => []),
         ]);
 
         health = healthData;
@@ -170,6 +174,7 @@
         renderResolutions(resolutions);
         renderMyAssignments(myAsg);
         renderMySubmissions(mySubs);
+        renderUpcomingCal(calItems);
 
         setupTabs();
       } catch(e) {
@@ -228,6 +233,21 @@
       if (evidence === null) return;
       try { await api.submitAssignment(id, evidence); load(); }
       catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    function renderUpcomingCal(list) {
+      const div = document.getElementById('upcomingCal');
+      const upcoming = (list || []).filter(c => c.deadline && new Date(c.deadline) >= new Date()).sort((a, b) => new Date(a.deadline) - new Date(b.deadline)).slice(0, 5);
+      if (!upcoming.length) { div.innerHTML = '<p class="text-dim text-sm">No upcoming calendar items.</p>'; return; }
+      div.innerHTML = upcoming.map(c => `
+        <div class="flex-between" style="padding:0.45rem 0;border-bottom:1px solid var(--border)">
+          <span class="text-sm">
+            <span class="badge badge-pending">${esc(c.type || 'other')}</span>
+            ${esc(c.title)}
+          </span>
+          <span class="text-dim text-sm">${new Date(c.deadline).toLocaleDateString('en', {month:'short', day:'numeric'})} ${new Date(c.deadline).toLocaleTimeString('en', {hour:'2-digit', minute:'2-digit'})}</span>
+        </div>
+      `).join('');
     }
 
     function renderMySubmissions(list) {
