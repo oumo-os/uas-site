@@ -156,7 +156,8 @@ tr:hover td { background: rgba(59,130,246,0.04); }
   .nav.open .nav-links { display: flex; }
   .nav-links .nav-link { padding: 0.45rem 0.5rem; }
 }
-.nav-brand { font-weight: 700; font-size: 1.1rem; color: var(--accent); text-decoration: none; }
+.nav-brand { font-weight: 700; font-size: 1.1rem; color: var(--accent); text-decoration: none; display: flex; align-items: center; gap: 0.5rem; }
+.nav-logo { height: 30px; width: auto; border-radius: 5px; }
 .nav-links { display: flex; gap: 0.5rem; flex: 1; }
 .nav-link { padding: 0.4rem 0.75rem; border-radius: var(--radius); color: var(--text-dim); text-decoration: none; font-size: 0.9rem; transition: all 0.15s; }
 .nav-link:hover, .nav-link.active { color: var(--text); background: var(--bg-card); }

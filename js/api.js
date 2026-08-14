@@ -207,6 +207,29 @@ const api = {
   else addToggle();
 })();
 
+// --- Brand emblem + favicon ---
+// Adds the UAS emblem to every .nav-brand and registers the site favicon.
+(function () {
+  function init() {
+    const link = document.createElement('link');
+    link.rel = 'icon';
+    link.type = 'image/png';
+    link.href = ua('/img/uas-emblem.png');
+    document.head.appendChild(link);
+
+    const brand = document.querySelector('.nav-brand');
+    if (brand && !brand.querySelector('img')) {
+      const img = document.createElement('img');
+      img.src = ua('/img/uas-emblem.png');
+      img.alt = 'UAS emblem';
+      img.className = 'nav-logo';
+      brand.prepend(img);
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+
 // --- Mobile nav (hamburger) ---
 // Injects a burger button into every .nav on small screens; no per-page edits.
 (function () {
