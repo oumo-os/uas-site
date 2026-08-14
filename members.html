@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Members — Uganda Astronomical Society</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <style>
+    .page-header { padding: 3rem 0 2rem; text-align: center; }
+    .page-header h1 { font-size: 2.2rem; font-weight: 800; }
+    .page-header p { color: var(--text-dim); max-width: 600px; margin: 0.5rem auto 0; }
+    .member-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+    .member-card {
+      padding: 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--bg-card);
+      text-align: center;
+    }
+    .member-avatar {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: var(--accent-glow); color: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 1.1rem; margin: 0 auto 0.75rem;
+    }
+    .member-card h3 { font-size: 0.95rem; margin-bottom: 0.25rem; }
+    .member-card .institution { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.5rem; }
+    .member-card .meta { font-size: 0.72rem; color: var(--text-faint); }
+    .search-row { max-width: 420px; margin: 0 auto 2rem; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="container" style="display:flex;align-items:center;width:100%">
+      <a href="/" class="nav-brand">UAS</a>
+      <div class="nav-links">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/about" class="nav-link">About</a>
+        <a href="/programmes" class="nav-link">Programmes</a>
+        <a href="/events" class="nav-link">Events</a>
+        <a href="/knowledge" class="nav-link">Knowledge</a>
+        <a href="/ecosystem" class="nav-link">Ecosystem</a>
+        <a href="/members" class="nav-link active">Members</a>
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+      </div>
+      <div class="nav-user" id="navUser"></div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Member Directory</h1>
+      <p>The community behind Uganda's astronomy movement</p>
+    </div>
+
+    <div class="search-row">
+      <input class="form-input" id="memberSearch" placeholder="Search by name, institution, or category..." oninput="filterMembers()">
+    </div>
+
+    <div class="member-grid" id="membersGrid"></div>
+    <p class="text-center text-dim" id="emptyMsg" style="display:none;padding:2rem 0">No members found.</p>
+  </div>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2026 Uganda Astronomical Society. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="js/api.js"></script>
+  <script>
+    let allMembers = [];
+
+    async function load() {
+      try { await api.me(); } catch(e) {}
+      updateNavUser();
+
+      allMembers = await api.getMembers().catch(() => []);
+      if (!allMembers.length && !api._user) {
+        document.getElementById('emptyMsg').innerHTML = 'Sign in to view the member directory.';
+        document.getElementById('emptyMsg').style.display = 'block';
+        return;
+      }
+      renderMembers(allMembers);
+    }
+
+    function renderMembers(list) {
+      const grid = document.getElementById('membersGrid');
+      document.getElementById('emptyMsg').style.display = list.length ? 'none' : 'block';
+      grid.innerHTML = list.map(m => {
+        const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        return `
+          <div class="member-card">
+            <div class="member-avatar">${initials}</div>
+            <h3>${esc(m.name)}</h3>
+            <div class="institution">${esc(m.institution || 'Independent')}</div>
+            <div class="meta">${esc(m.category || 'member')} · ${esc(m.membership_number || '')}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function filterMembers() {
+      const q = document.getElementById('memberSearch').value.toLowerCase();
+      if (!q) { renderMembers(allMembers); return; }
+      const filtered = allMembers.filter(m =>
+        (m.name || '').toLowerCase().includes(q) ||
+        (m.institution || '').toLowerCase().includes(q) ||
+        (m.category || '').toLowerCase().includes(q)
+      );
+      renderMembers(filtered);
+    }
+
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+    function updateNavUser() {
+      const el = document.getElementById('navUser');
+      el.innerHTML = api._user
+        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
+        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
+    }
+    load();
+  </script>
+</body>
+</html>

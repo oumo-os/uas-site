@@ -26,10 +26,12 @@ Administration Layer → Backups, config, security, maintenance
 - **Governance Engine**: Board resolutions that automatically create roles, assign capabilities, appoint members
 - **RBAC**: Granular capability-based access control (articles.approve, events.publish, finance.view, etc.)
 - **Workflow Engine**: Every institutional object follows Draft → Submit → Review → Approve → Publish → Archive
-- **Pending Items**: Centralized view of everything awaiting someone's action
+- **Member Lifecycle**: Register → pending → board approval → baseline Member role granted automatically
+- **Pending Items**: Centralized action queue — approve articles/events/documents or vote on resolutions inline
+- **Operations Console**: Finance records, documents, assignments, calendar in one admin panel
 - **Institutional Dashboard**: Members, programmes, projects, events, pending items, financials
 - **Audit Trail**: Who did what, when, with governance context
-- **Public Website**: Database-driven pages for About, Programmes, Events, Knowledge, Gallery
+- **Public Website**: Database-driven pages for About, Programmes, Events, Knowledge, Ecosystem, Member Directory
 
 ## Setup
 
@@ -37,7 +39,9 @@ Administration Layer → Backups, config, security, maintenance
 2. Run schema: `mysql -u root uas_platform < migrations/001_initial.sql`
 3. Configure `api/config.php` with DB credentials
 4. Seed dev data: `php api/seed.php`
-5. Point web root to project directory
+5. Point web root to project directory (e.g. `htdocs\uas` junction for XAMPP)
+
+**XAMPP local run**: junction `M:\Dev\xampp\htdocs\uas` → project dir, start Apache + MySQL, visit `http://localhost/uas`. Login: `admin@astronomy.ug` / `admin123` (board: `cosmus@astronomy.ug` etc., all `/password123`).
 
 ## API Endpoints
 
@@ -58,13 +62,20 @@ All requests go through `api/index.php?route=...` or rewrite to `/api/...`
 - `POST /resolutions/:id/vote` — Cast vote (auto-applies on quorum)
 
 ### Institutional Objects
-- `GET/POST /members` — List/create members
+- `GET/POST /members` — List members / approve members (POST flips user status + grants Member role)
 - `GET/POST /programmes` — List/create programmes
 - `GET/POST /projects` — List/create projects
 - `GET/POST /events` — List/create events
 - `GET/POST /articles` — List/create articles
-- `POST /events/:id/approve` — Approve event
-- `POST /articles/:id/publish` — Publish article
+- `GET/POST /documents` — List/upload documents
+- `GET/POST /finance` — List/record financials
+- `GET/POST /assignments` — List/create assignments
+- `GET/POST /calendar` — List/create calendar items
+- `POST /events/:id/approve` / `/publish` — Approve / publish event
+- `POST /articles/:id/approve` / `/publish` — Approve / publish article (auto-stages through review)
+- `POST /documents/:id/approve` / `/publish` — Approve / publish document
+- `GET /authority/:userId` — Governance trace ("why does this user have this authority")
+- `POST /governance/close-expired` — Deadline sweep for stale voting resolutions
 
 ### Dashboard
 - `GET /dashboard` — Institutional health metrics
@@ -113,7 +124,19 @@ uas-site/
 │   └── api.js           # Frontend API client
 ├── css/
 │   └── base.css         # Design system
-├── data/                # JSON data files (if any)
-├── img/uploads/         # User uploads
-└── index.html           # Landing page (to build)
+├── admin/
+│   └── resolution-builder.php  # Governance console
+├── member/
+│   └── submit-article.php      # Article submission form
+├── index.html           # Public landing page
+├── about.html           # About the society
+├── programmes.html      # Programmes (DB-driven)
+├── events.html          # Events (DB-driven)
+├── knowledge.html       # Articles/knowledge base (DB-driven)
+├── ecosystem.html       # Partners & links
+├── members.html         # Member directory
+├── login.html           # Login / register
+├── dashboard.html       # Member dashboard
+├── admin.html           # Administration console
+└── .htaccess            # Clean URLs + API rewrite
 ```

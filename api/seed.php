@@ -98,8 +98,8 @@ foreach ($boardMembers as $i => $bm) {
 // 3. Create sample roles
 $sampleRoles = [
   ['title' => 'PR Director', 'desc' => 'Manages public relations and communications', 'caps' => ['articles.review', 'articles.approve', 'articles.publish', 'events.approve', 'events.publish']],
-  ['title' => 'Education WG Lead', 'desc' => 'Leads the Education Working Group', 'caps' => ['articles.approve', 'events.approve', 'programmes.manage', 'reports.create']],
-  ['title' => 'Programme Lead', 'desc' => 'Oversees programme execution', 'caps' => ['programmes.manage', 'projects.approve', 'events.approve', 'reports.create', 'reports.approve']],
+  ['title' => 'Education WG Lead', 'desc' => 'Leads the Education Working Group', 'caps' => ['articles.approve', 'events.approve', 'programmes.create', 'programmes.manage', 'reports.create']],
+  ['title' => 'Programme Lead', 'desc' => 'Oversees programme execution', 'caps' => ['programmes.manage', 'projects.create', 'projects.manage', 'projects.approve', 'events.approve', 'reports.create', 'reports.approve']],
 ];
 
 foreach ($sampleRoles as $sr) {

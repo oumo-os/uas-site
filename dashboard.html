@@ -54,6 +54,7 @@
         <a href="/events" class="nav-link">Events</a>
         <a href="/knowledge" class="nav-link">Knowledge</a>
         <a href="/ecosystem" class="nav-link">Ecosystem</a>
+        <a href="/members" class="nav-link">Members</a>
         <a href="/dashboard" class="nav-link active">Dashboard</a>
       </div>
       <div class="nav-user" id="navUser"></div>
@@ -119,6 +120,10 @@
         <div class="card" style="cursor:pointer" onclick="showCreateForm('programme')">
           <h4 style="margin-bottom:0.25rem">🎯 Programme</h4>
           <p class="text-sm text-dim">Propose a new programme (requires programmes.create)</p>
+        </div>
+        <div class="card" style="cursor:pointer" onclick="showCreateForm('project')">
+          <h4 style="margin-bottom:0.25rem">🚀 Project</h4>
+          <p class="text-sm text-dim">Create a project under a programme (requires projects.create)</p>
         </div>
       </div>
       <div id="createForm" class="mt-2"></div>
@@ -357,6 +362,17 @@
             <button class="btn btn-primary" onclick="submitProgramme()">Submit</button>
           </div>
         `;
+      } else if (type === 'project') {
+        div.innerHTML = `
+          <div class="card create-form">
+            <h4 class="mb-1">Create Project</h4>
+            <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="projTitle"></div>
+            <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="projDesc" rows="4"></textarea></div>
+            <div class="form-group"><label class="form-label">Objectives</label><textarea class="form-textarea" id="projObj" rows="3"></textarea></div>
+            <div class="form-group"><label class="form-label">Deadline</label><input type="date" class="form-input" id="projDeadline"></div>
+            <button class="btn btn-primary" onclick="submitProject()">Create Project</button>
+          </div>
+        `;
       }
     }
 
@@ -393,6 +409,19 @@
           objectives: document.getElementById('progObj').value,
         });
         alert('Programme created!');
+        document.getElementById('createForm').innerHTML = '';
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function submitProject() {
+      try {
+        await api.createProject({
+          title: document.getElementById('projTitle').value,
+          description: document.getElementById('projDesc').value,
+          objectives: document.getElementById('projObj').value,
+          deadline: document.getElementById('projDeadline').value,
+        });
+        alert('Project created!');
         document.getElementById('createForm').innerHTML = '';
       } catch(e) { alert(e.error || 'Failed'); }
     }
