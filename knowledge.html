@@ -101,7 +101,7 @@
       if (filtered.length) {
         div.innerHTML = filtered.map(a => {
           const d = a.published_at ? new Date(a.published_at) : null;
-          const tags = a.tags ? (typeof a.tags === 'string' ? JSON.parse(a.tags) : a.tags) : [];
+          const tags = parseTags(a.tags);
           return `
             <div class="card article-card">
               <h3><a href="/article/${a.id}" style="color:inherit">${esc(a.title)}</a></h3>
@@ -128,6 +128,20 @@
         currentCat = chip.dataset.cat;
         render();
       });
+    }
+
+    function parseTags(t) {
+      if (!t) return [];
+      if (Array.isArray(t)) return t;
+      if (typeof t === 'string') {
+        try {
+          const v = JSON.parse(t);
+          return Array.isArray(v) ? v : parseTags(v);
+        } catch(e) {
+          return t.split(',').map(s => s.trim()).filter(Boolean);
+        }
+      }
+      return [];
     }
 
     function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }

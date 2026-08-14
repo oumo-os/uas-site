@@ -478,8 +478,13 @@ try {
   elseif ($path === '/articles' && $method === 'POST') {
     $user = require_cap('articles.submit');
     $data = input_json();
+    $tags = $data['tags'] ?? [];
+    if (is_string($tags)) {
+      $decoded = json_decode($tags, true);
+      $tags = is_array($decoded) ? $decoded : array_map('trim', explode(',', $tags));
+    }
     db()->prepare('INSERT INTO articles (author_id, title, body, category, tags, image_url, approver_role_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      ->execute([$user['id'], $data['title'], $data['body'] ?? null, $data['category'] ?? 'article', json_encode($data['tags'] ?? []), $data['image_url'] ?? null, $data['approver_role_id'] ?? null]);
+      ->execute([$user['id'], $data['title'], $data['body'] ?? null, $data['category'] ?? 'article', json_encode(array_values(array_filter($tags))), $data['image_url'] ?? null, $data['approver_role_id'] ?? null]);
     $id = (int) db()->lastInsertId();
     transition('article', $id, 'submitted', $user['id']);
     audit_log('article_create', 'article', $id);
