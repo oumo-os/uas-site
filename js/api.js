@@ -276,7 +276,7 @@ const api = {
   }
 
   function scan(root) {
-    (root.querySelectorAll ? root.querySelectorAll('a[href], form[action]') : []).forEach(rewrite);
+    (root.querySelectorAll ? root.querySelectorAll('a[href], form[action], img[src], link[href], script[src]') : []).forEach(rewrite);
   }
 
   scan(document);
