@@ -259,11 +259,16 @@ const api = {
   if (!window.UAS_BASE) return;
 
   function rewrite(el) {
-    const attr = el.tagName === 'A' ? 'href' : el.tagName === 'FORM' ? 'action' : null;
+    const tag = el.tagName;
+    let attr = null;
+    if (tag === 'A' || tag === 'LINK') attr = 'href';
+    else if (tag === 'FORM') attr = 'action';
+    else if (tag === 'SCRIPT' || tag === 'IMG') attr = 'src';
     if (!attr) return;
     const v = el.getAttribute(attr);
     if (!v || v.indexOf('://') !== -1 || v.startsWith('//') || v.startsWith('#')
-      || v.startsWith('mailto:') || v.startsWith('tel:') || v.startsWith('javascript:')) return;
+      || v.startsWith('mailto:') || v.startsWith('tel:') || v.startsWith('javascript:')
+      || v.startsWith('data:')) return;
     if (v.startsWith('/')) {
       if (v === window.UAS_BASE || v.startsWith(window.UAS_BASE + '/')) return;
       el.setAttribute(attr, window.UAS_BASE + v);
