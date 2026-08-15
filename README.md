@@ -34,6 +34,7 @@ Administration Layer → Backups, config, security, maintenance
 - **Public Website**: Database-driven pages for About, Programmes, Events, Knowledge, Library, Ecosystem, Member Directory, Article & Programme detail pages
 - **Event RSVPs**: Capacity-aware registration with attendee management for organizers
 - **Event Waitlist**: Join when full, auto-promotion on cancellation, manual promote for organizers
+- **Notifications**: In-app bell — approvals, rejections, publishing, assignments, waitlist promotion, voting and contact messages notify the right people
 - **Assignment Workflow**: Assignee start → submit with evidence → assigner/manager completes
 - **Member Profiles**: Editable profile, interests, profile visibility, password change
 - **Public Contact Form**: Honeypot-protected contact page feeding an admin inbox (mark read)
@@ -89,6 +90,7 @@ All requests go through `api/index.php?route=...` or rewrite to `/api/...`
 - `GET /events/:id` — Public event detail (+ my RSVP state, attendee list for managers)
 - `POST /events/:id/waitlist` / `DELETE` — Join / leave the waitlist when full
 - `POST /events/:id/waitlist/:wlId/promote` — Manager-promote a waitlisted member
+- `GET /notifications` — My notifications (unread first); `POST /notifications/read-all`, `POST /notifications/:id/read`
 - `GET /search?q=` — Cross-content public search
 - `POST /contact` — Public contact form (honeypot-filtered)
 - `GET /contact-messages` / `POST /contact-messages/read-all` — Admin inbox

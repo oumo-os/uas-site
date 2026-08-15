@@ -58,6 +58,27 @@ try {
     audit_log('password_change', 'user', $user['id']);
     json_response(['ok' => true]);
   }
+  // --- NOTIFICATIONS ---
+  elseif ($path === '/notifications' && $method === 'GET') {
+    $user = require_login();
+    $stmt = db()->prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY is_read ASC, created_at DESC LIMIT 50');
+    $stmt->execute([$user['id']]);
+    $items = $stmt->fetchAll();
+    $stmt = db()->prepare('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0');
+    $stmt->execute([$user['id']]);
+    json_response(['items' => $items, 'unread' => (int) $stmt->fetchColumn()]);
+  }
+  elseif ($path === '/notifications/read-all' && $method === 'POST') {
+    $user = require_login();
+    db()->prepare('UPDATE notifications SET is_read = 1 WHERE user_id = ?')->execute([$user['id']]);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/notifications/(\d+)/read$#', $path, $m) && $method === 'POST') {
+    $user = require_login();
+    db()->prepare('UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?')->execute([(int) $m[1], $user['id']]);
+    json_response(['ok' => true]);
+  }
+
   elseif ($path === '/profile' && $method === 'GET') {
     $user = require_login();
     $stmt = db()->prepare('SELECT m.interests, m.contributions, m.profile_visible, m.membership_number, m.category FROM members m WHERE m.user_id = ?');
@@ -136,6 +157,9 @@ try {
       'approved_by' => $user['id'],
       'status' => $newStatus
     ]);
+    if ($newStatus === 'active') {
+      notify_user((int) $data['user_id'], 'membership_approved', 'Membership approved', 'Your membership application has been approved. Welcome to the society!', '/dashboard');
+    }
     json_response(['ok' => true]);
   }
   elseif (preg_match('#^/members/(\d+)$#', $path, $m) && $method === 'GET') {
@@ -285,7 +309,14 @@ try {
   }
   elseif (preg_match('#^/resolutions/(\d+)/begin-voting$#', $path, $m) && $method === 'POST') {
     $user = require_cap('resolutions.manage');
-    begin_voting((int) $m[1]);
+    $resId = (int) $m[1];
+    $stmt = db()->prepare('SELECT title, code FROM resolutions WHERE id = ?');
+    $stmt->execute([$resId]);
+    $res = $stmt->fetch();
+    if ($res) {
+      notify_capability('resolutions.vote', 'resolution_voting', 'Voting open: ' . $res['title'], 'Resolution ' . $res['code'] . ' is now in voting. Cast your vote from the dashboard.', '/dashboard');
+    }
+    begin_voting($resId);
     json_response(['ok' => true]);
   }
   elseif ($path === '/governance/close-expired' && $method === 'POST') {
@@ -343,6 +374,7 @@ try {
     $id = (int) db()->lastInsertId();
     transition('event', $id, 'submitted', $user['id']);
     audit_log('event_create', 'event', $id);
+    notify_capability('events.approve', 'event_submitted', 'Event awaiting approval: ' . $data['title'], 'Submitted by ' . $user['name'] . '.', '/admin?tab=events');
     json_response(['id' => $id], 201);
   }
   elseif (preg_match('#^/events/(\d+)/approve$#', $path, $m) && $method === 'POST') {
@@ -352,7 +384,12 @@ try {
   }
   elseif (preg_match('#^/events/(\d+)/publish$#', $path, $m) && $method === 'POST') {
     $user = require_cap('events.publish');
-    transition('event', (int) $m[1], 'published', $user['id']);
+    $eid = (int) $m[1];
+    transition('event', $eid, 'published', $user['id']);
+    $stmt = db()->prepare('SELECT organizer_id, title FROM events WHERE id = ?');
+    $stmt->execute([$eid]);
+    $ev = $stmt->fetch();
+    if ($ev) notify_user((int) $ev['organizer_id'], 'event_published', 'Event live: ' . $ev['title'], 'Your event has been approved and is now open for RSVPs.', '/event/' . $eid);
     json_response(['ok' => true]);
   }
   elseif (preg_match('#^/events/(\d+)/cancel$#', $path, $m) && $method === 'POST') {
@@ -579,6 +616,7 @@ try {
     $id = (int) db()->lastInsertId();
     transition('article', $id, 'submitted', $user['id']);
     audit_log('article_create', 'article', $id);
+    notify_capability('articles.approve', 'article_submitted', 'Article awaiting review: ' . $data['title'], 'Submitted by ' . $user['name'] . '.', '/admin?tab=articles');
     json_response(['id' => $id], 201);
   }
   elseif (preg_match('#^/articles/(\d+)/approve$#', $path, $m) && $method === 'POST') {
@@ -593,11 +631,20 @@ try {
       update_object_status('article', $aid, 'under_review');
     }
     transition('article', $aid, 'approved', $user['id']);
+    $stmt = db()->prepare('SELECT author_id, title FROM articles WHERE id = ?');
+    $stmt->execute([$aid]);
+    $art = $stmt->fetch();
+    if ($art) notify_user((int) $art['author_id'], 'article_approved', 'Article approved: ' . $art['title'], 'Your article has been approved and is ready to publish.', '/article/' . $aid);
     json_response(['ok' => true]);
   }
   elseif (preg_match('#^/articles/(\d+)/publish$#', $path, $m) && $method === 'POST') {
     $user = require_cap('articles.publish');
-    transition('article', (int) $m[1], 'published', $user['id']);
+    $aid = (int) $m[1];
+    transition('article', $aid, 'published', $user['id']);
+    $stmt = db()->prepare('SELECT author_id, title FROM articles WHERE id = ?');
+    $stmt->execute([$aid]);
+    $art = $stmt->fetch();
+    if ($art) notify_user((int) $art['author_id'], 'article_published', 'Article published: ' . $art['title'], 'Your article is now live on the site.', '/article/' . $aid);
     json_response(['ok' => true]);
   }
   elseif (preg_match('#^/articles/(\d+)/reject$#', $path, $m) && $method === 'POST') {
@@ -608,6 +655,10 @@ try {
     db()->prepare("UPDATE articles SET status = 'rejected', rejection_reason = ?, approved_by = ?, approved_at = NOW() WHERE id = ?")
       ->execute([$reason, $user['id'], (int) $m[1]]);
     audit_log('article_reject', 'article', (int) $m[1], ['reason' => $reason]);
+    $stmt = db()->prepare('SELECT author_id, title FROM articles WHERE id = ?');
+    $stmt->execute([(int) $m[1]]);
+    $art = $stmt->fetch();
+    if ($art) notify_user((int) $art['author_id'], 'article_rejected', 'Article not approved: ' . $art['title'], 'Reason: ' . $reason, '/dashboard');
     json_response(['ok' => true]);
   }
 
@@ -626,6 +677,7 @@ try {
     $id = (int) db()->lastInsertId();
     transition('document', $id, 'submitted', $user['id']);
     audit_log('document_upload', 'document', $id);
+    notify_capability('documents.approve', 'document_submitted', 'Document awaiting review: ' . $data['title'], 'Uploaded by ' . $user['name'] . '.', '/admin?tab=documents');
     json_response(['id' => $id], 201);
   }
   elseif (preg_match('#^/documents/(\d+)/approve$#', $path, $m) && $method === 'POST') {
@@ -670,6 +722,9 @@ try {
       ->execute([$data['title'], $data['description'] ?? null, $data['assignee_id'] ?? null, $user['id'], $data['role_id'] ?? null, $data['due_date'] ?? null, $data['priority'] ?? 'medium', $data['related_type'] ?? null, $data['related_id'] ?? null]);
     $id = (int) db()->lastInsertId();
     audit_log('assignment_create', 'assignment', $id);
+    if (!empty($data['assignee_id'])) {
+      notify_user((int) $data['assignee_id'], 'assignment_assigned', 'New assignment: ' . $data['title'], 'An assignment has been given to you' . (!empty($data['due_date']) ? ' (due ' . $data['due_date'] . ')' : '') . '.', '/dashboard');
+    }
     json_response(['id' => $id], 201);
   }
   elseif ($path === '/assignments/mine' && $method === 'GET') {
@@ -810,6 +865,7 @@ try {
     if (mb_strlen($message) > 5000) json_error('Message too long', 400);
     db()->prepare('INSERT INTO contact_messages (name, email, subject, message) VALUES (?, ?, ?, ?)')
       ->execute([$name, $email, trim($data['subject'] ?? ''), $message]);
+    $n = notify_capability('admin.system', 'contact_message', 'New contact message from ' . $name, mb_substr($message, 0, 120) . (mb_strlen($message) > 120 ? '…' : ''), '/admin?tab=inbox');
     json_response(['ok' => true], 201);
   }
   elseif ($path === '/contact-messages' && $method === 'GET') {

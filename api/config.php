@@ -63,8 +63,24 @@ function db(): PDO {
   return $pdo;
 }
 
+// In-app notification: insert a row for a single user (or all users matching a capability).
+function notify_user(int $userId, string $type, string $title, string $body = '', ?string $link = null): void {
+  db()->prepare('INSERT INTO notifications (user_id, type, title, body, link) VALUES (?, ?, ?, ?, ?)')
+    ->execute([$userId, $type, $title, $body, $link]);
+}
+
+function notify_capability(string $capability, string $type, string $title, string $body = '', ?string $link = null): int {
+  $stmt = db()->prepare('SELECT DISTINCT u.id FROM users u JOIN role_assignments ra ON ra.user_id = u.id AND ra.status = "active" JOIN role_capabilities rc ON rc.role_id = ra.role_id JOIN capabilities c ON c.id = rc.capability_id WHERE c.slug = ? AND u.status = "active"');
+  $stmt->execute([$capability]);
+  $count = 0;
+  foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $uid) {
+    notify_user((int) $uid, $type, $title, $body, $link);
+    $count++;
+  }
+  return $count;
+}
+
 // Event waitlist: promote the earliest waitlisted member when capacity frees up.
-// Reuses a cancelled registration row if one exists; otherwise inserts a new one.
 function promote_from_waitlist(int $eventId): ?array {
   $stmt = db()->prepare('SELECT id, capacity, date FROM events WHERE id = ?');
   $stmt->execute([$eventId]);
@@ -90,5 +106,9 @@ function promote_from_waitlist(int $eventId): ?array {
   }
   db()->prepare('DELETE FROM event_waitlist WHERE id = ?')->execute([$next['id']]);
   audit_log('waitlist_promote', 'event', $eventId, ['user_id' => $next['user_id']]);
+  $stmt = db()->prepare('SELECT title FROM events WHERE id = ?');
+  $stmt->execute([$eventId]);
+  $eventTitle = $stmt->fetchColumn();
+  notify_user((int) $next['user_id'], 'waitlist_promote', 'Spot secured: ' . $eventTitle, 'A spot opened up and you have been auto-promoted from the waitlist to registered.', '/event/' . $eventId);
   return $next;
 }
