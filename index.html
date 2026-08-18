@@ -3,19 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="/img/uas-emblem.png">
+  <link rel="icon" type="image/png" href="img/uas-emblem.png">
   <title>Uganda Astronomical Society</title>
   <meta name="description" content="Uganda Astronomical Society — a public scientific society advancing astronomy, space science and scientific discovery in Uganda.">
   <meta property="og:title" content="Uganda Astronomical Society">
   <meta property="og:description" content="A public scientific society advancing astronomy, space science and scientific discovery in Uganda.">
-  <meta property="og:image" content="/img/uas-emblem.png">
+  <meta property="og:image" content="img/uas-emblem.png">
   <meta property="og:type" content="website">
-  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="css/base.css">
   <style>
     .hero {
       position: relative; min-height: 70vh; display: flex; flex-direction: column;
       justify-content: center; align-items: center; text-align: center;
-      padding: 6rem 1.5rem 5rem; background: url('/img/hero-bg.jpg') center/cover no-repeat; color: #fff;
+      padding: 6rem 1.5rem 5rem; background: url('img/hero-bg.jpg') center/cover no-repeat; color: #fff;
     }
     .hero::before { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(15,23,42,0.5) 0%,rgba(15,23,42,0.8) 100%); }
     .hero > * { position:relative; z-index:1; }
@@ -128,13 +128,14 @@
 <body>
   <nav class="nav" role="navigation" aria-label="Main navigation">
     <div class="container">
-      <a href="/" class="nav-brand"><img src="/img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
+      <a href="/" class="nav-brand"><img src="img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
       <button class="nav-burger" aria-label="Toggle navigation menu" onclick="this.closest('.nav').classList.toggle('open')" aria-label="Menu">&#9776;</button>
       <div class="nav-links">
         <a href="/" class="nav-link active">Home</a>
         <a href="/about" class="nav-link">About</a>
         <a href="/programmes" class="nav-link">Programmes</a>
         <a href="/events" class="nav-link">Events</a>
+        <a href="/news" class="nav-link">News</a>
         <a href="/knowledge" class="nav-link">Knowledge</a>
         <a href="/contact" class="nav-link">Contact</a>
       </div>
@@ -143,7 +144,7 @@
   </nav>
 
   <section class="hero">
-    <img src="/img/uas-emblem.png" alt="" class="hero-emblem">
+    <img src="img/uas-emblem.png" alt="" class="hero-emblem">
     <h1>Explore the Universe<br>From Uganda</h1>
     <p>A public scientific society advancing astronomy, space science and scientific discovery — bringing together stargazers, scientists, educators and curious minds across Uganda.</p>
     <div class="hero-actions">
@@ -267,7 +268,7 @@
     </div>
   </footer>
 
-  <script src="/js/api.js"></script>
+  <script src="js/api.js"></script>
   <script>
     async function load() {
       try {

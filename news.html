@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="img/uas-emblem.png">
+  <title>News — Uganda Astronomical Society</title>
+  <link rel="stylesheet" href="css/base.css">
+  <style>
+    .page-hero {
+      position:relative; min-height:45vh; display:flex; flex-direction:column;
+      justify-content:center; align-items:flex-start; padding:6rem 1.5rem 4rem; background:url('img/header-events.jpg') center/cover no-repeat; color:#fff;
+    }
+    .page-hero::before { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(15,23,42,0.6) 0%,rgba(15,23,42,0.85) 100%); }
+    .page-hero > * { position:relative; z-index:1; }
+    .page-hero h1 { font-size:2.8rem; font-weight:700; color:#fff; margin-bottom:0.75rem; }
+    .page-hero p { font-size:1.1rem; color:rgba(255,255,255,0.85); max-width:600px; }
+
+    .section { padding:4rem 0; }
+    .section-alt { background:var(--bg-card); border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+
+    .news-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:1.5rem; }
+    .news-card {
+      background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg);
+      overflow:hidden; transition:all 0.3s; cursor:pointer;
+    }
+    .news-card:hover { border-color:var(--border-focus); box-shadow:var(--shadow-md); transform:translateY(-2px); }
+    .news-card img { width:100%; height:180px; object-fit:cover; }
+    .news-card .card-body { padding:1.25rem; }
+    .news-card h3 { font-size:1.05rem; margin-bottom:0.35rem; line-height:1.3; }
+    .news-meta { display:flex; gap:0.5rem; font-size:0.8rem; color:var(--text-dim); flex-wrap:wrap; margin-top:0.5rem; }
+
+    .link-card {
+      background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg);
+      padding:1.25rem; transition:all 0.3s; display:flex; gap:0.75rem; align-items:flex-start;
+    }
+    .link-card:hover { border-color:var(--accent); box-shadow:var(--shadow-md); }
+    .link-card .link-icon { flex-shrink:0; color:var(--accent); margin-top:0.15rem; }
+    .link-card h4 { font-size:0.95rem; margin-bottom:0.25rem; }
+    .link-card .link-org { font-size:0.75rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.25rem; }
+    .link-card p { font-size:0.85rem; color:var(--text-dim); line-height:1.5; margin:0; }
+    .link-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1rem; }
+
+    .section-header { text-align:center; max-width:640px; margin:0 auto 2.5rem; }
+    .section-header h2 { font-size:1.8rem; margin-bottom:0.5rem; }
+    .section-header p { color:var(--text-dim); font-size:1rem; }
+
+    .empty-state { text-align:center; padding:4rem 0; }
+    .empty-state p { color:var(--text-dim); font-size:1rem; }
+
+    @media (max-width:768px) {
+      .page-hero { min-height:35vh; padding:4rem 1rem 3rem; }
+      .page-hero h1 { font-size:1.8rem; }
+      .news-grid { grid-template-columns:1fr; }
+      .link-grid { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="container">
+      <a href="/" class="nav-brand">Uganda Astronomical Society</a>
+      <div class="nav-links">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/about" class="nav-link">About</a>
+        <a href="/programmes" class="nav-link">Programmes</a>
+        <a href="/events" class="nav-link">Events</a>
+        <a href="/news" class="nav-link active">News</a>
+        <a href="/knowledge" class="nav-link">Knowledge</a>
+        <a href="/contact" class="nav-link">Contact</a>
+      </div>
+      <div class="nav-right"><div class="nav-user" id="navUser"></div></div>
+    </div>
+  </nav>
+
+  <section class="page-hero">
+    <div class="container">
+      <h1>News</h1>
+      <p>UAS announcements and external astronomy news from around the world</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <h2>UAS Announcements</h2>
+        <p>The latest official news from the Uganda Astronomical Society</p>
+      </div>
+      <div class="news-grid" id="newsGrid"></div>
+    </div>
+  </section>
+
+  <section class="section section-alt">
+    <div class="container">
+      <div class="section-header">
+        <h2>External News &amp; Resources</h2>
+        <p>Curated feeds and resources from the wider astronomy community</p>
+      </div>
+      <div class="link-grid" id="linkGrid"></div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">Uganda Astronomical Society</div>
+          <p class="footer-desc">A public scientific society advancing astronomy, space science and scientific discovery in Uganda since 2024.</p>
+        </div>
+        <div>
+          <div class="footer-heading">Explore</div>
+          <ul class="footer-links">
+            <li><a href="/about">About UAS</a></li>
+            <li><a href="/programmes">Programmes</a></li>
+            <li><a href="/events">Events</a></li>
+            <li><a href="/news">News</a></li>
+            <li><a href="/knowledge">Knowledge Base</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Community</div>
+          <ul class="footer-links">
+            <li><a href="/members">Members</a></li>
+            <li><a href="/ecosystem">Ecosystem</a></li>
+            <li><a href="/library">Library</a></li>
+            <li><a href="/contact">Contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Connect</div>
+          <ul class="footer-links">
+            <li><a href="mailto:contact@astronomy.ug">contact@astronomy.ug</a></li>
+            <li><a href="/login">Member Login</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2026 Uganda Astronomical Society. All rights reserved.</span>
+        <span>Kampala, Uganda</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/api.js"></script>
+  <script>
+    const articleImgs = ['img/article-moon.jpg','img/article-galaxy.jpg','img/article-solar.jpg','img/article-deepsky.jpg'];
+
+    function newsImg(a, i) {
+      if (a.image_url && /^[a-zA-Z0-9._-]+$/.test(a.image_url)) return ua('/img/' + a.image_url);
+      return articleImgs[i % articleImgs.length];
+    }
+
+    async function load() {
+      try { await api.me(); } catch(e) {}
+      updateNavUser();
+
+      const data = await api.request('/public/news').catch(() => ({ announcements: [], links: [] }));
+
+      const newsDiv = document.getElementById('newsGrid');
+      const items = data.announcements || [];
+      if (items.length) {
+        newsDiv.innerHTML = items.map((a, i) => {
+          const d = a.published_at ? new Date(a.published_at) : null;
+          return `
+            <div class="news-card" onclick="location.href=ua('/article/${a.id}')">
+              <img src="${newsImg(a, i)}" alt="" loading="lazy">
+              <div class="card-body">
+                <h3>${esc(a.title)}</h3>
+                <div class="news-meta">
+                  ${a.author_name ? `<span>${esc(a.author_name)}</span>` : ''}
+                  ${d ? `<span>${d.toLocaleDateString('en',{year:'numeric',month:'short',day:'numeric'})}</span>` : ''}
+                </div>
+              </div>
+            </div>`;
+        }).join('');
+      } else {
+        newsDiv.innerHTML = '<div class="empty-state"><p>No announcements yet — check back soon.</p></div>';
+      }
+
+      const linkDiv = document.getElementById('linkGrid');
+      const links = data.links || [];
+      if (links.length) {
+        linkDiv.innerHTML = links.map(l => `
+          <a class="link-card" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">
+            <span class="link-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span></span>
+            <div>
+              <div class="link-org">${esc(l.external_organization || l.category || 'External')}</div>
+              <h4>${esc(l.title)}</h4>
+              ${l.description ? `<p>${esc(l.description)}</p>` : ''}
+            </div>
+          </a>`).join('');
+      } else {
+        linkDiv.innerHTML = '<div class="empty-state"><p>No external resources linked yet.</p></div>';
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

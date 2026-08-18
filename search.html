@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="/img/uas-emblem.png">
+  <link rel="icon" type="image/png" href="img/uas-emblem.png">
   <title>Search — Uganda Astronomical Society</title>
-  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="css/base.css">
   <style>
     .search-hero { padding: 3rem 0 1.5rem; text-align: center; }
     .search-hero h1 { font-size: 2rem; font-weight: 700; }
@@ -34,13 +34,14 @@
 <body>
   <nav class="nav" role="navigation" aria-label="Main navigation">
     <div class="container">
-      <a href="/" class="nav-brand"><img src="/img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
+      <a href="/" class="nav-brand"><img src="img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
       <button class="nav-burger" onclick="this.closest('.nav').classList.toggle('open')" aria-label="Menu">&#9776;</button>
       <div class="nav-links">
         <a href="/" class="nav-link">Home</a>
         <a href="/about" class="nav-link">About</a>
         <a href="/programmes" class="nav-link">Programmes</a>
         <a href="/events" class="nav-link">Events</a>
+        <a href="/news" class="nav-link">News</a>
         <a href="/knowledge" class="nav-link">Knowledge</a>
         <a href="/contact" class="nav-link">Contact</a>
       </div>
@@ -99,7 +100,7 @@
     </div>
   </footer>
 
-  <script src="/js/api.js"></script>
+  <script src="js/api.js"></script>
   <script>
     async function load() {
       try { await api.me(); } catch(e) {}

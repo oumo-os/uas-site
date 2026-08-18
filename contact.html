@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="/img/uas-emblem.png">
+  <link rel="icon" type="image/png" href="img/uas-emblem.png">
   <title>Contact Us — Uganda Astronomical Society</title>
-  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="css/base.css">
   <style>
     .page-hero {
       position:relative; min-height:40vh; display:flex; flex-direction:column;
-      justify-content:center; align-items:flex-start; padding:6rem 1.5rem 4rem; background:url('/img/header-contact.jpg') center/cover no-repeat; color:#fff;
+      justify-content:center; align-items:flex-start; padding:6rem 1.5rem 4rem; background:url('img/header-contact.jpg') center/cover no-repeat; color:#fff;
     }
     .page-hero::before { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(15,23,42,0.6) 0%,rgba(15,23,42,0.85) 100%); }
     .page-hero > * { position:relative; z-index:1; }
@@ -62,13 +62,14 @@
 <body>
   <nav class="nav" role="navigation" aria-label="Main navigation">
     <div class="container">
-      <a href="/" class="nav-brand"><img src="/img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
+      <a href="/" class="nav-brand"><img src="img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
       <button class="nav-burger" aria-label="Toggle navigation menu" onclick="this.closest('.nav').classList.toggle('open')" aria-label="Menu">&#9776;</button>
       <div class="nav-links">
         <a href="/" class="nav-link">Home</a>
         <a href="/about" class="nav-link">About</a>
         <a href="/programmes" class="nav-link">Programmes</a>
         <a href="/events" class="nav-link">Events</a>
+        <a href="/news" class="nav-link">News</a>
         <a href="/knowledge" class="nav-link">Knowledge</a>
         <a href="/contact" class="nav-link active">Contact</a>
       </div>
@@ -199,7 +200,7 @@
     </div>
   </footer>
 
-  <script src="/js/api.js"></script>
+  <script src="js/api.js"></script>
   <script>
     async function load() {
       try { await api.me(); } catch(e) {}

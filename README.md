@@ -50,6 +50,7 @@ Administration Layer → Backups, config, security, maintenance
 - **Programme Teams**: Programme members with roles, plus free-form outputs per programme (member-only visibility, managed by programme leads)
 - **Financial Snapshot**: Dashboard and finance summary show income, expenses, committed funds and available balance
 - **Photo Gallery**: Knowledge Base gallery fed from published articles with images (`/public/gallery`)
+- **News & External Feeds**: News page combining official UAS announcements (published `announcement` articles) with curated external astronomy resources (`/public/news`)
 
 ## Setup
 
@@ -118,6 +119,7 @@ All requests go through `api/index.php?route=...` or rewrite to `/api/...`
 - `GET/POST /programmes/:id/members`, `DELETE /programmes/:id/members/:userId` — Programme teams (programmes.manage)
 - `PUT /programmes/:id` — Update programme incl. outputs
 - `GET /public/gallery` — Published articles with images (public feed)
+- `GET /public/news` — UAS announcements + active external links (public feed)
 - `POST /upload` — Attachment upload (MIME-whitelisted, 10MB cap, random filenames)
 - `GET /public/articles|events|programmes|documents` — Public content feeds (no login)
 - `POST /admin/login-as` — Admin impersonation for support (audit-logged)

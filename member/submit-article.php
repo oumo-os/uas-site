@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Submit Article — Uganda Astronomical Society</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/uas/css/base.css">
+  <link rel="stylesheet" href="../css/base.css">
 </head>
 <body>
   <nav class="nav">
@@ -13,6 +13,7 @@
       <a href="/" class="nav-brand">UAS</a>
       <div class="nav-links">
         <a href="/" class="nav-link">Home</a>
+        <a href="/news" class="nav-link">News</a>
         <a href="/knowledge" class="nav-link">Knowledge</a>
         <a href="/dashboard" class="nav-link">Dashboard</a>
       </div>
@@ -66,7 +67,7 @@
     <p>Uganda Astronomical Society &middot; Institutional Platform</p>
   </footer>
 
-  <script src="/uas/js/api.js"></script>
+  <script src="../js/api.js"></script>
   <script>
     async function load() {
       try {

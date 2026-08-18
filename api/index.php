@@ -1663,6 +1663,15 @@ try {
   }
 
   // --- PUBLIC: published articles, events, programmes (for website) ---
+  elseif ($path === '/public/news' && $method === 'GET') {
+    $stmt = db()->prepare('SELECT a.id, a.title, a.category, a.image_url, a.published_at, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.status = "published" AND a.category = "announcement" ORDER BY a.published_at DESC');
+    $stmt->execute();
+    $announcements = $stmt->fetchAll();
+    $stmt = db()->prepare('SELECT id, title, description, url, category, external_organization FROM useful_links WHERE status = "active" ORDER BY category, title');
+    $stmt->execute();
+    $links = $stmt->fetchAll();
+    json_response(['announcements' => $announcements, 'links' => $links]);
+  }
   elseif ($path === '/public/gallery' && $method === 'GET') {
     $stmt = db()->prepare('SELECT a.id, a.title, a.category, a.image_url, a.published_at, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.status = "published" AND a.image_url IS NOT NULL AND a.image_url <> "" ORDER BY a.published_at DESC');
     $stmt->execute();

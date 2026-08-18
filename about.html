@@ -3,19 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="/img/uas-emblem.png">
+  <link rel="icon" type="image/png" href="img/uas-emblem.png">
   <title>About — Uganda Astronomical Society</title>
   <meta name="description" content="Learn about UAS vision, mission, leadership, and our journey since 2024.">
   <meta property="og:title" content="About — Uganda Astronomical Society">
   <meta property="og:description" content="Learn about UAS vision, mission, leadership, and our journey since 2024.">
-  <meta property="og:image" content="/img/uas-emblem.png">
+  <meta property="og:image" content="img/uas-emblem.png">
   <meta property="og:type" content="website">
-  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="css/base.css">
   <style>
     .about-hero {
       position: relative; min-height: 50vh; display: flex; flex-direction: column;
       justify-content: center; align-items: center; text-align: center;
-      padding: 6rem 1.5rem 4rem; background: url('/img/header-about.jpg') center/cover no-repeat; color: #fff;
+      padding: 6rem 1.5rem 4rem; background: url('img/header-about.jpg') center/cover no-repeat; color: #fff;
     }
     .about-hero::before { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(15,23,42,0.6) 0%,rgba(15,23,42,0.85) 100%); }
     .about-hero > * { position:relative; z-index:1; }
@@ -105,13 +105,14 @@
 <body>
   <nav class="nav" role="navigation" aria-label="Main navigation">
     <div class="container">
-      <a href="/" class="nav-brand"><img src="/img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
+      <a href="/" class="nav-brand"><img src="img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
       <button class="nav-burger" aria-label="Toggle navigation menu" onclick="this.closest('.nav').classList.toggle('open')" aria-label="Menu">&#9776;</button>
       <div class="nav-links">
         <a href="/" class="nav-link">Home</a>
         <a href="/about" class="nav-link active">About</a>
         <a href="/programmes" class="nav-link">Programmes</a>
         <a href="/events" class="nav-link">Events</a>
+        <a href="/news" class="nav-link">News</a>
         <a href="/knowledge" class="nav-link">Knowledge</a>
         <a href="/contact" class="nav-link">Contact</a>
       </div>
@@ -323,7 +324,7 @@
     </div>
   </footer>
 
-  <script src="/js/api.js"></script>
+  <script src="js/api.js"></script>
   <script>
     const officers = [
       { name: 'Obwengye Cosmus', role: 'President', resp: 'Institutional leadership, representation, strategic direction, continuity, oversight of major partnerships.' },
