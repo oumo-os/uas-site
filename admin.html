@@ -183,66 +183,36 @@
       <div class="grid-2 gap-3" style="align-items:start">
         <div class="ops-section">
           <h3>Finance</h3>
-          <div class="flex gap-2" style="flex-wrap:wrap">
-            <input class="form-input" id="finAmount" type="number" step="0.01" placeholder="Amount" style="width:110px">
-            <select class="form-select" id="finType" style="width:110px"><option value="income">Income</option><option value="expense">Expense</option></select>
-            <input class="form-input" id="finCat" placeholder="Category" style="flex:1">
-            <input class="form-input" id="finDesc" placeholder="Description" style="flex:1.5">
-            <button class="btn btn-primary btn-sm" onclick="recordFinance()">Record</button>
-          </div>
+          <div id="adminFinanceForm"></div>
           <div id="financeList" class="mt-2 small"></div>
         </div>
         <div class="ops-section">
           <h3>Documents</h3>
-          <div class="flex gap-2" style="flex-wrap:wrap">
-            <input class="form-input" id="docTitle" placeholder="Title" style="flex:1.5">
-            <input class="form-input" id="docPath" placeholder="File path" style="flex:1.5">
-            <select class="form-select" id="docCat" style="width:120px"><option>report</option><option>policy</option><option>guide</option><option>other</option></select>
-            <button class="btn btn-primary btn-sm" onclick="uploadDoc()">Upload</button>
-          </div>
+          <div id="adminDocForm"></div>
           <div id="docList" class="mt-2 small"></div>
         </div>
       </div>
       <div class="grid-2 gap-3 mt-2" style="align-items:start">
         <div class="ops-section">
           <h3>Assignments</h3>
-          <div class="flex gap-2" style="flex-wrap:wrap">
-            <input class="form-input" id="asgTitle" placeholder="Task title" style="flex:2">
-            <input class="form-input" id="asgDue" type="date" style="width:150px">
-            <button class="btn btn-primary btn-sm" onclick="createAssignment()">Assign</button>
-          </div>
+          <div id="adminAsgForm"></div>
           <div id="asgList" class="mt-2 small"></div>
         </div>
         <div class="ops-section">
           <h3>Calendar</h3>
-          <div class="flex gap-2" style="flex-wrap:wrap">
-            <input class="form-input" id="calTitle" placeholder="Item title" style="flex:2">
-            <input class="form-input" id="calDeadline" type="datetime-local" style="width:170px">
-            <select class="form-select" id="calType" style="width:120px"><option>meeting</option><option>deadline</option><option>milestone</option></select>
-            <button class="btn btn-primary btn-sm" onclick="createCalendarItem()">Add</button>
-          </div>
+          <div id="adminCalForm"></div>
           <div id="calList" class="mt-2 small"></div>
         </div>
       </div>
       <div class="grid-2 gap-3 mt-2" style="align-items:start">
         <div class="ops-section">
           <h3>Partners</h3>
-          <div class="flex gap-2" style="flex-wrap:wrap">
-            <input class="form-input" id="pOrg" placeholder="Organization" style="flex:2">
-            <input class="form-input" id="pWebsite" placeholder="Website" style="flex:2">
-            <select class="form-select" id="pType" style="width:120px"><option>partner</option><option>affiliate</option><option>sponsor</option><option>institutional</option></select>
-            <button class="btn btn-primary btn-sm" onclick="addPartner()">Add</button>
-          </div>
+          <div id="adminPartnerForm"></div>
           <div id="partnerList" class="mt-2 small"></div>
         </div>
         <div class="ops-section">
           <h3>Useful Links</h3>
-          <div class="flex gap-2" style="flex-wrap:wrap">
-            <input class="form-input" id="lTitle" placeholder="Title" style="flex:2">
-            <input class="form-input" id="lUrl" placeholder="URL" style="flex:2">
-            <input class="form-input" id="lCat" placeholder="Category" style="width:120px">
-            <button class="btn btn-primary btn-sm" onclick="addLink()">Add</button>
-          </div>
+          <div id="adminLinkForm"></div>
           <div id="linkList" class="mt-2 small"></div>
         </div>
       </div>
@@ -622,6 +592,7 @@
       renderCalendar(calendar);
       renderPartners(partners);
       renderLinks(links);
+      await initAdminForms();
     }
 
     function renderPartners(rows) {
@@ -633,45 +604,6 @@
           <button class="btn btn-outline btn-xs" onclick="removePartner(${p.id})">Remove</button>
         </div>
       `).join('');
-    }
-
-    async function addPartner() {
-      const organization = document.getElementById('pOrg').value.trim();
-      if (!organization) return alert('Organization name required');
-      try {
-        await api.createPartner({ organization, website: document.getElementById('pWebsite').value.trim(), relationship_type: document.getElementById('pType').value });
-        document.getElementById('pOrg').value = ''; document.getElementById('pWebsite').value = '';
-        loadOperations();
-      } catch(e) { alert(e.error || 'Failed'); }
-    }
-
-    async function removePartner(id) {
-      try { await api.deletePartner(id); loadOperations(); } catch(e) { alert(e.error || 'Failed'); }
-    }
-
-    function renderLinks(rows) {
-      const div = document.getElementById('linkList');
-      if (!rows.length) { div.innerHTML = '<p class="text-dim">No links.</p>'; return; }
-      div.innerHTML = rows.map(l => `
-        <div class="flex-between" style="padding:0.3rem 0;border-bottom:1px solid var(--border)">
-          <span>${esc(l.title)} <span class="text-dim">(${esc(l.category || '')})</span></span>
-          <button class="btn btn-outline btn-xs" onclick="removeLink(${l.id})">Remove</button>
-        </div>
-      `).join('');
-    }
-
-    async function addLink() {
-      const title = document.getElementById('lTitle').value.trim();
-      if (!title) return alert('Title required');
-      try {
-        await api.createLink({ title, url: document.getElementById('lUrl').value.trim(), category: document.getElementById('lCat').value.trim() });
-        document.getElementById('lTitle').value = ''; document.getElementById('lUrl').value = ''; document.getElementById('lCat').value = '';
-        loadOperations();
-      } catch(e) { alert(e.error || 'Failed'); }
-    }
-
-    async function removeLink(id) {
-      try { await api.deleteLink(id); loadOperations(); } catch(e) { alert(e.error || 'Failed'); }
     }
 
     function renderFinance(rows) {
@@ -719,56 +651,106 @@
       `).join('');
     }
 
-    async function recordFinance() {
-      try {
-        await api.recordFinance({
-          type: document.getElementById('finType').value,
-          amount: parseFloat(document.getElementById('finAmount').value),
-          category: document.getElementById('finCat').value || 'other',
-          description: document.getElementById('finDesc').value,
-          record_date: new Date().toISOString().slice(0, 19).replace('T', ' '),
-        });
-        document.getElementById('finAmount').value = '';
-        document.getElementById('finDesc').value = '';
-        await loadOperations();
-      } catch(e) { alert(e.error || 'Failed'); }
+    function renderLinks(rows) {
+      const div = document.getElementById('linkList');
+      if (!rows.length) { div.innerHTML = '<p class="text-dim">No links.</p>'; return; }
+      div.innerHTML = rows.map(l => `
+        <div class="flex-between" style="padding:0.3rem 0;border-bottom:1px solid var(--border)">
+          <span>${esc(l.title)} <span class="text-dim">(${esc(l.category || '')})</span></span>
+          <button class="btn btn-outline btn-xs" onclick="removeLink(${l.id})">Remove</button>
+        </div>
+      `).join('');
     }
 
-    async function uploadDoc() {
-      try {
-        await api.uploadDocument({
-          title: document.getElementById('docTitle').value,
-          file_path: document.getElementById('docPath').value,
-          category: document.getElementById('docCat').value,
-        });
-        document.getElementById('docTitle').value = '';
-        document.getElementById('docPath').value = '';
-        await loadOperations();
-      } catch(e) { alert(e.error || 'Failed'); }
+    async function removePartner(id) {
+      try { await api.deletePartner(id); loadOperations(); } catch(e) { alert(e.error || 'Failed'); }
     }
 
-    async function createAssignment() {
-      try {
-        await api.createAssignment({
-          title: document.getElementById('asgTitle').value,
-          due_date: document.getElementById('asgDue').value,
-        });
-        document.getElementById('asgTitle').value = '';
-        await loadOperations();
-      } catch(e) { alert(e.error || 'Failed'); }
+    async function removeLink(id) {
+      try { await api.deleteLink(id); loadOperations(); } catch(e) { alert(e.error || 'Failed'); }
     }
 
-    async function createCalendarItem() {
-      try {
-        await api.createCalendarItem({
-          title: document.getElementById('calTitle').value,
-          type: document.getElementById('calType').value,
-          deadline: document.getElementById('calDeadline').value,
-        });
-        document.getElementById('calTitle').value = '';
+    async function initAdminForms() {
+      // Finance form
+      const finFields = [
+        { name: 'type', label: 'Type', type: 'select', required: true, options: [{ label: 'Income', value: 'income' }, { label: 'Expense', value: 'expense' }] },
+        { name: 'amount', label: 'Amount', type: 'number', required: true, min: 0 },
+        { name: 'category', label: 'Category', type: 'text', placeholder: 'e.g. equipment, travel' },
+        { name: 'description', label: 'Description', type: 'text', required: true },
+      ];
+      document.getElementById('adminFinanceForm').innerHTML = FormBuilder.render(finFields, { id: 'admin-fin', submitLabel: 'Record', submitClass: 'btn btn-primary btn-sm' });
+      FormBuilder.init('admin-fin', finFields, async (data) => {
+        data.record_date = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        await api.recordFinance(data);
         await loadOperations();
-      } catch(e) { alert(e.error || 'Failed'); }
+      });
+
+      // Document form
+      const docFields = [
+        { name: 'title', label: 'Title', type: 'text', required: true },
+        { name: 'file_path', label: 'File Path', type: 'text', required: true, placeholder: '/path/to/file' },
+        { name: 'category', label: 'Category', type: 'select', options: [{ label: 'Report', value: 'report' }, { label: 'Policy', value: 'policy' }, { label: 'Guide', value: 'guide' }, { label: 'Other', value: 'other' }] },
+      ];
+      document.getElementById('adminDocForm').innerHTML = FormBuilder.render(docFields, { id: 'admin-doc', submitLabel: 'Upload', submitClass: 'btn btn-primary btn-sm' });
+      FormBuilder.init('admin-doc', docFields, async (data) => {
+        await api.uploadDocument(data);
+        await loadOperations();
+      });
+
+      // Assignment form
+      const asgFields = [
+        { name: 'title', label: 'Task', type: 'text', required: true, placeholder: 'Task title' },
+        { name: 'due_date', label: 'Due Date', type: 'date' },
+      ];
+      document.getElementById('adminAsgForm').innerHTML = FormBuilder.render(asgFields, { id: 'admin-asg', submitLabel: 'Assign', submitClass: 'btn btn-primary btn-sm' });
+      FormBuilder.init('admin-asg', asgFields, async (data) => {
+        await api.createAssignment(data);
+        await loadOperations();
+      });
+
+      // Calendar form
+      const calFields = [
+        { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Item title' },
+        { name: 'deadline', label: 'Deadline', type: 'datetime-local' },
+        { name: 'type', label: 'Type', type: 'select', options: [{ label: 'Meeting', value: 'meeting' }, { label: 'Deadline', value: 'deadline' }, { label: 'Milestone', value: 'milestone' }] },
+      ];
+      document.getElementById('adminCalForm').innerHTML = FormBuilder.render(calFields, { id: 'admin-cal', submitLabel: 'Add', submitClass: 'btn btn-primary btn-sm' });
+      FormBuilder.init('admin-cal', calFields, async (data) => {
+        await api.createCalendarItem(data);
+        await loadOperations();
+      });
+
+      // Partner form
+      const pFields = [
+        { name: 'organization', label: 'Organization', type: 'text', required: true },
+        { name: 'website', label: 'Website', type: 'text', placeholder: 'https://...' },
+        { name: 'relationship_type', label: 'Type', type: 'select', options: [{ label: 'Partner', value: 'partner' }, { label: 'Affiliate', value: 'affiliate' }, { label: 'Sponsor', value: 'sponsor' }, { label: 'Institutional', value: 'institutional' }] },
+      ];
+      document.getElementById('adminPartnerForm').innerHTML = FormBuilder.render(pFields, { id: 'admin-partner', submitLabel: 'Add', submitClass: 'btn btn-primary btn-sm' });
+      FormBuilder.init('admin-partner', pFields, async (data) => {
+        await api.createPartner(data);
+        await loadOperations();
+      });
+
+      // Link form
+      const lFields = [
+        { name: 'title', label: 'Title', type: 'text', required: true },
+        { name: 'url', label: 'URL', type: 'text', required: true, placeholder: 'https://...' },
+        { name: 'category', label: 'Category', type: 'text', placeholder: 'e.g. research, tools' },
+      ];
+      document.getElementById('adminLinkForm').innerHTML = FormBuilder.render(lFields, { id: 'admin-link', submitLabel: 'Add', submitClass: 'btn btn-primary btn-sm' });
+      FormBuilder.init('admin-link', lFields, async (data) => {
+        await api.createLink(data);
+        await loadOperations();
+      });
     }
+
+    async function addPartner() { /* replaced by FormBuilder */ }
+    async function addLink() { /* replaced by FormBuilder */ }
+    async function recordFinance() { /* replaced by FormBuilder */ }
+    async function uploadDoc() { /* replaced by FormBuilder */ }
+    async function createAssignment() { /* replaced by FormBuilder */ }
+    async function createCalendarItem() { /* replaced by FormBuilder */ }
 
     function showRoleForm() {
       const div = document.getElementById('roleForm');

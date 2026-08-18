@@ -974,118 +974,6 @@
       return 'update';
     }
 
-    function showFinanceForm() {
-      openModal('Record Transaction', `
-        <div class="create-form" style="max-width:100%">
-          <div class="form-group"><label class="form-label">Type</label>
-            <select class="form-select" id="finType">
-              <option value="income">Income</option>
-              <option value="expense">Expense</option>
-              <option value="payable">Payable (Bill to pay)</option>
-              <option value="receivable">Receivable (Expected income)</option>
-            </select>
-          </div>
-          <div class="form-group"><label class="form-label">Amount (UGX)</label><input type="number" class="form-input" id="finAmount"></div>
-          <div class="form-group"><label class="form-label">Category</label>
-            <select class="form-select" id="finCat">
-              <optgroup label="Income">
-                <option value="donation">Donation</option>
-                <option value="grant">Grant</option>
-                <option value="membership">Membership Dues</option>
-                <option value="sponsorship">Sponsorship</option>
-                <option value="event">Event Revenue</option>
-              </optgroup>
-              <optgroup label="Expense">
-                <option value="programme">Programme</option>
-                <option value="equipment">Equipment</option>
-                <option value="training">Training</option>
-                <option value="publication">Publication</option>
-                <option value="travel">Travel</option>
-                <option value="communications">Communications</option>
-                <option value="administration">Administration</option>
-                <option value="utilities">Utilities</option>
-                <option value="outreach">Outreach</option>
-              </optgroup>
-              <optgroup label="Other">
-                <option value="other">Other</option>
-              </optgroup>
-            </select>
-          </div>
-          <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="finDesc"></div>
-          <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-input" id="finDate" value="${new Date().toISOString().split('T')[0]}"></div>
-          <div class="form-group"><label class="form-label">Due Date (payables/receivables)</label><input type="date" class="form-input" id="finDueDate"></div>
-          <div class="form-group"><label class="form-label">Status</label>
-            <select class="form-select" id="finStatus">
-              <option value="approved">Approved</option>
-              <option value="pending">Pending Approval</option>
-              <option value="paid">Paid</option>
-              <option value="draft">Draft</option>
-            </select>
-          </div>
-          <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="finNotes" rows="2"></textarea></div>
-          <button class="btn btn-primary" onclick="submitFinance()">Record</button>
-        </div>
-      `);
-    }
-
-    async function submitFinance() {
-      try {
-        await api.recordFinance({
-          type: document.getElementById('finType').value,
-          amount: parseFloat(document.getElementById('finAmount').value),
-          category: document.getElementById('finCat').value,
-          description: document.getElementById('finDesc').value,
-          record_date: document.getElementById('finDate').value,
-          due_date: document.getElementById('finDueDate').value || null,
-          status: document.getElementById('finStatus').value,
-          notes: document.getElementById('finNotes').value,
-        });
-        closeModal();
-        load();
-      } catch(e) { alert(e.error || 'Failed'); }
-    }
-
-    function showUploadForm() {
-      openModal('Upload Document', `
-        <div class="create-form" style="max-width:100%">
-          <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="docTitle"></div>
-          <div class="form-group"><label class="form-label">Category</label>
-            <select class="form-select" id="docCat">
-              <option value="report">Report</option><option value="guide">Guide</option>
-              <option value="policy">Policy</option><option value="constitution">Constitution</option>
-              <option value="minutes">Minutes</option><option value="other">Other</option>
-            </select>
-          </div>
-          <div class="form-group"><label class="form-label">Visibility</label>
-            <select class="form-select" id="docVis"><option value="public">Public</option><option value="internal">Internal</option></select>
-          </div>
-          <div class="form-group"><label class="form-label">File</label>
-            <input type="file" class="form-input" id="docFile" accept=".pdf,.doc,.docx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp">
-          </div>
-          <button class="btn btn-primary" onclick="submitUpload()">Upload</button>
-        </div>
-      `);
-    }
-
-    async function submitUpload() {
-      const fileInput = document.getElementById('docFile');
-      const file = fileInput.files[0];
-      if (!file) return alert('Please select a file');
-
-      try {
-        const uploadResult = await api.uploadFile(file);
-        await api.uploadDocument({
-          title: document.getElementById('docTitle').value,
-          category: document.getElementById('docCat').value,
-          visibility: document.getElementById('docVis').value,
-          file_path: uploadResult.url,
-        });
-        closeModal();
-        alert('Document uploaded!');
-        load();
-      } catch(e) { alert(e.error || 'Failed'); }
-    }
-
     function renderFinance(fin) {
       if (!fin || (fin.income === 0 && fin.expense === 0)) {
         document.getElementById('financeStatGrid').innerHTML = '<div class="empty-state"><h4>No financial records</h4><p>Record your first income or expense to start tracking finances.</p>' + (api.hasCap('finance.record') ? '<button class="btn btn-primary btn-sm" onclick="showFinanceForm()">Record Transaction</button>' : '') + '</div>';
@@ -1480,148 +1368,259 @@
       }
     }
 
-    function showCreateForm(type) {
+    async function showCreateForm(type) {
       const div = document.getElementById('createForm');
+      const formId = 'create-' + type;
+      let fields, title;
+
       if (type === 'article') {
-        div.innerHTML = `
-          <div class="card create-form">
-            <h4 class="mb-1">Submit Article</h4>
-            <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="artTitle"></div>
-            <div class="form-group"><label class="form-label">Category</label>
-              <select class="form-select" id="artCat"><option value="article">Article</option><option value="observing_report">Observing Report</option><option value="educational">Educational</option><option value="announcement">Announcement</option></select>
-            </div>
-            <div class="form-group"><label class="form-label">Body</label><textarea class="form-textarea" id="artBody" rows="6"></textarea></div>
-            <button class="btn btn-primary" onclick="submitArticle()">Submit</button>
-          </div>
-        `;
+        title = 'Submit Article';
+        fields = [
+          { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Article title' },
+          { name: 'category', label: 'Category', type: 'select', required: true, options: [
+            { label: 'Article', value: 'article' },
+            { label: 'Observing Report', value: 'observing_report' },
+            { label: 'Educational', value: 'educational' },
+            { label: 'Announcement', value: 'announcement' },
+          ]},
+          { name: 'body', label: 'Body', type: 'rich-text', required: true },
+        ];
       } else if (type === 'event') {
-        div.innerHTML = `
-          <div class="card create-form">
-            <h4 class="mb-1">Create Event</h4>
-            <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="evtTitle"></div>
-            <div class="form-group"><label class="form-label">Date & Time</label><input type="datetime-local" class="form-input" id="evtDate"></div>
-            <div class="form-group"><label class="form-label">Location</label><input class="form-input" id="evtLoc"></div>
-            <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="evtDesc" rows="4"></textarea></div>
-            <button class="btn btn-primary" onclick="submitEvent()">Submit for Approval</button>
-          </div>
-        `;
+        title = 'Create Event';
+        let progOpts = [{ label: '— None —', value: '' }];
+        try {
+          const progs = await api.getProgrammes();
+          progs.forEach(p => progOpts.push({ label: p.title, value: p.id }));
+        } catch(e) {}
+        fields = [
+          { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Event title' },
+          { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts },
+          { name: 'date', label: 'Start Date & Time', type: 'datetime-local', required: true },
+          { name: 'end_date', label: 'End Date & Time', type: 'datetime-local' },
+          { name: 'location', label: 'Location', type: 'text', placeholder: 'e.g. Kololo Airstrip, Kampala' },
+          { name: 'capacity', label: 'Capacity', type: 'number', min: 0, placeholder: 'Max attendees (0 = unlimited)' },
+          { name: 'description', label: 'Description', type: 'textarea', rows: 4, required: true },
+        ];
       } else if (type === 'programme') {
-        div.innerHTML = `
-          <div class="card create-form">
-            <h4 class="mb-1">Propose Programme</h4>
-            <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="progTitle"></div>
-            <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="progDesc" rows="4"></textarea></div>
-            <div class="form-group"><label class="form-label">Objectives</label><textarea class="form-textarea" id="progObj" rows="3"></textarea></div>
-            <button class="btn btn-primary" onclick="submitProgramme()">Submit</button>
-          </div>
-        `;
+        title = 'Propose Programme';
+        let leadOpts = [{ label: '— Select Lead —', value: '' }];
+        try {
+          const members = await api.request('/members');
+          members.forEach(m => leadOpts.push({ label: m.name, value: m.id }));
+        } catch(e) {}
+        fields = [
+          { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Programme title' },
+          { name: 'lead_id', label: 'Programme Lead', type: 'select', options: leadOpts },
+          { name: 'description', label: 'Description', type: 'textarea', rows: 4, required: true },
+          { name: 'objectives', label: 'Objectives', type: 'textarea', rows: 3, placeholder: 'Key objectives and goals' },
+        ];
       } else if (type === 'project') {
-        div.innerHTML = `
-          <div class="card create-form">
-            <h4 class="mb-1">Create Project</h4>
-            <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="projTitle"></div>
-            <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="projDesc" rows="4"></textarea></div>
-            <div class="form-group"><label class="form-label">Objectives</label><textarea class="form-textarea" id="projObj" rows="3"></textarea></div>
-            <div class="form-group"><label class="form-label">Deadline</label><input type="date" class="form-input" id="projDeadline"></div>
-            <button class="btn btn-primary" onclick="submitProject()">Create Project</button>
-          </div>
-        `;
+        title = 'Create Project';
+        let progOpts = [{ label: '— None —', value: '' }];
+        let leadOpts = [{ label: '— Select Lead —', value: '' }];
+        try {
+          const [progs, members] = await Promise.all([api.getProgrammes(), api.request('/members')]);
+          progs.forEach(p => progOpts.push({ label: p.title, value: p.id }));
+          members.forEach(m => leadOpts.push({ label: m.name, value: m.id }));
+        } catch(e) {}
+        fields = [
+          { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Project title' },
+          { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts },
+          { name: 'lead_id', label: 'Project Lead', type: 'select', options: leadOpts },
+          { name: 'description', label: 'Description', type: 'textarea', rows: 4, required: true },
+          { name: 'objectives', label: 'Objectives', type: 'textarea', rows: 3 },
+          { name: 'deadline', label: 'Deadline', type: 'date' },
+        ];
       }
-    }
 
-    async function submitArticle() {
-      try {
-        await api.createArticle({
-          title: document.getElementById('artTitle').value,
-          category: document.getElementById('artCat').value,
-          body: document.getElementById('artBody').value,
-        });
-        alert('Article submitted for review!');
-        document.getElementById('createForm').innerHTML = '';
-      } catch(e) { alert(e.error || 'Failed'); }
-    }
-
-    async function submitEvent() {
-      try {
-        await api.createEvent({
-          title: document.getElementById('evtTitle').value,
-          date: document.getElementById('evtDate').value,
-          location: document.getElementById('evtLoc').value,
-          description: document.getElementById('evtDesc').value,
-        });
-        alert('Event submitted for approval!');
-        document.getElementById('createForm').innerHTML = '';
-      } catch(e) { alert(e.error || 'Failed'); }
-    }
-
-    async function submitProgramme() {
-      try {
-        await api.createProgramme({
-          title: document.getElementById('progTitle').value,
-          description: document.getElementById('progDesc').value,
-          objectives: document.getElementById('progObj').value,
-        });
-        alert('Programme created!');
-        document.getElementById('createForm').innerHTML = '';
-      } catch(e) { alert(e.error || 'Failed'); }
-    }
-
-    async function submitProject() {
-      try {
-        await api.createProject({
-          title: document.getElementById('projTitle').value,
-          description: document.getElementById('projDesc').value,
-          objectives: document.getElementById('projObj').value,
-          deadline: document.getElementById('projDeadline').value,
-        });
-        alert('Project created!');
-        document.getElementById('createForm').innerHTML = '';
-      } catch(e) { alert(e.error || 'Failed'); }
-    }
-
-    function showCreateResolution() {
-      switchTab('create');
-      const div = document.getElementById('createForm');
       div.innerHTML = `
-        <div class="card create-form">
-          <h4 class="mb-1">Propose Governance Resolution</h4>
-          <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="resTitle"></div>
-          <div class="form-group"><label class="form-label">Type</label>
-            <select class="form-select" id="resType">
-              <option value="role_create">Create Role</option>
-              <option value="role_modify">Modify Role</option>
-              <option value="appointment">Appointment</option>
-              <option value="policy_adopt">Adopt Policy</option>
-              <option value="committee_create">Create Committee</option>
-              <option value="programme_create">Create Programme</option>
-            </select>
+        <div class="card create-form" style="max-width:700px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h4>${title}</h4>
+            <button class="btn btn-outline btn-xs" onclick="document.getElementById('createForm').innerHTML=''">Cancel</button>
           </div>
-          <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="resDesc" rows="4"></textarea></div>
-          <div class="form-group"><label class="form-label">Majority</label>
-            <select class="form-select" id="resMajority"><option value="simple">Simple Majority</option><option value="two_thirds">Two-Thirds</option><option value="unanimous">Unanimous</option></select>
-          </div>
-          <div class="form-group"><label class="form-label">Quorum (min votes, 0 = any)</label><input type="number" class="form-input" id="resQuorum" value="0"></div>
-          <button class="btn btn-primary" onclick="submitResolution()">Create Resolution</button>
+          ${FormBuilder.render(fields, { id: formId, submitLabel: type === 'event' ? 'Submit for Approval' : 'Submit' })}
         </div>
       `;
+      // Add preview toggle for articles
+      if (type === 'article') {
+        const form = document.getElementById(formId);
+        if (form) {
+          const actions = form.querySelector('.form-actions');
+          if (actions) {
+            const previewBtn = document.createElement('button');
+            previewBtn.type = 'button';
+            previewBtn.className = 'btn btn-outline';
+            previewBtn.style.marginRight = '0.5rem';
+            previewBtn.textContent = 'Preview';
+            previewBtn.onclick = () => toggleArticlePreview(formId);
+            actions.insertBefore(previewBtn, actions.firstChild);
+          }
+        }
+      }
+      FormBuilder.init(formId, fields, async (data) => {
+        if (type === 'article') await api.createArticle(data);
+        else if (type === 'event') await api.createEvent(data);
+        else if (type === 'programme') await api.createProgramme(data);
+        else if (type === 'project') await api.createProject(data);
+        div.innerHTML = `<div class="card" style="max-width:700px;text-align:center;padding:2rem">
+          <div style="font-size:1.5rem;margin-bottom:0.5rem">${ICONS.check}</div>
+          <h4>Submitted successfully</h4>
+          <p class="text-dim" style="margin:0.5rem 0 1rem">Your ${type} has been submitted for review.</p>
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('createForm').innerHTML=''">Close</button>
+        </div>`;
+      });
     }
 
-    async function submitResolution() {
-      try {
-        await api.createResolution({
-          title: document.getElementById('resTitle').value,
-          type: document.getElementById('resType').value,
-          description: document.getElementById('resDesc').value,
-          majority: document.getElementById('resMajority').value,
-          quorum: parseInt(document.getElementById('resQuorum').value) || 0,
-          changes: [],
-        });
-        alert('Resolution created! Submit it to begin voting.');
+    function toggleArticlePreview(formId) {
+      const editor = document.getElementById(formId + '-body');
+      const toolbar = document.getElementById(formId + '-body-toolbar');
+      const wrap = document.getElementById(formId + '-body-wrap');
+      if (!editor) return;
+      const previewId = formId + '-preview';
+      let preview = document.getElementById(previewId);
+      if (preview) {
+        preview.remove();
+        editor.style.display = '';
+        if (toolbar) toolbar.style.display = '';
+        return;
+      }
+      preview = document.createElement('div');
+      preview.id = previewId;
+      preview.className = 'article-preview';
+      preview.style.cssText = 'padding:1rem;border:1px solid var(--border);border-radius:var(--radius);min-height:200px;background:var(--bg-card);margin-top:0.5rem';
+      preview.innerHTML = '<div class="article-body">' + editor.innerHTML + '</div>';
+      editor.style.display = 'none';
+      if (toolbar) toolbar.style.display = 'none';
+      wrap.parentNode.insertBefore(preview, wrap.nextSibling);
+    }
+
+    async function showCreateResolution() {
+      switchTab('create');
+      const div = document.getElementById('createForm');
+      const formId = 'create-resolution';
+      const fields = [
+        { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Resolution title' },
+        { name: 'type', label: 'Type', type: 'select', required: true, options: [
+          { label: 'Create Role', value: 'role_create' },
+          { label: 'Modify Role', value: 'role_modify' },
+          { label: 'Appointment', value: 'appointment' },
+          { label: 'Adopt Policy', value: 'policy_adopt' },
+          { label: 'Create Committee', value: 'committee_create' },
+          { label: 'Create Programme', value: 'programme_create' },
+        ]},
+        { name: 'description', label: 'Description', type: 'textarea', rows: 4, required: true, placeholder: 'Describe the resolution and its rationale' },
+        { name: 'majority', label: 'Majority Required', type: 'select', required: true, options: [
+          { label: 'Simple Majority', value: 'simple' },
+          { label: 'Two-Thirds', value: 'two_thirds' },
+          { label: 'Unanimous', value: 'unanimous' },
+        ]},
+        { name: 'quorum', label: 'Quorum (min votes, 0 = any)', type: 'number', min: 0, value: '0' },
+      ];
+      div.innerHTML = `
+        <div class="card create-form" style="max-width:700px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h4>Propose Governance Resolution</h4>
+            <button class="btn btn-outline btn-xs" onclick="document.getElementById('createForm').innerHTML=''">Cancel</button>
+          </div>
+          ${FormBuilder.render(fields, { id: formId, submitLabel: 'Create Resolution' })}
+        </div>
+      `;
+      FormBuilder.init(formId, fields, async (data) => {
+        data.changes = [];
+        await api.createResolution(data);
+        div.innerHTML = `<div class="card" style="max-width:700px;text-align:center;padding:2rem">
+          <div style="font-size:1.5rem;margin-bottom:0.5rem">${ICONS.check}</div>
+          <h4>Resolution created</h4>
+          <p class="text-dim" style="margin:0.5rem 0 1rem">Submit it from the Resolutions tab to begin voting.</p>
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('createForm').innerHTML=''">Close</button>
+        </div>`;
         const resolutions = await api.getResolutions();
         renderResolutions(resolutions);
-        switchTab('resolutions');
-        document.getElementById('createForm').innerHTML = '';
-      } catch(e) { alert(e.error || 'Failed'); }
+      });
+    }
+
+    async function showFinanceForm() {
+      const formId = 'form-finance';
+      let progOpts = [{ label: '— None —', value: '' }];
+      let evtOpts = [{ label: '— None —', value: '' }];
+      try {
+        const [progs, evts] = await Promise.all([api.getProgrammes(), api.getEvents()]);
+        progs.forEach(p => progOpts.push({ label: p.title, value: p.id }));
+        evts.forEach(e => evtOpts.push({ label: e.title, value: e.id }));
+      } catch(e) {}
+      const fields = [
+        { name: 'type', label: 'Type', type: 'select', required: true, options: [
+          { label: 'Income', value: 'income' },
+          { label: 'Expense', value: 'expense' },
+          { label: 'Payable (Bill to pay)', value: 'payable' },
+          { label: 'Receivable (Expected income)', value: 'receivable' },
+        ]},
+        { name: 'amount', label: 'Amount (UGX)', type: 'number', required: true, min: 0 },
+        { name: 'category', label: 'Category', type: 'select', required: true, options: [
+          { label: 'Donation', value: 'donation' },
+          { label: 'Grant', value: 'grant' },
+          { label: 'Membership Dues', value: 'membership' },
+          { label: 'Sponsorship', value: 'sponsorship' },
+          { label: 'Event Revenue', value: 'event' },
+          { label: 'Programme', value: 'programme' },
+          { label: 'Equipment', value: 'equipment' },
+          { label: 'Training', value: 'training' },
+          { label: 'Publication', value: 'publication' },
+          { label: 'Travel', value: 'travel' },
+          { label: 'Communications', value: 'communications' },
+          { label: 'Administration', value: 'administration' },
+          { label: 'Utilities', value: 'utilities' },
+          { label: 'Outreach', value: 'outreach' },
+          { label: 'Other', value: 'other' },
+        ]},
+        { name: 'description', label: 'Description', type: 'text', required: true, placeholder: 'Brief description' },
+        { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts },
+        { name: 'event_id', label: 'Event', type: 'select', options: evtOpts },
+        { name: 'record_date', label: 'Date', type: 'date', value: new Date().toISOString().split('T')[0] },
+        { name: 'due_date', label: 'Due Date', type: 'date', help: 'For payables/receivables' },
+        { name: 'status', label: 'Status', type: 'select', options: [
+          { label: 'Approved', value: 'approved' },
+          { label: 'Pending Approval', value: 'pending' },
+          { label: 'Paid', value: 'paid' },
+          { label: 'Draft', value: 'draft' },
+        ]},
+        { name: 'notes', label: 'Notes', type: 'textarea', rows: 2 },
+      ];
+      openModal('Record Transaction', FormBuilder.render(fields, { id: formId, submitLabel: 'Record' }));
+      FormBuilder.init(formId, fields, async (data) => {
+        await api.recordFinance(data);
+        closeModal();
+        load();
+      });
+    }
+
+    async function showUploadForm() {
+      const formId = 'form-upload';
+      const fields = [
+        { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Document title' },
+        { name: 'category', label: 'Category', type: 'select', required: true, options: [
+          { label: 'Report', value: 'report' },
+          { label: 'Guide', value: 'guide' },
+          { label: 'Policy', value: 'policy' },
+          { label: 'Constitution', value: 'constitution' },
+          { label: 'Minutes', value: 'minutes' },
+          { label: 'Other', value: 'other' },
+        ]},
+        { name: 'visibility', label: 'Visibility', type: 'select', options: [
+          { label: 'Public', value: 'public' },
+          { label: 'Internal', value: 'internal' },
+        ]},
+        { name: 'file', label: 'File', type: 'file', required: true, accept: '.pdf,.doc,.docx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp' },
+      ];
+      openModal('Upload Document', FormBuilder.render(fields, { id: formId, submitLabel: 'Upload' }));
+      FormBuilder.init(formId, fields, async (data) => {
+        if (!data.file) throw { error: 'Please select a file' };
+        const uploadResult = await api.uploadFile(data.file);
+        await api.uploadDocument({ title: data.title, category: data.category, visibility: data.visibility, file_path: uploadResult.url });
+        closeModal();
+        load();
+      });
     }
 
     function setupTabs() {

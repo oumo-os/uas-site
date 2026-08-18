@@ -271,6 +271,192 @@ const api = {
   },
 };
 
+// --- FormBuilder: shared form rendering with validation ---
+// Field types: text, email, password, number, date, datetime-local, textarea, select, multiselect, rich-text, file, hidden
+// Option: { label, value, group? }
+const FormBuilder = {
+  render(fields, opts = {}) {
+    const id = opts.id || 'form-' + Math.random().toString(36).slice(2, 8);
+    const submitLabel = opts.submitLabel || 'Submit';
+    const submitClass = opts.submitClass || 'btn btn-primary';
+    const layout = opts.layout || 'stacked'; // stacked | inline
+    let html = `<form id="${id}" class="uas-form" onsubmit="return false" novalidate>`;
+    fields.forEach(f => {
+      html += this._field(id, f);
+    });
+    html += `<div class="form-actions"><button type="submit" class="${submitClass}" id="${id}-submit">${submitLabel}</button></div>`;
+    html += '</form>';
+    return html;
+  },
+
+  _field(formId, f) {
+    const fid = formId + '-' + f.name;
+    const req = f.required ? ' <span class="form-required">*</span>' : '';
+    const reqAttr = f.required ? ' required' : '';
+    const ph = f.placeholder ? ` placeholder="${esc(f.placeholder)}"` : '';
+    const help = f.help ? `<div class="form-help">${esc(f.help)}</div>` : '';
+    let input = '';
+    switch (f.type) {
+      case 'select':
+        input = `<select class="form-select" id="${fid}"${reqAttr}>`;
+        if (f.placeholder) input += `<option value="">${esc(f.placeholder)}</option>`;
+        (f.options || []).forEach(o => {
+          if (o.group) return;
+          input += `<option value="${esc(o.value)}">${esc(o.label)}</option>`;
+        });
+        input += '</select>';
+        break;
+      case 'multiselect':
+        input = `<select class="form-select" id="${fid}" multiple size="${Math.min((f.options||[]).length, 6)}"${reqAttr}>`;
+        (f.options || []).forEach(o => {
+          input += `<option value="${esc(o.value)}">${esc(o.label)}</option>`;
+        });
+        input += '</select>';
+        break;
+      case 'textarea':
+        input = `<textarea class="form-textarea" id="${fid}" rows="${f.rows || 4}"${reqAttr}${ph}>${esc(f.value || '')}</textarea>`;
+        break;
+      case 'rich-text':
+        input = `<div class="rte-wrap" id="${fid}-wrap"><div class="rte-toolbar" id="${fid}-toolbar"></div><div class="rte-editor" id="${fid}" contenteditable="true"${reqAttr}>${f.value || ''}</div></div>`;
+        break;
+      case 'file':
+        const accept = f.accept ? ` accept="${esc(f.accept)}"` : '';
+        input = `<input type="file" class="form-input" id="${fid}"${accept}${reqAttr}>`;
+        break;
+      case 'hidden':
+        input = `<input type="hidden" id="${fid}" value="${esc(f.value || '')}">`;
+        break;
+      default:
+        const extra = f.min !== undefined ? ` min="${f.min}"` : '';
+        const step = f.step ? ` step="${f.step}"` : '';
+        input = `<input type="${f.type || 'text'}" class="form-input" id="${fid}"${reqAttr}${ph}${extra}${step} value="${esc(f.value || '')}">`;
+    }
+    return `<div class="form-group" data-field="${f.name}"><label class="form-label" for="${fid}">${esc(f.label)}${req}</label>${input}<div class="form-error" id="${fid}-error"></div>${help}</div>`;
+  },
+
+  init(formId, fields, onSubmit) {
+    const form = document.getElementById(formId);
+    if (!form) return;
+    // Init rich text editors
+    fields.filter(f => f.type === 'rich-text').forEach(f => {
+      const fid = formId + '-' + f.name;
+      RichTextEditor.init(fid + '-toolbar', fid);
+    });
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = {};
+      let valid = true;
+      fields.forEach(f => {
+        const el = document.getElementById(formId + '-' + f.name);
+        const errEl = document.getElementById(formId + '-' + f.name + '-error');
+        if (!el) return;
+        if (f.type === 'rich-text') {
+          data[f.name] = el.innerHTML.trim();
+        } else if (f.type === 'multiselect') {
+          data[f.name] = Array.from(el.selectedOptions).map(o => o.value);
+        } else if (f.type === 'file') {
+          data[f.name] = el.files[0] || null;
+        } else if (f.type === 'number') {
+          data[f.name] = el.value ? parseFloat(el.value) : null;
+        } else {
+          data[f.name] = el.value || null;
+        }
+        // Validate
+        if (errEl) errEl.textContent = '';
+        el.classList.remove('input-error');
+        if (f.required && !data[f.name] && data[f.name] !== 0) {
+          if (errEl) errEl.textContent = f.label + ' is required';
+          el.classList.add('input-error');
+          valid = false;
+        }
+        if (f.validate && data[f.name]) {
+          const msg = f.validate(data[f.name]);
+          if (msg) {
+            if (errEl) errEl.textContent = msg;
+            el.classList.add('input-error');
+            valid = false;
+          }
+        }
+      });
+      if (!valid) return;
+      const btn = document.getElementById(formId + '-submit');
+      if (btn) { btn.disabled = true; btn.dataset.origText = btn.textContent; btn.textContent = 'Saving...'; }
+      try {
+        await onSubmit(data);
+      } catch (err) {
+        alert(err.error || err.message || 'Failed');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origText || 'Submit'; }
+      }
+    });
+  },
+
+  getValues(formId, fields) {
+    const data = {};
+    fields.forEach(f => {
+      const el = document.getElementById(formId + '-' + f.name);
+      if (!el) return;
+      if (f.type === 'rich-text') data[f.name] = el.innerHTML.trim();
+      else if (f.type === 'multiselect') data[f.name] = Array.from(el.selectedOptions).map(o => o.value);
+      else if (f.type === 'file') data[f.name] = el.files[0] || null;
+      else if (f.type === 'number') data[f.name] = el.value ? parseFloat(el.value) : null;
+      else data[f.name] = el.value || null;
+    });
+    return data;
+  },
+
+  clearErrors(formId) {
+    document.querySelectorAll(`#${formId} .form-error`).forEach(e => e.textContent = '');
+    document.querySelectorAll(`#${formId} .input-error`).forEach(e => e.classList.remove('input-error'));
+  },
+};
+
+// --- RichTextEditor: lightweight contenteditable toolbar ---
+const RichTextEditor = {
+  init(toolbarId, editorId) {
+    const toolbar = document.getElementById(toolbarId);
+    const editor = document.getElementById(editorId);
+    if (!toolbar || !editor) return;
+    const cmds = [
+      { cmd: 'bold', icon: '<strong>B</strong>', title: 'Bold' },
+      { cmd: 'italic', icon: '<em>I</em>', title: 'Italic' },
+      { cmd: 'underline', icon: '<u>U</u>', title: 'Underline' },
+      { cmd: 'insertUnorderedList', icon: '&#8226;', title: 'Bullet List' },
+      { cmd: 'insertOrderedList', icon: '1.', title: 'Numbered List' },
+      { cmd: 'formatBlock', val: 'h3', icon: 'H3', title: 'Heading' },
+      { cmd: 'formatBlock', val: 'p', icon: 'P', title: 'Paragraph' },
+      { cmd: 'createLink', icon: '<svg viewBox="0 0 24 24" width="14" height="14"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>', title: 'Link' },
+    ];
+    toolbar.innerHTML = cmds.map((c, i) =>
+      `<button type="button" class="rte-btn" data-cmd="${c.cmd}" data-val="${c.val || ''}" title="${c.title}">${c.icon}</button>`
+    ).join('');
+    toolbar.addEventListener('click', e => {
+      const btn = e.target.closest('.rte-btn');
+      if (!btn) return;
+      e.preventDefault();
+      const cmd = btn.dataset.cmd;
+      const val = btn.dataset.val || null;
+      if (cmd === 'createLink') {
+        const url = prompt('Enter URL:');
+        if (url) document.execCommand(cmd, false, url);
+      } else {
+        document.execCommand(cmd, false, val);
+      }
+      editor.focus();
+    });
+  },
+
+  getHtml(editorId) {
+    const el = document.getElementById(editorId);
+    return el ? el.innerHTML.trim() : '';
+  },
+
+  setHtml(editorId, html) {
+    const el = document.getElementById(editorId);
+    if (el) el.innerHTML = html;
+  },
+};
+
 // --- Theme toggle (dark/light) ---
 (function () {
   const saved = localStorage.getItem('uas-theme');
