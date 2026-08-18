@@ -261,6 +261,26 @@ function get_pending_items(?int $userId = null): array {
     $stmt->execute([$userId]);
     $items = array_merge($items, $stmt->fetchAll());
 
+    // Open polls the user is eligible for and has not voted in
+    $roleIds = $userRoleIds ?: [-1];
+    $placeholders2 = implode(',', array_fill(0, count($roleIds), '?'));
+    $sql = "SELECT p.id, p.title, p.status, p.starts_at AS created_at, u.name AS author_name,
+            'poll' AS item_type, p.id AS related_id
+            FROM polls p LEFT JOIN users u ON u.id = p.created_by
+            WHERE p.status = 'open'
+              AND (p.ends_at IS NULL OR p.ends_at > NOW())
+              AND NOT EXISTS (SELECT 1 FROM poll_votes pv WHERE pv.poll_id = p.id AND pv.user_id = ?)
+              AND (p.eligibility = 'all'
+                OR (p.eligibility = 'directors' AND EXISTS (
+                  SELECT 1 FROM role_capabilities rc2 JOIN capabilities c2 ON c2.id = rc2.capability_id
+                  WHERE rc2.role_id IN ($placeholders2) AND c2.slug = 'resolutions.vote'))
+                OR (p.eligibility = 'members' AND EXISTS (
+                  SELECT 1 FROM members m2 WHERE m2.user_id = ? AND m2.status = 'active')))";
+    $params = array_merge([$userId], $roleIds, [$userId]);
+    $stmt = db()->prepare($sql);
+    $stmt->execute($params);
+    $items = array_merge($items, $stmt->fetchAll());
+
   } else {
     // ORG WIDE: all pending items
     // Articles pending review/approval
@@ -326,6 +346,17 @@ function get_pending_items(?int $userId = null): array {
     $stmt = db()->prepare($sql);
     $stmt->execute();
     $items = array_merge($items, $stmt->fetchAll());
+
+    // Open polls awaiting votes
+    $sql = "SELECT p.id, p.title, p.status, p.starts_at AS created_at, u.name AS author_name,
+            'poll' AS item_type,
+            CONCAT((SELECT COUNT(*) FROM poll_votes pv WHERE pv.poll_id = p.id), ' votes') AS approver_role
+            FROM polls p LEFT JOIN users u ON u.id = p.created_by
+            WHERE p.status = 'open'
+              AND (p.ends_at IS NULL OR p.ends_at > NOW())";
+    $stmt = db()->prepare($sql);
+    $stmt->execute();
+    $items = array_merge($items, $stmt->fetchAll());
   }
 
   // Sort by date (oldest first)
@@ -370,14 +401,23 @@ function institutional_health(): array {
   $stmt = db()->prepare("SELECT COUNT(*) AS total FROM resolutions WHERE status = 'voting'");
   $stmt->execute();
   $health['governance'] = $stmt->fetch();
+  $stmt = db()->prepare("SELECT COUNT(*) AS open FROM polls WHERE status = 'open' AND (ends_at IS NULL OR ends_at > NOW())");
+  $stmt->execute();
+  $health['polls_open'] = (int) $stmt->fetch()['open'];
+  $stmt = db()->prepare("SELECT COUNT(*) AS upcoming FROM meetings WHERE status IN ('scheduled','in_progress') AND (scheduled_at IS NULL OR scheduled_at >= NOW())");
+  $stmt->execute();
+  $health['meetings_upcoming'] = (int) $stmt->fetch()['upcoming'];
 
-  // Financials
+  // Financials (snapshot: received / spent / committed / available)
   $stmt = db()->prepare("SELECT
     SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS income,
-    SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS spent
+    SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS spent,
+    SUM(CASE WHEN type = 'commitment' THEN amount ELSE 0 END) AS committed
   FROM financial_records");
   $stmt->execute();
-  $health['finance'] = $stmt->fetch();
+  $finance = $stmt->fetch();
+  $finance['available'] = $finance['income'] - $finance['spent'] - $finance['committed'];
+  $health['finance'] = $finance;
 
   // Recent memberships
   $stmt = db()->prepare("SELECT COUNT(*) AS new_this_quarter FROM members WHERE joined_date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)");

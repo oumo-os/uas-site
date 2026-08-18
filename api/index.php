@@ -147,6 +147,278 @@ try {
     json_response(['ok' => true]);
   }
 
+  // --- MEETINGS ---
+  elseif ($path === '/meetings' && $method === 'GET') {
+    $user = require_login();
+    $stmt = db()->prepare('SELECT m.*, u.name AS created_by_name,
+      (SELECT COUNT(*) FROM meeting_attendance ma WHERE ma.meeting_id = m.id) AS attendees
+      FROM meetings m LEFT JOIN users u ON u.id = m.created_by
+      ORDER BY COALESCE(m.scheduled_at, m.created_at) DESC');
+    $stmt->execute();
+    $list = $stmt->fetchAll();
+    foreach ($list as &$mtg) {
+      $mtg['agenda'] = $mtg['agenda'] ? json_decode($mtg['agenda'], true) : [];
+      $mtg['decisions'] = $mtg['decisions'] ? json_decode($mtg['decisions'], true) : [];
+      $mtg['my_attendance'] = null;
+      $s = db()->prepare('SELECT status FROM meeting_attendance WHERE meeting_id = ? AND user_id = ?');
+      $s->execute([$mtg['id'], $user['id']]);
+      $mtg['my_attendance'] = $s->fetchColumn();
+    }
+    json_response($list);
+  }
+  elseif ($path === '/meetings' && $method === 'POST') {
+    $user = require_cap('meetings.create');
+    $data = input_json();
+    if (empty($data['title'])) json_error('Title is required', 400);
+    $validTypes = ['board', 'general', 'committee', 'working_group', 'other'];
+    $type = $data['meeting_type'] ?? 'board';
+    if (!in_array($type, $validTypes, true)) json_error('Invalid meeting type', 400);
+    db()->prepare('INSERT INTO meetings (title, meeting_type, description, scheduled_at, location, agenda, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      ->execute([
+        $data['title'],
+        $type,
+        $data['description'] ?? null,
+        $data['scheduled_at'] ?? null,
+        $data['location'] ?? null,
+        isset($data['agenda']) ? json_encode($data['agenda']) : null,
+        $data['status'] ?? 'scheduled',
+        $user['id']
+      ]);
+    $id = (int) db()->lastInsertId();
+    audit_log('meeting_create', 'meeting', $id);
+    notify_capability('meetings.manage', 'meeting_scheduled', 'Meeting scheduled: ' . $data['title'], 'A new meeting has been scheduled. Review it from the dashboard.', '/dashboard');
+    json_response(['id' => $id], 201);
+  }
+  elseif (preg_match('#^/meetings/(\d+)$#', $path, $m) && $method === 'GET') {
+    require_login();
+    $id = (int) $m[1];
+    $stmt = db()->prepare('SELECT m.*, u.name AS created_by_name FROM meetings m LEFT JOIN users u ON u.id = m.created_by WHERE m.id = ?');
+    $stmt->execute([$id]);
+    $meeting = $stmt->fetch();
+    if (!$meeting) json_error('Meeting not found', 404);
+    $meeting['agenda'] = $meeting['agenda'] ? json_decode($meeting['agenda'], true) : [];
+    $meeting['decisions'] = $meeting['decisions'] ? json_decode($meeting['decisions'], true) : [];
+    $stmt = db()->prepare('SELECT ma.*, u.name AS user_name FROM meeting_attendance ma JOIN users u ON u.id = ma.user_id WHERE ma.meeting_id = ? ORDER BY u.name');
+    $stmt->execute([$id]);
+    $meeting['attendance'] = $stmt->fetchAll();
+    json_response($meeting);
+  }
+  elseif (preg_match('#^/meetings/(\d+)$#', $path, $m) && $method === 'PUT') {
+    require_cap('meetings.manage');
+    $data = input_json();
+    $id = (int) $m[1];
+    $sets = [];
+    $args = [];
+    foreach (['title', 'meeting_type', 'description', 'location'] as $f) {
+      if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = $data[$f]; }
+    }
+    if (array_key_exists('scheduled_at', $data)) { $sets[] = 'scheduled_at = ?'; $args[] = $data['scheduled_at'] ?: null; }
+    if (array_key_exists('agenda', $data)) { $sets[] = 'agenda = ?'; $args[] = json_encode($data['agenda']); }
+    if (!$sets) json_error('Nothing to update', 400);
+    $args[] = $id;
+    db()->prepare('UPDATE meetings SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($args);
+    audit_log('meeting_update', 'meeting', $id);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/meetings/(\d+)/status$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('meetings.manage');
+    $data = input_json();
+    $status = $data['status'] ?? '';
+    if (!in_array($status, ['scheduled', 'in_progress', 'completed', 'cancelled'], true)) json_error('Invalid status', 400);
+    db()->prepare('UPDATE meetings SET status = ? WHERE id = ?')->execute([$status, (int) $m[1]]);
+    audit_log('meeting_status', 'meeting', (int) $m[1], ['status' => $status]);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/meetings/(\d+)/attendance$#', $path, $m) && $method === 'POST') {
+    require_cap('meetings.record');
+    $data = input_json();
+    $id = (int) $m[1];
+    $stmt = db()->prepare('SELECT id FROM meetings WHERE id = ?');
+    $stmt->execute([$id]);
+    if (!$stmt->fetch()) json_error('Meeting not found', 404);
+    foreach ($data['attendees'] ?? [] as $a) {
+      if (empty($a['user_id'])) continue;
+      db()->prepare('INSERT INTO meeting_attendance (meeting_id, user_id, status, notes) VALUES (?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE status = VALUES(status), notes = VALUES(notes)')
+        ->execute([$id, (int) $a['user_id'], $a['status'] ?? 'absent', $a['notes'] ?? null]);
+    }
+    audit_log('meeting_attendance', 'meeting', $id);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/meetings/(\d+)/minutes$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('meetings.record');
+    $data = input_json();
+    $id = (int) $m[1];
+    $stmt = db()->prepare('SELECT id, title FROM meetings WHERE id = ?');
+    $stmt->execute([$id]);
+    $meetingRow = $stmt->fetch();
+    if (!$meetingRow) json_error('Meeting not found', 404);
+    $decisions = $data['decisions'] ?? [];
+    db()->prepare('UPDATE meetings SET minutes = ?, decisions = ? WHERE id = ?')
+      ->execute([$data['minutes'] ?? null, json_encode($decisions), $id]);
+    // Action items become assignments
+    $stmt = db()->prepare('INSERT INTO assignments (title, description, assignee_id, assigner_id, due_date, priority, related_type, related_id, status)
+      VALUES (?, ?, ?, ?, ?, ?, "meeting", ?, "not_started")');
+    foreach ($decisions as $d) {
+      if (empty($d['text'])) continue;
+      $assigneeId = !empty($d['assignee_id']) ? (int) $d['assignee_id'] : null;
+      $text = trim($d['text']);
+      $stmt->execute([
+        mb_substr($text, 0, 120),
+        $text,
+        $assigneeId,
+        $user['id'],
+        $d['due_date'] ?? null,
+        $d['priority'] ?? 'medium',
+        $id
+      ]);
+      $asgId = (int) db()->lastInsertId();
+      if ($assigneeId) {
+        notify_user($assigneeId, 'assignment_assigned', 'Action item: ' . mb_substr($text, 0, 80), 'Assigned from meeting minutes.', '/dashboard');
+      }
+    }
+    audit_log('meeting_minutes', 'meeting', $id);
+    json_response(['ok' => true]);
+  }
+
+  // --- POLLS ---
+  elseif ($path === '/polls' && $method === 'GET') {
+    $user = require_login();
+    $stmt = db()->prepare('SELECT p.*, u.name AS created_by_name FROM polls p LEFT JOIN users u ON u.id = p.created_by ORDER BY p.created_at DESC');
+    $stmt->execute();
+    $polls = $stmt->fetchAll();
+    foreach ($polls as &$p) {
+      $p['options'] = json_decode($p['options'], true) ?: [];
+      $p['my_vote'] = null;
+      $s = db()->prepare('SELECT option_index FROM poll_votes WHERE poll_id = ? AND user_id = ?');
+      $s->execute([$p['id'], $user['id']]);
+      $myVote = $s->fetchColumn();
+      $p['my_vote'] = $myVote !== false ? (int) $myVote : null;
+      $s = db()->prepare('SELECT COUNT(*) FROM poll_votes WHERE poll_id = ?');
+      $s->execute([$p['id']]);
+      $p['votes'] = (int) $s->fetchColumn();
+      $p['eligible'] = poll_eligible($p, $user['id']);
+    }
+    json_response($polls);
+  }
+  elseif ($path === '/polls' && $method === 'POST') {
+    $user = require_cap('governance.poll.create');
+    $data = input_json();
+    $options = $data['options'] ?? [];
+    if (empty($data['title']) || count($options) < 2) json_error('Title and at least 2 options are required', 400);
+    db()->prepare('INSERT INTO polls (title, description, poll_type, eligibility, options, quorum, allow_anonymous, starts_at, ends_at, status, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      ->execute([
+        $data['title'],
+        $data['description'] ?? null,
+        $data['poll_type'] ?? 'consultation',
+        $data['eligibility'] ?? 'directors',
+        json_encode($options),
+        (int) ($data['quorum'] ?? 0),
+        !empty($data['allow_anonymous']) ? 1 : 0,
+        $data['starts_at'] ?? null,
+        $data['ends_at'] ?? null,
+        'draft',
+        $user['id']
+      ]);
+    $id = (int) db()->lastInsertId();
+    audit_log('poll_create', 'poll', $id);
+    json_response(['id' => $id], 201);
+  }
+  elseif (preg_match('#^/polls/(\d+)$#', $path, $m) && $method === 'GET') {
+    $user = require_login();
+    $id = (int) $m[1];
+    $stmt = db()->prepare('SELECT p.*, u.name AS created_by_name FROM polls p LEFT JOIN users u ON u.id = p.created_by WHERE p.id = ?');
+    $stmt->execute([$id]);
+    $poll = $stmt->fetch();
+    if (!$poll) json_error('Poll not found', 404);
+    $poll['options'] = json_decode($poll['options'], true) ?: [];
+    $poll['my_vote'] = null;
+    $s = db()->prepare('SELECT option_index FROM poll_votes WHERE poll_id = ? AND user_id = ?');
+    $s->execute([$id, $user['id']]);
+    $myVote = $s->fetchColumn();
+    $poll['my_vote'] = $myVote !== false ? (int) $myVote : null;
+    $results = [];
+    $s = db()->prepare('SELECT option_index, COUNT(*) AS c FROM poll_votes WHERE poll_id = ? GROUP BY option_index');
+    $s->execute([$id]);
+    foreach ($s->fetchAll() as $r) $results[(int) $r['option_index']] = (int) $r['c'];
+    $poll['results'] = $results;
+    $poll['voters'] = [];
+    if (!$poll['allow_anonymous']) {
+      $s = db()->prepare('SELECT pv.*, u.name AS voter_name FROM poll_votes pv JOIN users u ON u.id = pv.user_id WHERE pv.poll_id = ? ORDER BY pv.voted_at');
+      $s->execute([$id]);
+      $poll['voters'] = $s->fetchAll();
+    }
+    json_response($poll);
+  }
+  elseif (preg_match('#^/polls/(\d+)/open$#', $path, $m) && $method === 'POST') {
+    require_cap('governance.poll.manage');
+    $id = (int) $m[1];
+    $stmt = db()->prepare('SELECT id, title FROM polls WHERE id = ?');
+    $stmt->execute([$id]);
+    $poll = $stmt->fetch();
+    if (!$poll) json_error('Poll not found', 404);
+    db()->prepare("UPDATE polls SET status = 'open', starts_at = COALESCE(starts_at, NOW()) WHERE id = ?")->execute([$id]);
+    audit_log('poll_open', 'poll', $id);
+    notify_capability('governance.poll.vote', 'poll_open', 'Poll open: ' . $poll['title'], 'Voting is now open — cast your vote from the dashboard.', '/dashboard');
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/polls/(\d+)/vote$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('governance.poll.vote');
+    $data = input_json();
+    $id = (int) $m[1];
+    $stmt = db()->prepare('SELECT * FROM polls WHERE id = ?');
+    $stmt->execute([$id]);
+    $poll = $stmt->fetch();
+    if (!$poll) json_error('Poll not found', 404);
+    if ($poll['status'] !== 'open') json_error('Poll is not open for voting', 400);
+    if ($poll['ends_at'] && $poll['ends_at'] < date('Y-m-d H:i:s')) json_error('Poll has ended', 400);
+    if (!poll_eligible($poll, $user['id'])) json_error('You are not eligible to vote in this poll', 403);
+    $options = json_decode($poll['options'], true) ?: [];
+    $opt = isset($data['option_index']) ? (int) $data['option_index'] : -1;
+    if ($opt < 0 || $opt >= count($options)) json_error('Invalid option', 400);
+    $s = db()->prepare('SELECT 1 FROM poll_votes WHERE poll_id = ? AND user_id = ?');
+    $s->execute([$id, $user['id']]);
+    if ($s->fetch()) json_error('You have already voted in this poll', 409);
+    db()->prepare('INSERT INTO poll_votes (poll_id, user_id, option_index) VALUES (?, ?, ?)')->execute([$id, $user['id'], $opt]);
+    audit_log('poll_vote', 'poll', $id, ['option' => $opt]);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/polls/(\d+)/close$#', $path, $m) && $method === 'POST') {
+    require_cap('governance.poll.manage');
+    $id = (int) $m[1];
+    $result = close_poll($id);
+    $stmt = db()->prepare('SELECT title FROM polls WHERE id = ?');
+    $stmt->execute([$id]);
+    $title = $stmt->fetchColumn();
+    audit_log('poll_close', 'poll', $id, ['result' => $result]);
+    notify_capability('governance.poll.vote', 'poll_closed', 'Poll closed: ' . $title, 'Results have been finalized.', '/dashboard');
+    json_response(['ok' => true, 'result' => $result]);
+  }
+  elseif (preg_match('#^/polls/(\d+)/resolve$#', $path, $m) && $method === 'POST') {
+    require_cap('governance.poll.resolve');
+    $id = (int) $m[1];
+    $result = close_poll($id);
+    $stmt = db()->prepare('SELECT title FROM polls WHERE id = ?');
+    $stmt->execute([$id]);
+    $title = $stmt->fetchColumn();
+    audit_log('poll_resolve', 'poll', $id, ['result' => $result]);
+    notify_capability('governance.poll.vote', 'poll_closed', 'Poll resolved: ' . $title, 'Results have been recorded.', '/dashboard');
+    json_response(['ok' => true, 'result' => $result]);
+  }
+  elseif (preg_match('#^/polls/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    require_cap('governance.poll.manage');
+    $id = (int) $m[1];
+    $stmt = db()->prepare('SELECT status FROM polls WHERE id = ?');
+    $stmt->execute([$id]);
+    $poll = $stmt->fetch();
+    if (!$poll) json_error('Poll not found', 404);
+    if ($poll['status'] !== 'draft') json_error('Only draft polls can be deleted', 400);
+    db()->prepare('DELETE FROM polls WHERE id = ?')->execute([$id]);
+    audit_log('poll_delete', 'poll', $id);
+    json_response(['ok' => true]);
+  }
+
   elseif ($path === '/profile' && $method === 'GET') {
     $user = require_login();
     $stmt = db()->prepare('SELECT m.interests, m.contributions, m.profile_visible, m.membership_number, m.category FROM members m WHERE m.user_id = ?');
@@ -997,7 +1269,8 @@ try {
     json_response([
       'income' => $byType['income'] ?? 0,
       'expense' => $byType['expense'] ?? 0,
-      'balance' => ($byType['income'] ?? 0) - ($byType['expense'] ?? 0),
+      'commitment' => $byType['commitment'] ?? 0,
+      'available' => ($byType['income'] ?? 0) - ($byType['expense'] ?? 0) - ($byType['commitment'] ?? 0),
       'by_category' => $byCategory,
       'recent' => $recent,
     ]);
@@ -1390,6 +1663,11 @@ try {
   }
 
   // --- PUBLIC: published articles, events, programmes (for website) ---
+  elseif ($path === '/public/gallery' && $method === 'GET') {
+    $stmt = db()->prepare('SELECT a.id, a.title, a.category, a.image_url, a.published_at, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.status = "published" AND a.image_url IS NOT NULL AND a.image_url <> "" ORDER BY a.published_at DESC');
+    $stmt->execute();
+    json_response($stmt->fetchAll());
+  }
   elseif ($path === '/public/articles' && $method === 'GET') {
     $stmt = db()->prepare('SELECT a.id, a.title, a.category, a.tags, a.image_url, a.published_at, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.status = "published" ORDER BY a.published_at DESC');
     $stmt->execute();
@@ -1443,6 +1721,16 @@ try {
     $stmt->execute([$pid]);
     $programme['events'] = $stmt->fetchAll();
 
+    // Members and outputs are member-only
+    if ($requester) {
+      $stmt = db()->prepare('SELECT pm.*, u.name AS user_name, u.email AS user_email FROM programme_members pm JOIN users u ON u.id = pm.user_id WHERE pm.programme_id = ? AND pm.status = "active" ORDER BY u.name');
+      $stmt->execute([$pid]);
+      $programme['members'] = $stmt->fetchAll();
+    } else {
+      $programme['members'] = [];
+      unset($programme['outputs']);
+    }
+
     // Finance and programme budget are member-only
     if ($requester) {
       $stmt = db()->prepare('SELECT type, SUM(amount) AS total FROM financial_records WHERE programme_id = ? GROUP BY type');
@@ -1484,6 +1772,49 @@ try {
     $stmt = db()->prepare('SELECT a.*, u.name AS assignee_name, u2.name AS assigner_name FROM assignments a LEFT JOIN users u ON u.id = a.assignee_id LEFT JOIN users u2 ON u2.id = a.assigner_id WHERE a.assignee_id = ? ORDER BY a.due_date ASC, a.created_at DESC');
     $stmt->execute([current_user_id()]);
     json_response($stmt->fetchAll());
+  }
+  // --- PROGRAMME MEMBERS & OUTPUTS ---
+  elseif (preg_match('#^/programmes/(\d+)$#', $path, $m) && $method === 'PUT') {
+    require_cap('programmes.manage');
+    $data = input_json();
+    $id = (int) $m[1];
+    $sets = [];
+    $args = [];
+    foreach (['title', 'description', 'objectives', 'outputs', 'status', 'lead_id'] as $f) {
+      if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = $data[$f]; }
+    }
+    if (array_key_exists('budget', $data)) { $sets[] = 'budget = ?'; $args[] = $data['budget'] !== null ? (float) $data['budget'] : null; }
+    if (array_key_exists('spent', $data)) { $sets[] = 'spent = ?'; $args[] = $data['spent'] !== null ? (float) $data['spent'] : null; }
+    if (!$sets) json_error('Nothing to update', 400);
+    $args[] = $id;
+    db()->prepare('UPDATE programmes SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($args);
+    audit_log('programme_update', 'programme', $id);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/programmes/(\d+)/members$#', $path, $m) && $method === 'GET') {
+    require_login();
+    $id = (int) $m[1];
+    $stmt = db()->prepare('SELECT pm.*, u.name AS user_name, u.email AS user_email FROM programme_members pm JOIN users u ON u.id = pm.user_id WHERE pm.programme_id = ? ORDER BY u.name');
+    $stmt->execute([$id]);
+    json_response($stmt->fetchAll());
+  }
+  elseif (preg_match('#^/programmes/(\d+)/members$#', $path, $m) && $method === 'POST') {
+    require_cap('programmes.manage');
+    $data = input_json();
+    $id = (int) $m[1];
+    if (empty($data['user_id'])) json_error('user_id is required', 400);
+    db()->prepare('INSERT INTO programme_members (programme_id, user_id, role_in_programme, status, joined_date) VALUES (?, ?, ?, "active", COALESCE(?, CURDATE()))
+      ON DUPLICATE KEY UPDATE role_in_programme = VALUES(role_in_programme), status = "active"')
+      ->execute([$id, (int) $data['user_id'], $data['role_in_programme'] ?? null, $data['joined_date'] ?? null]);
+    audit_log('programme_member_add', 'programme', $id, ['user_id' => (int) $data['user_id']]);
+    notify_user((int) $data['user_id'], 'programme_member_add', 'Programme membership', 'You were added to a programme team.', '/dashboard');
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/programmes/(\d+)/members/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    require_cap('programmes.manage');
+    db()->prepare('DELETE FROM programme_members WHERE programme_id = ? AND user_id = ?')->execute([(int) $m[1], (int) $m[2]]);
+    audit_log('programme_member_remove', 'programme', (int) $m[1], ['user_id' => (int) $m[2]]);
+    json_response(['ok' => true]);
   }
   // --- MEMBER CALENDAR ---
   elseif ($path === '/member/calendar' && $method === 'GET') {

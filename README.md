@@ -45,11 +45,16 @@ Administration Layer → Backups, config, security, maintenance
 - **Site-wide Search**: Cross-content search (articles, events, programmes, projects, documents, members) with public-safe member results
 - **Password Reset (admin)**: Generate a one-time temporary password for any member, audit-logged
 - **Hardening**: Login/registration rate limiting, SameSite session cookies, server-side password policy, cross-origin request rejection, MIME-whitelisted uploads
+- **Meetings**: Board/general/committee meetings with agenda, scheduled time, attendance records (attended/absent/excused/apology), posted minutes, and decisions that generate assignments with notifications
+- **Polls**: Governance or consultation polls with eligibility rules (directors / members / all), quorum, deadlines, anonymous voting, one-vote-per-user, tally bars, and close/resolve with tie and quorum handling; open polls surface in Pending Items
+- **Programme Teams**: Programme members with roles, plus free-form outputs per programme (member-only visibility, managed by programme leads)
+- **Financial Snapshot**: Dashboard and finance summary show income, expenses, committed funds and available balance
+- **Photo Gallery**: Knowledge Base gallery fed from published articles with images (`/public/gallery`)
 
 ## Setup
 
 1. Create MySQL database `uas_platform`
-2. Run all migrations in order: `mysql -u root uas_platform < migrations/001_initial.sql` … `010_rate_limits.sql` (each file can be piped the same way)
+2. Run all migrations in order: `mysql -u root uas_platform < migrations/001_initial.sql` … `013_programme_members.sql` (each file can be piped the same way)
 3. Configure `api/config.php` with DB credentials (or environment variables `UAS_DB_HOST`, `UAS_DB_USER`, `UAS_DB_PASS`, `UAS_ENV=production`)
 4. Seed dev data: `php api/seed.php` (admin + board + roles + capabilities)
 5. Seed sample content: `php api/seed-content.php`, then `api/seed-richer.php`, `api/seed-users.php`, `api/seed-budget-groups.php` (all idempotent)
@@ -102,6 +107,17 @@ All requests go through `api/index.php?route=...` or rewrite to `/api/...`
 - `GET/POST /budget-items` — Budget items (finance.view); `GET /budget-items/:id`
 - `GET/POST /working-groups`, `GET/POST /working-groups/:id/members` — Committees & task forces
 - `GET/POST /backups` — List / create database backups; `GET /backups/:file/download`, `DELETE /backups/:file` (admin.system)
+- `GET/POST /meetings`, `GET/PUT /meetings/:id` — Meetings list/create/update
+- `POST /meetings/:id/status` — Set meeting status (meetings.manage)
+- `POST /meetings/:id/attendance` — Record attendance (meetings.record)
+- `POST /meetings/:id/minutes` — Post minutes; decisions become assignments + notify assignees (meetings.record)
+- `GET/POST /polls`, `GET/DELETE /polls/:id` — Polls list/create/detail/delete (draft only)
+- `POST /polls/:id/open` — Open voting (notifies eligible voters)
+- `POST /polls/:id/vote` — Cast vote (eligibility + one-vote + quorum aware)
+- `POST /polls/:id/close` — Close & tally (tie / quorum → no result); `POST /polls/:id/resolve` — same, record-level
+- `GET/POST /programmes/:id/members`, `DELETE /programmes/:id/members/:userId` — Programme teams (programmes.manage)
+- `PUT /programmes/:id` — Update programme incl. outputs
+- `GET /public/gallery` — Published articles with images (public feed)
 - `POST /upload` — Attachment upload (MIME-whitelisted, 10MB cap, random filenames)
 - `GET /public/articles|events|programmes|documents` — Public content feeds (no login)
 - `POST /admin/login-as` — Admin impersonation for support (audit-logged)
@@ -135,6 +151,8 @@ Roles are configurable. Capabilities are granular:
 - `events.create`, `events.approve`, `events.publish`
 - `programmes.create`, `programmes.manage`, `programmes.approve`
 - `resolutions.create`, `resolutions.vote`, `resolutions.manage`
+- `meetings.create`, `meetings.manage`, `meetings.record`
+- `governance.poll.create`, `governance.poll.manage`, `governance.poll.vote`, `governance.poll.resolve`
 - `finance.view`, `finance.record`, `finance.approve`
 - `members.view`, `members.approve`, `members.manage`
 - `admin.system`

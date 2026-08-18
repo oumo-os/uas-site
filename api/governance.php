@@ -421,3 +421,48 @@ function list_resolutions(array $filters = []): array {
   $stmt->execute($params);
   return $stmt->fetchAll();
 }
+
+// ============================================================
+// POLLS
+// ============================================================
+
+/**
+ * Whether a user may vote in a poll (eligibility rule).
+ */
+function poll_eligible(array $poll, int $userId): bool {
+  if ($poll['eligibility'] === 'all') return true;
+  if ($poll['eligibility'] === 'directors') return user_has_cap($userId, 'resolutions.vote');
+  $stmt = db()->prepare('SELECT 1 FROM members WHERE user_id = ? AND status = "active"');
+  $stmt->execute([$userId]);
+  return (bool) $stmt->fetch();
+}
+
+/**
+ * Close a poll: tally votes, respect quorum (required vote count) and ties.
+ * Returns the winning option index, or null (no quorum / tied).
+ */
+function close_poll(int $pollId): ?int {
+  $stmt = db()->prepare('SELECT * FROM polls WHERE id = ?');
+  $stmt->execute([$pollId]);
+  $poll = $stmt->fetch();
+  if (!$poll) return null;
+
+  $stmt = db()->prepare('SELECT option_index, COUNT(*) AS c FROM poll_votes WHERE poll_id = ? GROUP BY option_index ORDER BY c DESC, option_index ASC');
+  $stmt->execute([$pollId]);
+  $rows = $stmt->fetchAll();
+
+  $total = 0;
+  $result = null;
+  if ($rows) {
+    foreach ($rows as $r) $total += (int) $r['c'];
+    $top = (int) $rows[0]['option_index'];
+    $topCount = (int) $rows[0]['c'];
+    $ties = count(array_filter($rows, fn($r) => (int) $r['c'] === $topCount));
+    if (($poll['quorum'] <= 0 || $total >= (int) $poll['quorum']) && $ties === 1) {
+      $result = $top;
+    }
+  }
+
+  db()->prepare("UPDATE polls SET status = 'closed', result_option = ? WHERE id = ?")->execute([$result, $pollId]);
+  return $result;
+}

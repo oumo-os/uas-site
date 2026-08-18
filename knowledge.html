@@ -116,6 +116,12 @@
         <button class="filter-chip" data-cat="paper">Papers</button>
       </div>
 
+      <div class="section-header" style="margin-top:3rem">
+        <h2 style="font-size:1.4rem">Gallery</h2>
+        <p class="text-dim">Photos and featured imagery from UAS activities</p>
+      </div>
+      <div class="gallery-grid" id="galleryGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem;margin-bottom:3rem"></div>
+
       <div class="article-grid" id="articlesList"></div>
       <div class="pagination" id="articlesPagination"></div>
     </div>
@@ -170,11 +176,32 @@
     let artPage = 1;
     const ART_PER = 6;
 
+    function articleImg(a, i) {
+      if (a.image_url && /^[a-zA-Z0-9._-]+$/.test(a.image_url)) return ua('/img/' + a.image_url);
+      return articleImgs[i % articleImgs.length];
+    }
+
     async function load() {
       try { await api.me(); } catch(e) {}
       updateNavUser();
 
       allArticles = await api.getPublicArticles().catch(() => []);
+
+      // Gallery
+      const galleryDiv = document.getElementById('galleryGrid');
+      const gallery = await api.request('/public/gallery').catch(() => []);
+      if (gallery.length) {
+        galleryDiv.innerHTML = gallery.map((g, i) => `
+          <div class="article-card" style="cursor:pointer" onclick="location.href=ua('/article/${g.id}')">
+            <img src="${articleImg(g, i)}" alt="${esc(g.title)}" loading="lazy" style="height:170px">
+            <div class="card-body" style="padding:0.85rem 1rem">
+              <h3 style="font-size:0.9rem;margin:0">${esc(g.title)}</h3>
+              <div class="article-meta">${g.author_name ? `<span>${esc(g.author_name)}</span>` : ''}${g.published_at ? `<span>${new Date(g.published_at).toLocaleDateString('en',{year:'numeric',month:'short'})}</span>` : ''}</div>
+            </div>
+          </div>`).join('');
+      } else {
+        galleryDiv.innerHTML = '';
+      }
 
       // Stats
       document.getElementById('statTotal').textContent = allArticles.length;
@@ -234,7 +261,7 @@
         const catLabel = (a.category || 'article').replace(/_/g, ' ');
         return `
           <div class="article-card" onclick="location.href=ua('/article/${a.id}')">
-            <img src="${articleImgs[idx % articleImgs.length]}" alt="" loading="lazy">
+            <img src="${articleImg(a, idx)}" alt="" loading="lazy">
             <div class="card-body">
               <span class="tag" style="margin-bottom:0.5rem;display:inline-flex">${esc(catLabel)}</span>
               <h3>${esc(a.title)}</h3>
