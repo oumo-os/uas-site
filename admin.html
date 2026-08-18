@@ -310,7 +310,7 @@
       div.innerHTML = members.map(m => {
         const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
         const accountStatus = m.user_status || 'active';
-        const canApprove = api.hasCap('members.approve') && accountStatus === 'pending';
+        const canApprove = api.hasCap('members.approve') && (accountStatus === 'pending' || accountStatus === 'rejected');
         const roles = (m.roles || []).map(r => r.title || r).join(', ');
         return `
           <div class="member-row">
@@ -319,11 +319,11 @@
               <h4>${esc(m.name)} ${roles ? `<span style="font-size:0.75rem;color:var(--text-dim);font-weight:400">&middot; ${esc(roles)}</span>` : ''}</h4>
               <p>${esc(m.email)} &middot; ${esc(m.membership_number || '—')} &middot; ${esc(m.category)}</p>
             </div>
-            <span class="badge badge-${accountStatus === 'active' ? 'active' : 'inactive'}">${esc(accountStatus)}</span>
+            <span class="badge badge-${accountStatus === 'active' ? 'active' : (accountStatus === 'rejected' ? 'inactive' : 'inactive')}">${esc(accountStatus)}</span>
             <div class="member-actions">
               ${canApprove ? `
                 <button class="btn btn-primary btn-xs" onclick="setMemberStatus(${m.user_id}, 'active')">Approve</button>
-                <button class="btn btn-outline btn-xs" onclick="setMemberStatus(${m.user_id}, 'pending')">Reject</button>
+                <button class="btn btn-outline btn-xs" onclick="setMemberStatus(${m.user_id}, 'rejected')">Reject</button>
               ` : ''}
               ${api.hasCap('admin.system') && accountStatus === 'active' ? `
                 <button class="btn btn-outline btn-xs" onclick="loginAsUser(${m.user_id})" title="Login as this user">Login as</button>

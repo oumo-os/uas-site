@@ -21,6 +21,9 @@ function is_logged_in(): bool {
 function require_login(): array {
   $user = current_user();
   if (!$user) json_error('Authentication required', 401);
+  if ($user['status'] === 'pending') json_error('Account is awaiting admin approval', 403);
+  if ($user['status'] === 'rejected') json_error('Membership application was not approved', 403);
+  if ($user['status'] === 'suspended') json_error('Account has been suspended', 403);
   if ($user['status'] !== 'active') json_error('Account is not active', 403);
   return $user;
 }
@@ -35,8 +38,11 @@ function login(string $email, string $password): array {
   $stmt->execute([$email]);
   $user = $stmt->fetch();
   if (!$user || !password_verify($password, $user['password'])) {
-    json_error('Invalid credentials', 401);
+    json_error('Invalid email or password', 401);
   }
+  if ($user['status'] === 'pending') json_error('Your account is awaiting admin approval. You will receive a notification once approved.', 403);
+  if ($user['status'] === 'rejected') json_error('Your membership application was not approved. Please contact us for more information.', 403);
+  if ($user['status'] === 'suspended') json_error('Your account has been suspended. Please contact an administrator.', 403);
   if ($user['status'] !== 'active') json_error('Account is not active', 403);
   $_SESSION['user_id'] = $user['id'];
   db()->prepare('UPDATE users SET last_login = NOW() WHERE id = ?')->execute([$user['id']]);
@@ -74,11 +80,11 @@ function register(string $name, string $email, string $password, array $extra = 
     $stmt->execute();
     $memberNum = 'UAS-' . $year . '-' . str_pad($stmt->fetchColumn(), 4, '0', STR_PAD_LEFT);
 
-    // Auto-create member record
+    // Auto-create member record (pending until admin approval)
     db()->prepare(
       'INSERT INTO members (user_id, membership_number, category, status, joined_date)
        VALUES (?, ?, ?, ?, ?)'
-    )->execute([$userId, $memberNum, $extra['category'] ?? 'regular', 'active', date('Y-m-d')]);
+    )->execute([$userId, $memberNum, $extra['category'] ?? 'regular', 'pending', date('Y-m-d')]);
 
     db()->commit();
   } catch (Exception $e) {
@@ -86,9 +92,9 @@ function register(string $name, string $email, string $password, array $extra = 
     json_error('Registration failed', 500);
   }
 
-  $_SESSION['user_id'] = $userId;
   audit_log('register', 'user', $userId);
-  return current_user();
+  // Do NOT create a session — user must wait for admin approval
+  return ['id' => $userId, 'status' => 'pending', 'membership_number' => $memberNum];
 }
 
 function logout(): void {

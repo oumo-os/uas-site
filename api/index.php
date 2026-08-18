@@ -150,7 +150,7 @@ try {
   elseif ($path === '/members' && $method === 'POST') {
     $user = require_cap('members.approve');
     $data = input_json();
-    $newStatus = $data['status'] === 'active' ? 'active' : 'pending';
+    $newStatus = in_array($data['status'] ?? '', ['active', 'rejected']) ? $data['status'] : 'pending';
     db()->prepare("UPDATE members SET status = ?, approved_by = ?, approved_at = NOW() WHERE user_id = ?")
       ->execute([$newStatus, $user['id'], $data['user_id']]);
     db()->prepare("UPDATE users SET status = ? WHERE id = ?")
@@ -162,8 +162,16 @@ try {
       $stmt->execute(['Member']);
       $memberRoleId = $stmt->fetchColumn();
       if (!$memberRoleId) {
-        $baseline = [1, 7, 40, 27, 34]; // articles.submit, events.create, events.rsvp, documents.upload, reports.create
-        $memberRoleId = create_role('Member', 'Baseline membership role', $baseline, $user['id']);
+        // Create baseline Member role with correct capability slugs
+        $baselineSlugs = ['articles.submit', 'events.create', 'events.rsvp', 'documents.upload', 'reports.create'];
+        $capIds = [];
+        foreach ($baselineSlugs as $slug) {
+          $stmt = db()->prepare('SELECT id FROM capabilities WHERE slug = ?');
+          $stmt->execute([$slug]);
+          $id = $stmt->fetchColumn();
+          if ($id) $capIds[] = (int) $id;
+        }
+        $memberRoleId = create_role('Member', 'Baseline membership role', $capIds, $user['id']);
       }
       $stmt = db()->prepare('SELECT id FROM role_assignments WHERE role_id = ? AND user_id = ? AND status = "active"');
       $stmt->execute([$memberRoleId, $data['user_id']]);
@@ -172,12 +180,14 @@ try {
       }
     }
 
-    audit_log('member_approve', 'member', $data['user_id'], [
+    audit_log('member_' . ($newStatus === 'active' ? 'approve' : 'reject'), 'member', $data['user_id'], [
       'approved_by' => $user['id'],
       'status' => $newStatus
     ]);
     if ($newStatus === 'active') {
       notify_user((int) $data['user_id'], 'membership_approved', 'Membership approved', 'Your membership application has been approved. Welcome to the society!', '/dashboard');
+    } elseif ($newStatus === 'rejected') {
+      notify_user((int) $data['user_id'], 'membership_rejected', 'Membership not approved', 'Your membership application was not approved. Please contact us for more information.', '/contact');
     }
     json_response(['ok' => true]);
   }
