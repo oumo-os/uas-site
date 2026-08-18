@@ -382,6 +382,7 @@ try {
     if ($s->fetch()) json_error('You have already voted in this poll', 409);
     db()->prepare('INSERT INTO poll_votes (poll_id, user_id, option_index) VALUES (?, ?, ?)')->execute([$id, $user['id'], $opt]);
     audit_log('poll_vote', 'poll', $id, ['option' => $opt]);
+    apply_delegated_poll_votes($id, $poll, $user['id'], $opt);
     json_response(['ok' => true]);
   }
   elseif (preg_match('#^/polls/(\d+)/close$#', $path, $m) && $method === 'POST') {
@@ -785,6 +786,29 @@ try {
     $stmt = db()->prepare('SELECT c.*, u.name AS user_name FROM resolution_comments c JOIN users u ON u.id = c.user_id WHERE c.id = ?');
     $stmt->execute([$commentId]);
     json_response($stmt->fetch(), 201);
+  }
+
+  // --- DELEGATIONS (proxy voting) ---
+  elseif ($path === '/delegations' && $method === 'GET') {
+    $user = require_login();
+    $stmt = db()->prepare('SELECT d.*, u.name AS delegatee_name FROM delegations d JOIN users u ON u.id = d.delegatee_id WHERE d.delegator_id = ? AND d.status = "active" ORDER BY d.created_at DESC');
+    $stmt->execute([$user['id']]);
+    $outgoing = $stmt->fetchAll();
+    $stmt = db()->prepare('SELECT d.*, u.name AS delegator_name FROM delegations d JOIN users u ON u.id = d.delegator_id WHERE d.delegatee_id = ? AND d.status = "active" ORDER BY d.created_at DESC');
+    $stmt->execute([$user['id']]);
+    $incoming = $stmt->fetchAll();
+    json_response(['outgoing' => $outgoing, 'incoming' => $incoming]);
+  }
+  elseif ($path === '/delegations' && $method === 'POST') {
+    $user = require_login();
+    $data = input_json();
+    $id = create_delegation($user['id'], (int) ($data['delegatee_id'] ?? 0), $data['scope'] ?? 'all');
+    json_response(['id' => $id], 201);
+  }
+  elseif (preg_match('#^/delegations/(\d+)/revoke$#', $path, $m) && $method === 'POST') {
+    $user = require_login();
+    revoke_delegation((int) $m[1], $user['id']);
+    json_response(['ok' => true]);
   }
 
   // --- PROGRAMMES ---

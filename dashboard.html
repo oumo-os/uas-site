@@ -419,6 +419,7 @@
       <button class="dash-tab" data-panel="groups">Groups</button>
       <button class="dash-tab" data-panel="meetings">Meetings</button>
       <button class="dash-tab" data-panel="polls">Polls</button>
+      <button class="dash-tab" data-panel="delegations">Delegations</button>
       <button class="dash-tab" data-panel="roles">My Roles</button>
       <button class="dash-tab" data-panel="create">Submit Item</button>
     </div>
@@ -572,6 +573,27 @@
       <div id="pollsList"></div>
     </div>
 
+    <!-- Delegations Panel -->
+    <div class="dash-panel" id="panel-delegations">
+      <div class="section-header">
+        <h3>Delegations</h3>
+        <p>Transfer your voting right to another voter — they cast your votes on resolutions and polls while the delegation is active. You can revoke at any time.</p>
+      </div>
+      <div class="dash-card mb-2">
+        <div class="dash-card-header">
+          <h4>My Delegations</h4>
+          <button class="btn btn-primary btn-sm" onclick="showDelegationForm()" id="newDelegationBtn">New Delegation</button>
+        </div>
+        <div id="outgoingDelegations"></div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-header">
+          <h4>Incoming Delegations</h4>
+        </div>
+        <div id="incomingDelegations"></div>
+      </div>
+    </div>
+
     <!-- Roles Panel -->
     <div class="dash-panel" id="panel-roles">
       <div class="dash-card mb-2">
@@ -679,6 +701,8 @@
     let pendingScope = 'mine';
     let calMonth = new Date().getMonth();
     let calYear = new Date().getFullYear();
+    let delegationsData = { outgoing: [], incoming: [] };
+    let usersData = [];
 
     async function load() {
       try {
@@ -703,7 +727,7 @@
           document.getElementById('createResBtn').style.display = '';
         }
 
-        const [healthData, pending, resolutions, myAsg, mySubs, calItems, finData, budgetData, wgData, activityData, meetingsData, pollsData] = await Promise.all([
+        const [healthData, pending, resolutions, myAsg, mySubs, calItems, finData, budgetData, wgData, activityData, meetingsData, pollsData, delData, users] = await Promise.all([
           api.getDashboard().catch(() => ({})),
           api.getPending({ scope: pendingScope }).catch(() => []),
           api.getResolutions().catch(() => []),
@@ -716,6 +740,8 @@
           api.getActivity(20).catch(() => []),
           api.request('/meetings').catch(() => []),
           api.request('/polls').catch(() => []),
+          api.request('/delegations').catch(() => ({ outgoing: [], incoming: [] })),
+          api.request('/users').catch(() => []),
         ]);
 
         health = healthData;
@@ -730,6 +756,9 @@
         renderWorkingGroups(wgData);
         renderMeetings(meetingsData);
         renderPolls(pollsData);
+        delegationsData = delData || { outgoing: [], incoming: [] };
+        usersData = users || [];
+        renderDelegations();
         renderRoles(roles);
         renderQuickActions();
         renderHeroMeta(healthData);
@@ -1345,11 +1374,77 @@
       } catch (e) { alert(e.error || 'Failed to load poll'); }
     }
 
-    async function showPollVote(id) {
+    async function renderDelegations() {
+      const out = document.getElementById('outgoingDelegations');
+      const inc = document.getElementById('incomingDelegations');
+      const scopeLabel = s => s === 'all' ? 'All votes' : s === 'polls' ? 'Polls' : 'Resolutions';
+      if ((delegationsData.outgoing || []).length) {
+        out.innerHTML = '<table style="width:100%"><thead><tr><th>To</th><th>Scope</th><th>Since</th><th></th></tr></thead><tbody>' + delegationsData.outgoing.map(x => `
+          <tr>
+            <td>${esc(x.delegatee_name)}</td>
+            <td>${scopeLabel(x.scope)}</td>
+            <td>${new Date(x.created_at).toLocaleDateString('en',{year:'numeric',month:'short',day:'numeric'})}</td>
+            <td><button class="btn btn-outline btn-xs" onclick="revokeDelegation(${x.id})">Revoke</button></td>
+          </tr>`).join('') + '</tbody></table>';
+      } else {
+        out.innerHTML = '<div class="empty-state" style="padding:2rem 0"><p>You have no active delegations.</p></div>';
+      }
+      if ((delegationsData.incoming || []).length) {
+        inc.innerHTML = '<table style="width:100%"><thead><tr><th>From</th><th>Scope</th><th>Since</th></tr></thead><tbody>' + delegationsData.incoming.map(x => `
+          <tr>
+            <td>${esc(x.delegator_name)}</td>
+            <td>${scopeLabel(x.scope)}</td>
+            <td>${new Date(x.created_at).toLocaleDateString('en',{year:'numeric',month:'short',day:'numeric'})}</td>
+          </tr>`).join('') + '</tbody></table>';
+      } else {
+        inc.innerHTML = '<div class="empty-state" style="padding:2rem 0"><p>No one has delegated their vote to you yet.</p></div>';
+      }
+    }
+
+    function showDelegationForm() {
+      const meId = api.currentUser().id;
+      const opts = usersData.filter(u => u.id !== meId && u.status === 'active')
+        .map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('');
+      openModal('New Delegation', `
+        <div style="display:flex;flex-direction:column;gap:0.75rem">
+          <label>Delegate to<select id="dgDelegatee" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)">${opts}</select></label>
+          <label>Scope<select id="dgScope" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)">
+            <option value="all">All votes (resolutions + polls)</option>
+            <option value="resolutions">Resolutions only</option>
+            <option value="polls">Polls only</option>
+          </select></label>
+          <button class="btn btn-primary" onclick="submitDelegation()">Delegate</button>
+        </div>`);
+    }
+
+    async function submitDelegation() {
+      const delegateeId = parseInt(document.getElementById('dgDelegatee').value, 10);
+      const scope = document.getElementById('dgScope').value;
+      try {
+        await api.request('/delegations', { method: 'POST', body: { delegatee_id: delegateeId, scope } });
+        closeModal();
+        load();
+      } catch (e) { alert(e.error || 'Failed to delegate'); }
+    }
+
+    async function revokeDelegation(id) {
+      if (!confirm('Revoke this delegation?')) return;
+      try {
+        await api.request('/delegations/' + id + '/revoke', { method: 'POST' });
+        load();
+      } catch (e) { alert(e.error || 'Failed to revoke'); }
+    }
+
+    function delegatedHint() {
+      const n = (delegationsData.incoming || []).length;
+      return n > 0 ? `<p class="text-dim" style="font-size:0.82rem;margin:0 0 0.6rem">You hold ${n} delegated vote${n > 1 ? 's' : ''} — they will be cast along with yours.</p>` : '';
+    }
+
+    function showPollVote(id) {
       const p = pollsData.find(x => x.id === id);
       if (!p) return;
       const options = (p.options || []).map((o, i) => `<button class="btn btn-outline" style="display:block;width:100%;margin-bottom:0.5rem;text-align:left" onclick="castPollVote(${id}, ${i})">${i + 1}. ${esc(o)}</button>`).join('');
-      openModal('Vote: ' + p.title, `<div style="padding:0.25rem 0">${options}</div>`);
+      openModal('Vote: ' + p.title, `<div style="padding:0.25rem 0">${delegatedHint()}${options}</div>`);
     }
 
     async function castPollVote(id, optionIndex) {
@@ -1707,6 +1802,7 @@
                   </span>
                   <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>
                   ${canVote ? `
+                    ${delegatedHint()}
                     <button class="btn btn-success btn-vote" onclick="vote(${r.id},'for')">For</button>
                     <button class="btn btn-danger btn-vote" onclick="vote(${r.id},'against')">Against</button>
                     <button class="btn btn-outline btn-vote" onclick="vote(${r.id},'abstain')">Abstain</button>

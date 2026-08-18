@@ -245,8 +245,9 @@ function get_pending_items(?int $userId = null): array {
               LEFT JOIN capabilities c ON c.id = rc.capability_id AND c.slug = 'resolutions.vote'
               WHERE r.status = 'voting'
                 AND (r.voting_deadline IS NULL OR r.voting_deadline > NOW())
+                AND NOT EXISTS (SELECT 1 FROM delegations dg WHERE dg.delegator_id = ? AND dg.status = 'active' AND dg.scope IN ('all','resolutions'))
                 AND (r.proposed_by = ? OR c.id IS NOT NULL)";
-      $params = array_merge($userRoleIds, [$userId]);
+      $params = array_merge($userRoleIds, [$userId, $userId]);
       $stmt = db()->prepare($sql);
       $stmt->execute($params);
       $items = array_merge($items, $stmt->fetchAll());
@@ -269,6 +270,7 @@ function get_pending_items(?int $userId = null): array {
             FROM polls p LEFT JOIN users u ON u.id = p.created_by
             WHERE p.status = 'open'
               AND (p.ends_at IS NULL OR p.ends_at > NOW())
+              AND NOT EXISTS (SELECT 1 FROM delegations dg WHERE dg.delegator_id = ? AND dg.status = 'active' AND dg.scope IN ('all','polls'))
               AND NOT EXISTS (SELECT 1 FROM poll_votes pv WHERE pv.poll_id = p.id AND pv.user_id = ?)
               AND (p.eligibility = 'all'
                 OR (p.eligibility = 'directors' AND EXISTS (
@@ -276,7 +278,7 @@ function get_pending_items(?int $userId = null): array {
                   WHERE rc2.role_id IN ($placeholders2) AND c2.slug = 'resolutions.vote'))
                 OR (p.eligibility = 'members' AND EXISTS (
                   SELECT 1 FROM members m2 WHERE m2.user_id = ? AND m2.status = 'active')))";
-    $params = array_merge([$userId], $roleIds, [$userId]);
+    $params = array_merge([$userId], [$userId], $roleIds, [$userId]);
     $stmt = db()->prepare($sql);
     $stmt->execute($params);
     $items = array_merge($items, $stmt->fetchAll());

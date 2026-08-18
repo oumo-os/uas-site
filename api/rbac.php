@@ -9,8 +9,9 @@ require_once __DIR__ . '/config.php';
  * Global capabilities have scope_type = null.
  */
 function user_capabilities(int $userId): array {
-  static $cache = [];
-  if (isset($cache[$userId])) return $cache[$userId];
+  global $UAS_CAP_CACHE;
+  if (!isset($UAS_CAP_CACHE)) $UAS_CAP_CACHE = [];
+  if (isset($UAS_CAP_CACHE[$userId])) return $UAS_CAP_CACHE[$userId];
 
   $stmt = db()->prepare("
     SELECT DISTINCT c.slug, rc.scope_type, rc.scope_id
@@ -23,8 +24,16 @@ function user_capabilities(int $userId): array {
   ");
   $stmt->execute([$userId]);
   $caps = $stmt->fetchAll(PDO::FETCH_ASSOC);
-  $cache[$userId] = $caps;
+  $UAS_CAP_CACHE[$userId] = $caps;
   return $caps;
+}
+
+/**
+ * Drop the per-request capability cache for a user (after role changes).
+ */
+function user_capabilities_invalidate(int $userId): void {
+  global $UAS_CAP_CACHE;
+  if (isset($UAS_CAP_CACHE)) unset($UAS_CAP_CACHE[$userId]);
 }
 
 /**
@@ -174,6 +183,7 @@ function assign_role(int $roleId, int $userId, int $assignedBy, ?int $resolution
     'INSERT INTO role_assignments (role_id, user_id, assigned_by, resolution_id, effective_from, effective_to, status)
      VALUES (?, ?, ?, ?, CURDATE(), ?, ?)'
   )->execute([$roleId, $userId, $assignedBy, $resolutionId, $effectiveTo, 'active']);
+  user_capabilities_invalidate($userId);
 
   audit_log('role_assign', 'role', $roleId, [
     'user_id' => $userId,
@@ -186,10 +196,16 @@ function assign_role(int $roleId, int $userId, int $assignedBy, ?int $resolution
  * Revoke a role from a user.
  */
 function revoke_role(int $roleId, int $userId): void {
+  // Prune stale revoked rows first (reassign+revoke cycles would otherwise hit the unique key)
+  db()->prepare(
+    "DELETE FROM role_assignments WHERE role_id = ? AND user_id = ? AND status = 'revoked'"
+  )->execute([$roleId, $userId]);
   db()->prepare(
     "UPDATE role_assignments SET status = 'revoked' WHERE role_id = ? AND user_id = ? AND status = 'active'"
   )->execute([$roleId, $userId]);
+  user_capabilities_invalidate($userId);
   audit_log('role_revoke', 'role', $roleId, ['user_id' => $userId]);
+  if (function_exists('auto_revoke_delegations')) auto_revoke_delegations($userId);
 }
 
 /**

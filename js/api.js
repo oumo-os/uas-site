@@ -108,6 +108,10 @@ const api = {
     return this._capabilities.includes(cap);
   },
 
+  currentUser() {
+    return this._user || {};
+  },
+
   // Members
   async getMembers() { return this.request('/members'); },
   async getMember(id) { return this.request('/members/' + id); },

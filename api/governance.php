@@ -126,6 +126,9 @@ function cast_vote(int $resolutionId, int $userId, string $value, ?string $ratio
     'value' => $value
   ]);
 
+  // Cast proxy votes for active delegators
+  apply_delegated_resolution_votes($resolutionId, $userId, $value, $rationale);
+
   // Check quorum and apply if met
   check_and_apply($resolutionId);
 }
@@ -465,4 +468,157 @@ function close_poll(int $pollId): ?int {
 
   db()->prepare("UPDATE polls SET status = 'closed', result_option = ? WHERE id = ?")->execute([$result, $pollId]);
   return $result;
+}
+
+// ============================================================
+// DELEGATIONS (proxy voting)
+// ============================================================
+
+const DELEGATION_SCOPES = ['all', 'resolutions', 'polls'];
+
+/**
+ * Does a user hold the voting right for a delegation scope?
+ */
+function delegation_right(int $userId, string $scope): bool {
+  if ($scope === 'resolutions') return user_has_cap($userId, 'resolutions.vote');
+  if ($scope === 'polls') {
+    return user_has_cap($userId, 'governance.poll.vote')
+      || user_has_cap($userId, 'resolutions.vote')
+      || (bool) db()->query("SELECT 1 FROM members WHERE user_id = {$userId} AND status = 'active'")->fetchColumn();
+  }
+  return delegation_right($userId, 'resolutions') && delegation_right($userId, 'polls');
+}
+
+/**
+ * Active delegations where $userId is the delegator, keyed by scope.
+ */
+function delegator_scopes(int $userId): array {
+  $stmt = db()->prepare('SELECT scope FROM delegations WHERE delegator_id = ? AND status = "active"');
+  $stmt->execute([$userId]);
+  return $stmt->fetchAll(PDO::FETCH_COLUMN);
+}
+
+/**
+ * Active delegators (principals) for a delegatee and a voting scope.
+ */
+function active_delegators(int $delegateeId, string $scope): array {
+  $scopes = $scope === 'all' ? ['all'] : ['all', $scope];
+  $in = implode(',', array_fill(0, count($scopes), '?'));
+  $stmt = db()->prepare("SELECT delegator_id FROM delegations WHERE delegatee_id = ? AND status = 'active' AND scope IN ({$in})");
+  $stmt->execute(array_merge([$delegateeId], $scopes));
+  return $stmt->fetchAll(PDO::FETCH_COLUMN);
+}
+
+/**
+ * Create or replace the delegator's active delegation for a scope.
+ */
+function create_delegation(int $delegatorId, int $delegateeId, string $scope): int {
+  if (!in_array($scope, DELEGATION_SCOPES, true)) json_error('Invalid delegation scope', 400);
+  if ($delegatorId === $delegateeId) json_error('You cannot delegate to yourself', 400);
+  if (!delegation_right($delegatorId, $scope)) json_error('You do not hold the voting right being delegated', 403);
+  if (!delegation_right($delegateeId, $scope)) json_error('The delegatee does not hold that voting right', 400);
+
+  // Upsert: reactivate an existing row (active or revoked) with the new delegatee,
+  // or insert a fresh one. The (delegator_id, scope) key is unique regardless of status.
+  $stmt = db()->prepare("UPDATE delegations SET delegatee_id = ?, status = 'active', revoked_at = NULL, revoked_by = NULL, created_at = NOW() WHERE delegator_id = ? AND scope = ?");
+  $stmt->execute([$delegateeId, $delegatorId, $scope]);
+  if ($stmt->rowCount() === 0) {
+    db()->prepare('INSERT INTO delegations (delegator_id, delegatee_id, scope) VALUES (?, ?, ?)')
+      ->execute([$delegatorId, $delegateeId, $scope]);
+  }
+  $stmt = db()->prepare('SELECT id FROM delegations WHERE delegator_id = ? AND scope = ?');
+  $stmt->execute([$delegatorId, $scope]);
+  $id = (int) $stmt->fetchColumn();
+  audit_log('delegation_create', 'delegation', $id, ['delegator_id' => $delegatorId, 'delegatee_id' => $delegateeId, 'scope' => $scope]);
+
+  $stmt = db()->prepare('SELECT name FROM users WHERE id = ?');
+  $stmt->execute([$delegatorId]);
+  $delegatorName = $stmt->fetchColumn();
+  notify_user($delegateeId, 'delegation_assigned', $delegatorName . ' delegated ' . ($scope === 'all' ? 'all their votes' : $scope . ' votes') . ' to you', 'You may now cast votes on their behalf from the dashboard.', '/dashboard');
+
+  return $id;
+}
+
+/**
+ * Revoke a delegation (delegator only).
+ */
+function revoke_delegation(int $delegationId, int $userId): void {
+  $stmt = db()->prepare('SELECT * FROM delegations WHERE id = ?');
+  $stmt->execute([$delegationId]);
+  $d = $stmt->fetch();
+  if (!$d) json_error('Delegation not found', 404);
+  if ($d['delegator_id'] != $userId) json_error('Only the delegator can revoke this delegation', 403);
+  db()->prepare("UPDATE delegations SET status = 'revoked', revoked_at = NOW(), revoked_by = ? WHERE id = ? AND status = 'active'")
+    ->execute([$userId, $delegationId]);
+  audit_log('delegation_revoke', 'delegation', $delegationId, ['delegator_id' => $d['delegator_id']]);
+}
+
+/**
+ * Revoke delegations whose delegator or delegatee no longer holds the voting right
+ * (called after role/capability revocation). Purely a cleanup guard — cast-time
+ * validation is the authoritative check.
+ */
+function auto_revoke_delegations(int $userId): void {
+  $stmt = db()->prepare("SELECT id, delegator_id, delegatee_id, scope FROM delegations WHERE status = 'active' AND (delegator_id = ? OR delegatee_id = ?)");
+  $stmt->execute([$userId, $userId]);
+  foreach ($stmt->fetchAll() as $d) {
+    if (!delegation_right((int) $d['delegator_id'], $d['scope']) || !delegation_right((int) $d['delegatee_id'], $d['scope'])) {
+      db()->prepare("UPDATE delegations SET status = 'revoked', revoked_at = NOW(), revoked_by = NULL WHERE id = ? AND status = 'active'")->execute([$d['id']]);
+      audit_log('delegation_auto_revoke', 'delegation', (int) $d['id'], ['user_id' => $userId]);
+    }
+  }
+}
+
+/**
+ * Insert proxy vote rows for a delegatee's active delegators on a resolution.
+ * Returns the number of proxy votes inserted (counters already incremented).
+ */
+function apply_delegated_resolution_votes(int $resolutionId, int $delegateeId, string $value, ?string $rationale): int {
+  $delegators = active_delegators($delegateeId, 'resolutions');
+  if (!$delegators) return 0;
+
+  $have = db()->prepare('SELECT user_id FROM votes WHERE resolution_id = ? AND user_id IN (' . implode(',', array_fill(0, count($delegators), '?')) . ')');
+  $have->execute(array_merge([$resolutionId], $delegators));
+  $voted = $have->fetchAll(PDO::FETCH_COLUMN);
+  $eligible = array_values(array_diff($delegators, $voted));
+
+  $ins = db()->prepare('INSERT INTO votes (resolution_id, user_id, value, rationale, delegated_for) VALUES (?, ?, ?, NULL, ?)');
+  $n = 0;
+  foreach ($eligible as $uid) {
+    if (!user_has_cap((int) $uid, 'resolutions.vote')) continue;
+    $ins->execute([$resolutionId, $uid, $value, $delegateeId]);
+    $n++;
+  }
+  if ($n > 0) {
+    $field = 'votes_' . $value;
+    db()->prepare("UPDATE resolutions SET {$field} = {$field} + ? WHERE id = ?")->execute([$n, $resolutionId]);
+    audit_log('resolution_proxy_votes', 'resolution', $resolutionId, ['delegatee_id' => $delegateeId, 'count' => $n, 'value' => $value]);
+  }
+  return $n;
+}
+
+/**
+ * Insert proxy vote rows for a delegatee's active delegators on a poll.
+ * Returns the number of proxy votes inserted.
+ */
+function apply_delegated_poll_votes(int $pollId, array $poll, int $delegateeId, int $optionIndex): int {
+  $delegators = active_delegators($delegateeId, 'polls');
+  if (!$delegators) return 0;
+
+  $have = db()->prepare('SELECT user_id FROM poll_votes WHERE poll_id = ? AND user_id IN (' . implode(',', array_fill(0, count($delegators), '?')) . ')');
+  $have->execute(array_merge([$pollId], $delegators));
+  $voted = $have->fetchAll(PDO::FETCH_COLUMN);
+  $eligible = array_values(array_diff($delegators, $voted));
+
+  $ins = db()->prepare('INSERT INTO poll_votes (poll_id, user_id, option_index, delegated_for) VALUES (?, ?, ?, ?)');
+  $n = 0;
+  foreach ($eligible as $uid) {
+    if (!poll_eligible($poll, (int) $uid)) continue;
+    $ins->execute([$pollId, $uid, $optionIndex, $delegateeId]);
+    $n++;
+  }
+  if ($n > 0) {
+    audit_log('poll_proxy_votes', 'poll', $pollId, ['delegatee_id' => $delegateeId, 'count' => $n, 'option' => $optionIndex]);
+  }
+  return $n;
 }

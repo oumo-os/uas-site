@@ -51,11 +51,12 @@ Administration Layer → Backups, config, security, maintenance
 - **Financial Snapshot**: Dashboard and finance summary show income, expenses, committed funds and available balance
 - **Photo Gallery**: Knowledge Base gallery fed from published articles with images (`/public/gallery`)
 - **News & External Feeds**: News page combining official UAS announcements (published `announcement` articles) with curated external astronomy resources (`/public/news`)
+- **Delegation / Proxy Voting**: Members delegate their resolution and/or poll votes to a trusted peer (scope: `all` | `resolutions` | `polls`); delegatee votes are cast on the delegator's behalf (`delegated_for`), one-vote-per-user enforced, delegations auto-revoked when either side loses the voting right
 
 ## Setup
 
 1. Create MySQL database `uas_platform`
-2. Run all migrations in order: `mysql -u root uas_platform < migrations/001_initial.sql` … `013_programme_members.sql` (each file can be piped the same way)
+2. Run all migrations in order: `mysql -u root uas_platform < migrations/001_initial.sql` … `014_delegations.sql` (each file can be piped the same way)
 3. Configure `api/config.php` with DB credentials (or environment variables `UAS_DB_HOST`, `UAS_DB_USER`, `UAS_DB_PASS`, `UAS_ENV=production`)
 4. Seed dev data: `php api/seed.php` (admin + board + roles + capabilities)
 5. Seed sample content: `php api/seed-content.php`, then `api/seed-richer.php`, `api/seed-users.php`, `api/seed-budget-groups.php` (all idempotent)
@@ -131,7 +132,10 @@ All requests go through `api/index.php?route=...` or rewrite to `/api/...`
 
 ### Dashboard
 - `GET /dashboard` — Institutional health metrics
-- `GET /pending` — All pending items
+- `GET /pending` — All pending items (delegated polls/resolutions excluded from `scope=mine` for delegators)
+- `GET /delegations` — My outgoing + incoming delegations
+- `POST /delegations` — Create/re-delegate (upsert per delegator+scope)
+- `POST /delegations/:id/revoke` — Revoke an outgoing delegation
 - `GET /audit` — Audit log
 
 ## Governance Engine
@@ -174,7 +178,7 @@ uas-site/
 │   ├── backup.php       # Database dump/restore helpers
 │   └── seed*.php        # Dev seed data (seed, seed-content, seed-richer, seed-users, seed-budget-groups)
 ├── migrations/
-│   └── 001…010_*.sql    # Schema + incremental migrations
+│   └── 001…014_*.sql    # Schema + incremental migrations
 ├── data/backups/        # Generated database dumps
 ├── js/
 │   └── api.js           # Frontend API client
