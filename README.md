@@ -24,35 +24,42 @@ Administration Layer → Backups, config, security, maintenance
 ## Key Features
 
 - **Governance Engine**: Board resolutions that automatically create roles, assign capabilities, appoint members
-- **RBAC**: Granular capability-based access control (articles.approve, events.publish, finance.view, etc.)
+- **RBAC**: Granular capability-based access control (articles.approve, events.publish, finance.view, etc.) with per-resource scoping (programme / event / project)
 - **Workflow Engine**: Every institutional object follows Draft → Submit → Review → Approve → Publish → Archive
-- **Member Lifecycle**: Register → pending → board approval → baseline Member role granted automatically
+- **Member Lifecycle**: Register → pending → board approval (or rejection) → baseline Member role granted automatically
 - **Pending Items**: Centralized action queue — approve articles/events/documents or vote on resolutions inline
+- **Resolution Discussions**: Comment threads on resolutions before and during voting
 - **Operations Console**: Finance records, documents, assignments, calendar in one admin panel
-- **Institutional Dashboard**: Members, programmes, projects, events, pending items, financials
+- **Budget & Working Groups**: Budget items per programme/project/event, plus committees and task forces with memberships
+- **Institutional Dashboard**: Members, programmes, projects, events, pending items, financials, budget, groups
 - **Audit Trail**: Who did what, when, with governance context
-- **Public Website**: Database-driven pages for About, Programmes, Events, Knowledge, Library, Ecosystem, Member Directory, Article & Programme detail pages
+- **Database Backups**: Admin-triggered gzipped SQL dumps (last 20 kept), download from the admin console
+- **Public Website**: Database-driven pages for About, Programmes, Events, Knowledge, Library, Ecosystem, Member Directory, Membership page, Article/Event/Programme detail pages, custom 404
 - **Event RSVPs**: Capacity-aware registration with attendee management for organizers
 - **Event Waitlist**: Join when full, auto-promotion on cancellation, manual promote for organizers
 - **Notifications**: In-app bell — approvals, rejections, publishing, assignments, waitlist promotion, voting and contact messages notify the right people
 - **Assignment Workflow**: Assignee start → submit with evidence → assigner/manager completes
 - **Member Profiles**: Editable profile, interests, profile visibility, password change
 - **Public Contact Form**: Honeypot-protected contact page feeding an admin inbox (mark read)
-- **CSV Exports**: Members, finance, and audit log one-click downloads (RBAC-guarded)
+- **CSV Exports & Import**: Members, finance, and audit log one-click downloads (RBAC-guarded); bulk member CSV import with temp passwords
 - **Site-wide Search**: Cross-content search (articles, events, programmes, projects, documents, members) with public-safe member results
-- **Event Detail Pages**: Full event view with RSVP/re-register/cancel, capacity stats, and attendee management for organizers
 - **Password Reset (admin)**: Generate a one-time temporary password for any member, audit-logged
+- **Hardening**: Login/registration rate limiting, SameSite session cookies, server-side password policy, cross-origin request rejection, MIME-whitelisted uploads
 
 ## Setup
 
 1. Create MySQL database `uas_platform`
-2. Run schema: `mysql -u root uas_platform < migrations/001_initial.sql` then `migrations/002_event_rsvps.sql`
-3. Configure `api/config.php` with DB credentials
+2. Run all migrations in order: `mysql -u root uas_platform < migrations/001_initial.sql` … `010_rate_limits.sql` (each file can be piped the same way)
+3. Configure `api/config.php` with DB credentials (or environment variables `UAS_DB_HOST`, `UAS_DB_USER`, `UAS_DB_PASS`, `UAS_ENV=production`)
 4. Seed dev data: `php api/seed.php` (admin + board + roles + capabilities)
-5. Seed sample content: `php api/seed-content.php` (idempotent — members, articles, events, programmes, projects, documents, finance, assignments, calendar, partners, links, one applied resolution)
+5. Seed sample content: `php api/seed-content.php`, then `api/seed-richer.php`, `api/seed-users.php`, `api/seed-budget-groups.php` (all idempotent)
 6. Point web root to project directory (e.g. `htdocs\uas` junction for XAMPP)
+7. Local 404 page (XAMPP only): hardlink the custom page to htdocs root so `ErrorDocument 404 /404.html` resolves:
+   `cmd /c mklink /H M:\Dev\xampp\htdocs\404.html M:\Dev\projects\New folder\uas\uas-site\404.html`
 
-**XAMPP local run**: junction `M:\Dev\xampp\htdocs\uas` → project dir, start Apache + MySQL, visit `http://localhost/uas`. Login: `admin@astronomy.ug` / `admin123` (board: `cosmus@astronomy.ug` etc., all `/password123`).
+**XAMPP local run**: junction `M:\Dev\xampp\htdocs\uas` → project dir, start Apache + MySQL, visit `http://localhost/uas`. Login: `admin@astronomy.ug` / `admin123` (board: `cosmus@astronomy.ug` etc., all `/password123`; imported and seeded users also `/password123`).
+
+**Backups**: admin console → Backups tab (or `POST /backups`). Dumps land in `data/backups/` and the last 20 are kept. For automated nightly backups add a cron job calling `POST /api/backups` with an admin session.
 
 ## API Endpoints
 
@@ -91,6 +98,13 @@ All requests go through `api/index.php?route=...` or rewrite to `/api/...`
 - `POST /events/:id/waitlist` / `DELETE` — Join / leave the waitlist when full
 - `POST /events/:id/waitlist/:wlId/promote` — Manager-promote a waitlisted member
 - `GET /notifications` — My notifications (unread first); `POST /notifications/read-all`, `POST /notifications/:id/read`
+- `GET/POST /resolutions/:id/comments` — Resolution discussion threads
+- `GET/POST /budget-items` — Budget items (finance.view); `GET /budget-items/:id`
+- `GET/POST /working-groups`, `GET/POST /working-groups/:id/members` — Committees & task forces
+- `GET/POST /backups` — List / create database backups; `GET /backups/:file/download`, `DELETE /backups/:file` (admin.system)
+- `POST /upload` — Attachment upload (MIME-whitelisted, 10MB cap, random filenames)
+- `GET /public/articles|events|programmes|documents` — Public content feeds (no login)
+- `POST /admin/login-as` — Admin impersonation for support (audit-logged)
 - `GET /search?q=` — Cross-content public search
 - `POST /contact` — Public contact form (honeypot-filtered)
 - `GET /contact-messages` / `POST /contact-messages/read-all` — Admin inbox
@@ -131,15 +145,17 @@ Roles are configurable. Capabilities are granular:
 uas-site/
 ├── api/
 │   ├── index.php        # API router
-│   ├── config.php       # DB, session, helpers
+│   ├── config.php       # DB, session, rate limiting, helpers
 │   ├── auth.php         # Authentication
 │   ├── rbac.php         # Roles, capabilities, assignments
 │   ├── governance.php   # Resolutions, voting, auto-apply
 │   ├── workflow.php     # Lifecycle engine + pending items
 │   ├── audit.php        # Audit trail
-│   └── seed.php         # Dev seed data
+│   ├── backup.php       # Database dump/restore helpers
+│   └── seed*.php        # Dev seed data (seed, seed-content, seed-richer, seed-users, seed-budget-groups)
 ├── migrations/
-│   └── 001_initial.sql  # Full database schema
+│   └── 001…010_*.sql    # Schema + incremental migrations
+├── data/backups/        # Generated database dumps
 ├── js/
 │   └── api.js           # Frontend API client
 ├── css/
@@ -151,12 +167,19 @@ uas-site/
 ├── index.html           # Public landing page
 ├── about.html           # About the society
 ├── programmes.html      # Programmes (DB-driven)
+├── programme.html       # Programme detail
 ├── events.html          # Events (DB-driven)
+├── event.html           # Event detail + RSVP/waitlist
 ├── knowledge.html       # Articles/knowledge base (DB-driven)
+├── article.html         # Article detail
 ├── ecosystem.html       # Partners & links
 ├── members.html         # Member directory
+├── join.html            # Membership page
 ├── login.html           # Login / register
 ├── dashboard.html       # Member dashboard
 ├── admin.html           # Administration console
+├── search.html          # Site-wide search
+├── profile.html         # My profile
+├── 404.html             # Self-contained error page
 └── .htaccess            # Clean URLs + API rewrite
 ```

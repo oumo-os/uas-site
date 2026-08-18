@@ -3,44 +3,46 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="/img/uas-emblem.png">
   <title>Page Not Found — Uganda Astronomical Society</title>
   <meta name="robots" content="noindex, nofollow">
-  <link rel="stylesheet" href="/css/base.css">
   <style>
-    .error-page {
-      min-height: 80vh; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; text-align: center;
-      padding: 2rem 1.5rem;
+    :root {
+      --bg: #0a1128; --bg-card: #111a38; --border: #233052;
+      --text: #e7ecf6; --text-dim: #94a3c3; --accent: #60a5fa;
+      --radius: 8px;
     }
-    .error-code {
-      font-size: 8rem; font-weight: 900; color: var(--accent);
-      line-height: 1; margin-bottom: 0.5rem; opacity: 0.15;
-    }
-    .error-title {
-      font-size: 1.8rem; font-weight: 700; margin-bottom: 0.75rem;
-    }
-    .error-desc {
-      color: var(--text-dim); max-width: 420px; margin-bottom: 2rem;
-      line-height: 1.6;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
+    a { color: var(--accent); text-decoration: none; }
+    .nav { display: flex; align-items: center; padding: 0.9rem 1.5rem; border-bottom: 1px solid var(--border); }
+    .nav-brand { font-weight: 700; font-size: 1.05rem; color: var(--text); display: flex; align-items: center; gap: 0.6rem; }
+    .brand-mark { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 6px; background: linear-gradient(135deg, #1e3a8a, #312e81); border: 1px solid #3b4a8f; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em; color: #bfdbfe; }
+    .nav-links { display: flex; gap: 0.5rem; margin-left: 1.25rem; flex-wrap: wrap; }
+    .nav-link { padding: 0.4rem 0.7rem; border-radius: var(--radius); color: var(--text-dim); font-size: 0.9rem; }
+    .nav-link:hover { color: var(--text); background: var(--bg-card); }
+    .error-page { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2rem 1.5rem; }
+    .error-code { font-size: 7rem; font-weight: 900; color: var(--accent); line-height: 1; margin-bottom: 0.5rem; opacity: 0.18; }
+    .error-title { font-size: 1.7rem; font-weight: 700; margin-bottom: 0.75rem; }
+    .error-desc { color: var(--text-dim); max-width: 430px; margin-bottom: 2rem; line-height: 1.6; }
     .error-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center; }
+    .btn { display: inline-block; padding: 0.55rem 1.1rem; border-radius: var(--radius); font-size: 0.9rem; font-weight: 600; border: 1px solid transparent; }
+    .btn-primary { background: var(--accent); color: #0a1128; }
+    .btn-primary:hover { filter: brightness(1.1); }
+    .btn-outline { border-color: var(--border); color: var(--text); }
+    .btn-outline:hover { background: var(--bg-card); }
+    .site-footer { border-top: 1px solid var(--border); padding: 1.1rem 1.5rem; color: var(--text-dim); font-size: 0.82rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
   </style>
 </head>
 <body>
   <nav class="nav" role="navigation" aria-label="Main navigation">
-    <div class="container">
-      <a href="/" class="nav-brand"><img src="/img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
-      <button class="nav-burger" onclick="this.closest('.nav').classList.toggle('open')" aria-label="Menu">&#9776;</button>
-      <div class="nav-links">
-        <a href="/" class="nav-link">Home</a>
-        <a href="/about" class="nav-link">About</a>
-        <a href="/programmes" class="nav-link">Programmes</a>
-        <a href="/events" class="nav-link">Events</a>
-        <a href="/knowledge" class="nav-link">Knowledge</a>
-        <a href="/contact" class="nav-link">Contact</a>
-      </div>
-      <div class="nav-right"><div class="nav-user" id="navUser"></div></div>
+    <a href="#" class="nav-brand" data-home=""><span class="brand-mark">UAS</span>Uganda Astronomical Society</a>
+    <div class="nav-links">
+      <a href="#" data-home="" class="nav-link">Home</a>
+      <a href="#" data-about="" class="nav-link">About</a>
+      <a href="#" data-programmes="" class="nav-link">Programmes</a>
+      <a href="#" data-events="" class="nav-link">Events</a>
+      <a href="#" data-knowledge="" class="nav-link">Knowledge</a>
+      <a href="#" data-contact="" class="nav-link">Contact</a>
     </div>
   </nav>
 
@@ -49,26 +51,31 @@
     <h1 class="error-title">Page Not Found</h1>
     <p class="error-desc">The page you are looking for does not exist or has been moved. Let us help you find your way back.</p>
     <div class="error-actions">
-      <a href="/" class="btn btn-primary">Back to Home</a>
-      <a href="/events" class="btn btn-outline">Upcoming Events</a>
-      <a href="/contact" class="btn btn-outline">Contact Us</a>
+      <a href="#" data-home="" class="btn btn-primary">Back to Home</a>
+      <a href="#" data-events="" class="btn btn-outline">Upcoming Events</a>
+      <a href="#" data-contact="" class="btn btn-outline">Contact Us</a>
     </div>
   </main>
 
   <footer class="site-footer">
-    <div class="container">
-      <div class="footer-bottom"><span>&copy; 2026 Uganda Astronomical Society.</span><span>Kampala, Uganda</span></div>
-    </div>
+    <span>&copy; 2026 Uganda Astronomical Society.</span><span>Kampala, Uganda</span>
   </footer>
 
-  <script src="/js/api.js"></script>
   <script>
-    async function init() {
-      try { await api.me(); } catch(e) {}
-      updateNavUser();
-    }
-
-    init();
+    // Error pages are served from a fixed path while the address bar keeps the
+    // broken URL, so derive the app base from the requested path:
+    //   /uas/anything        -> base /uas
+    //   /anything (root)     -> base ""
+    (function () {
+      var seg = location.pathname.split('/');
+      var base = (seg[1] === 'uas') ? '/uas' : '';
+      document.querySelectorAll('[data-home]').forEach(function (a) { a.setAttribute('href', base + '/'); });
+      document.querySelectorAll('[data-about]').forEach(function (a) { a.setAttribute('href', base + '/about'); });
+      document.querySelectorAll('[data-programmes]').forEach(function (a) { a.setAttribute('href', base + '/programmes'); });
+      document.querySelectorAll('[data-events]').forEach(function (a) { a.setAttribute('href', base + '/events'); });
+      document.querySelectorAll('[data-knowledge]').forEach(function (a) { a.setAttribute('href', base + '/knowledge'); });
+      document.querySelectorAll('[data-contact]').forEach(function (a) { a.setAttribute('href', base + '/contact'); });
+    })();
   </script>
 </body>
 </html>

@@ -129,6 +129,7 @@
       <button class="dash-tab" data-panel="operations">Operations</button>
       <button class="dash-tab" data-panel="inbox">Inbox</button>
       <button class="dash-tab" data-panel="audit">Audit Log</button>
+      <button class="dash-tab" data-panel="backups">Backups</button>
     </div>
 
     <!-- Members -->
@@ -231,6 +232,18 @@
     <div class="dash-panel" id="panel-audit">
       <div id="auditLog"></div>
     </div>
+
+    <!-- Backups -->
+    <div class="dash-panel" id="panel-backups">
+      <div class="flex-between mb-2">
+        <div>
+          <h3 class="section-title" style="margin:0">Database Backups</h3>
+          <p class="text-sm text-dim mt-1">Gzipped SQL dumps of the full database (keeps the last 20). Download a copy and store it somewhere safe — restore is done manually by an administrator.</p>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="createBackup()">Create Backup Now</button>
+      </div>
+      <div id="backupsList"></div>
+    </div>
   </div>
 
   <script src="/js/api.js"></script>
@@ -259,6 +272,7 @@
         renderResolutions(resolutions);
         renderAudit(audit);
         loadOperations();
+        if (api.hasCap('admin.system')) loadBackups();
         setupTabs();
       } catch(e) { window.location.href = ua('/login'); }
     }
@@ -816,6 +830,48 @@
         renderRoles(roles);
         document.getElementById('roleForm').innerHTML = '';
       } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function loadBackups() {
+      try {
+        const list = await api.request('/backups');
+        const el = document.getElementById('backupsList');
+        if (!el) return;
+        if (!list.length) { el.innerHTML = '<div class="empty-state"><h4>No backups yet</h4><p>Create your first backup above.</p></div>'; return; }
+        el.innerHTML = `
+          <div class="table-wrap"><table>
+            <thead><tr><th>File</th><th>Size</th><th>Created</th><th></th></tr></thead>
+            <tbody>
+              ${list.map(b => `
+                <tr>
+                  <td><code>${esc(b.file)}</code></td>
+                  <td>${(b.size / 1024).toFixed(1)} KB</td>
+                  <td>${esc(b.created_at)}</td>
+                  <td style="text-align:right">
+                    <a class="btn btn-outline btn-xs" href="${API_BASE}/backups/${encodeURIComponent(b.file)}/download">Download</a>
+                    <button class="btn btn-outline btn-xs" onclick="deleteBackup('${esc(b.file)}')">Delete</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table></div>
+        `;
+      } catch (e) { }
+    }
+
+    async function createBackup() {
+      try {
+        await api.request('/backups', { method: 'POST' });
+        await loadBackups();
+      } catch (e) { alert(e.error || 'Backup failed'); }
+    }
+
+    async function deleteBackup(file) {
+      if (!confirm('Delete backup ' + file + '?')) return;
+      try {
+        await api.request('/backups/' + encodeURIComponent(file), { method: 'DELETE' });
+        await loadBackups();
+      } catch (e) { alert(e.error || 'Delete failed'); }
     }
 
     function setupTabs() {

@@ -17,7 +17,47 @@ define('UPLOAD_DIR', __DIR__ . '/../img/uploads/');
 if (session_status() === PHP_SESSION_NONE) {
   ini_set('session.cookie_httponly', 1);
   ini_set('session.use_strict_mode', 1);
+  session_set_cookie_params([
+    'lifetime' => 0,
+    'path' => '/',
+    'domain' => '',
+    'secure' => ENV === 'production',
+    'httponly' => true,
+    'samesite' => 'Lax',
+  ]);
   session_start();
+}
+
+// Rate limiter: tracks attempts per key within a sliding window.
+// Returns true when the request is allowed; false (or errors out) when throttled.
+function rate_limit(string $key, string $type, int $maxAttempts, int $windowSeconds): bool {
+  $now = time();
+  $windowStart = date('Y-m-d H:i:s', $now - $windowSeconds);
+  $stmt = db()->prepare('SELECT attempts, window_start FROM rate_limits WHERE rl_key = ?');
+  $stmt->execute([$key]);
+  $row = $stmt->fetch();
+  if (!$row) {
+    db()->prepare('INSERT INTO rate_limits (rl_key, rl_type, attempts, window_start) VALUES (?, ?, 1, ?)')
+      ->execute([$key, $type, date('Y-m-d H:i:s', $now)]);
+    return true;
+  }
+  if ($row['window_start'] < $windowStart) {
+    db()->prepare('UPDATE rate_limits SET attempts = 1, window_start = ? WHERE rl_key = ?')
+      ->execute([date('Y-m-d H:i:s', $now), $key]);
+    return true;
+  }
+  if ((int) $row['attempts'] >= $maxAttempts) return false;
+  db()->prepare('UPDATE rate_limits SET attempts = attempts + 1 WHERE rl_key = ?')->execute([$key]);
+  return true;
+}
+
+function client_ip(): string {
+  return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+}
+
+// Password policy: at least 8 characters, one letter, one digit.
+function password_is_strong(string $pw): bool {
+  return strlen($pw) >= 8 && preg_match('/[A-Za-z]/', $pw) && preg_match('/\d/', $pw);
 }
 
 // JSON response helper

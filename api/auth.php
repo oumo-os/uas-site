@@ -34,6 +34,12 @@ function public_user(array $user): array {
 }
 
 function login(string $email, string $password): array {
+  $email = mb_strtolower(trim($email));
+  $ipKey = 'login-ip:' . client_ip();
+  $emailKey = 'login:' . $email;
+  if (!rate_limit($ipKey, 'login', 10, 900) || !rate_limit($emailKey, 'login', 5, 900)) {
+    json_error('Too many failed login attempts. Try again in 15 minutes.', 429);
+  }
   $stmt = db()->prepare('SELECT * FROM users WHERE email = ?');
   $stmt->execute([$email]);
   $user = $stmt->fetch();
@@ -51,6 +57,13 @@ function login(string $email, string $password): array {
 }
 
 function register(string $name, string $email, string $password, array $extra = []): array {
+  if (!rate_limit('register-ip:' . client_ip(), 'register', 5, 900)) {
+    json_error('Too many registration attempts. Try again in 15 minutes.', 429);
+  }
+  $email = mb_strtolower(trim($email));
+  if (!filter_var($email, FILTER_VALIDATE_EMAIL)) json_error('A valid email address is required', 400);
+  if (mb_strlen($name) < 2) json_error('Name must be at least 2 characters', 400);
+  if (!password_is_strong($password)) json_error('Password must be at least 8 characters with at least one letter and one digit', 400);
   $stmt = db()->prepare('SELECT id FROM users WHERE email = ?');
   $stmt->execute([$email]);
   if ($stmt->fetch()) json_error('Email already registered', 409);

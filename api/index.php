@@ -10,6 +10,7 @@ require_once __DIR__ . '/rbac.php';
 require_once __DIR__ . '/audit.php';
 require_once __DIR__ . '/governance.php';
 require_once __DIR__ . '/workflow.php';
+require_once __DIR__ . '/backup.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $route = $_GET['route'] ?? '';
@@ -17,6 +18,20 @@ $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $path = rtrim(str_replace('/uas/api', '', $path), '/');
 $path = str_replace('/api', '', $path);
 if ($path === '') $path = '/';
+
+// CSRF guard: state-changing requests must come from our own origin.
+// Headers are absent for CLI/tests, which are allowed; browsers always send
+// Origin on POST, so cross-site form/fetch attacks get rejected here.
+if (in_array($method, ['POST', 'PUT', 'DELETE'], true)) {
+  $ref = $_SERVER['HTTP_ORIGIN'] ?? $_SERVER['HTTP_REFERER'] ?? '';
+  if ($ref !== '') {
+    $refHost = parse_url($ref, PHP_URL_HOST);
+    $ourHost = parse_url(SITE_URL, PHP_URL_HOST);
+    if ($refHost && $ourHost && strcasecmp($refHost, $ourHost) !== 0) {
+      json_error('Cross-origin request rejected', 403);
+    }
+  }
+}
 
 // CORS for dev
 if (ENV === 'development') {
@@ -55,7 +70,7 @@ try {
     $data = input_json();
     if (!password_verify($data['current_password'] ?? '', $user['password'])) json_error('Current password is incorrect', 400);
     $new = $data['new_password'] ?? '';
-    if (strlen($new) < 8) json_error('New password must be at least 8 characters', 400);
+    if (!password_is_strong($new)) json_error('New password must be at least 8 characters with at least one letter and one digit', 400);
     db()->prepare('UPDATE users SET password = ? WHERE id = ?')->execute([password_hash($new, PASSWORD_DEFAULT), $user['id']]);
     audit_log('password_change', 'user', $user['id']);
     json_response(['ok' => true]);
@@ -95,6 +110,40 @@ try {
   elseif (preg_match('#^/notifications/(\d+)/read$#', $path, $m) && $method === 'POST') {
     $user = require_login();
     db()->prepare('UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?')->execute([(int) $m[1], $user['id']]);
+    json_response(['ok' => true]);
+  }
+
+  // --- BACKUPS ---
+  elseif ($path === '/backups' && $method === 'GET') {
+    require_cap('admin.system');
+    json_response(backup_list());
+  }
+  elseif ($path === '/backups' && $method === 'POST') {
+    require_cap('admin.system');
+    $name = backup_create();
+    audit_log('backup_create', 'backup', 0, ['file' => $name]);
+    json_response(['file' => $name], 201);
+  }
+  elseif (preg_match('#^/backups/([A-Za-z0-9._-]+\.sql\.gz)/download$#', $path, $m) && $method === 'GET') {
+    require_cap('admin.system');
+    $name = $m[1];
+    if (!backup_filename_ok($name)) json_error('Invalid backup name', 400);
+    $full = backup_path($name);
+    if (!is_file($full)) json_error('Backup not found', 404);
+    header('Content-Type: application/gzip');
+    header('Content-Disposition: attachment; filename="' . $name . '"');
+    header('Content-Length: ' . filesize($full));
+    readfile($full);
+    exit;
+  }
+  elseif (preg_match('#^/backups/([A-Za-z0-9._-]+\.sql\.gz)$#', $path, $m) && $method === 'DELETE') {
+    require_cap('admin.system');
+    $name = $m[1];
+    if (!backup_filename_ok($name)) json_error('Invalid backup name', 400);
+    $full = backup_path($name);
+    if (!is_file($full)) json_error('Backup not found', 404);
+    backup_delete($name);
+    audit_log('backup_delete', 'backup', 0, ['file' => $name]);
     json_response(['ok' => true]);
   }
 
