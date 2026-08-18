@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <script>(function(){var s=location.pathname.replace(/\/+$/,'').split('/').filter(Boolean);var P=/^(index\.html|index|about|programmes|programme|events|event|news|knowledge|article|library|search|ecosystem|members|join|login|dashboard|profile|admin|member|404\.html|gallery)$/;while(s.length>=2&&/^(article|event|programme|poll|resolution)$/.test(s[s.length-2])&&/^\d+$/.test(s[s.length-1])){s.pop();s.pop();}while(s.length&&(P.test(s[s.length-1])||/\.[a-z0-9]+$/i.test(s[s.length-1]))){s.pop();}var base=s.length?'/'+s.join('/'):'';var b=document.createElement('base');b.href=base+'/';document.head.appendChild(b);if(!window.UAS_BASE)window.UAS_BASE=base;})();</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Resolution Builder — Uganda Astronomical Society</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -104,14 +105,14 @@
       try {
         await api.me();
         if (!api.hasCap('resolutions.create') && !api.hasCap('resolutions.vote')) {
-          window.location.href = '/dashboard';
+          window.location.href = ua('/dashboard');
           return;
         }
         updateNavUser();
         updateChangeFields();
         await refreshResolutions();
         await Promise.all([loadMembers(), loadRoles()]);
-      } catch(e) { window.location.href = '/login'; }
+      } catch(e) { window.location.href = ua('/login'); }
     }
 
     async function loadMembers() {

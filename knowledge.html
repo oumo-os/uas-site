@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <script>(function(){var s=location.pathname.replace(/\/+$/,'').split('/').filter(Boolean);var P=/^(index\.html|index|about|programmes|programme|events|event|news|knowledge|article|library|search|ecosystem|members|join|login|dashboard|profile|admin|member|404\.html|gallery)$/;while(s.length>=2&&/^(article|event|programme|poll|resolution)$/.test(s[s.length-2])&&/^\d+$/.test(s[s.length-1])){s.pop();s.pop();}while(s.length&&(P.test(s[s.length-1])||/\.[a-z0-9]+$/i.test(s[s.length-1]))){s.pop();}var base=s.length?'/'+s.join('/'):'';var b=document.createElement('base');b.href=base+'/';document.head.appendChild(b);if(!window.UAS_BASE)window.UAS_BASE=base;})();</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/png" href="img/uas-emblem.png">
   <title>Knowledge — Uganda Astronomical Society</title>
@@ -60,6 +61,27 @@
     .empty-state { text-align:center; padding:4rem 0; }
     .empty-state p { color:var(--text-dim); font-size:1rem; }
 
+    .gallery-masonry { columns:3; column-gap:1.25rem; }
+    .gallery-item {
+      break-inside:avoid; position:relative; margin-bottom:1.25rem;
+      border-radius:var(--radius-lg); overflow:hidden; cursor:pointer;
+      background:var(--bg-card); border:1px solid var(--border);
+      transition:all 0.3s; display:block;
+    }
+    .gallery-item:hover { border-color:var(--border-focus); box-shadow:var(--shadow-md); transform:translateY(-2px); }
+    .gallery-item img { width:100%; display:block; transition:transform 0.4s; }
+    .gallery-item:hover img { transform:scale(1.04); }
+    .gallery-item .gallery-caption {
+      position:absolute; left:0; right:0; bottom:0; padding:2.75rem 1rem 0.9rem;
+      background:linear-gradient(180deg,transparent,rgba(10,17,40,0.9));
+      color:#fff; font-size:0.82rem;
+    }
+    .gallery-item .gallery-caption strong { display:block; font-size:0.92rem; line-height:1.3; margin-bottom:0.15rem; }
+    .gallery-item .gallery-caption span { color:rgba(255,255,255,0.75); font-size:0.75rem; }
+
+    @media (max-width:992px) { .gallery-masonry { columns:2; } }
+    @media (max-width:600px) { .gallery-masonry { columns:1; } }
+
     @media (max-width:768px) {
       .page-hero { min-height:35vh; padding:4rem 1rem 3rem; }
       .page-hero h1 { font-size:1.8rem; }
@@ -117,14 +139,20 @@
         <button class="filter-chip" data-cat="paper">Papers</button>
       </div>
 
-      <div class="section-header" style="margin-top:3rem">
-        <h2 style="font-size:1.4rem">Gallery</h2>
-        <p class="text-dim">Photos and featured imagery from UAS activities</p>
-      </div>
-      <div class="gallery-grid" id="galleryGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem;margin-bottom:3rem"></div>
-
       <div class="article-grid" id="articlesList"></div>
       <div class="pagination" id="articlesPagination"></div>
+    </div>
+  </section>
+
+  <section class="section section-alt" id="gallerySection">
+    <div class="container">
+      <div class="section-header">
+        <h2 style="font-size:1.4rem">Photo Gallery</h2>
+        <p class="text-dim">Photos and featured imagery from UAS activities</p>
+      </div>
+      <div class="filter-bar" id="galleryFilterBar"></div>
+      <div class="gallery-masonry" id="galleryGrid"></div>
+      <div class="empty-state" id="galleryEmpty" style="display:none"><p>No photos match your selection.</p></div>
     </div>
   </section>
 
@@ -188,21 +216,47 @@
 
       allArticles = await api.getPublicArticles().catch(() => []);
 
-      // Gallery
-      const galleryDiv = document.getElementById('galleryGrid');
-      const gallery = await api.request('/public/gallery').catch(() => []);
-      if (gallery.length) {
-        galleryDiv.innerHTML = gallery.map((g, i) => `
-          <div class="article-card" style="cursor:pointer" onclick="location.href=ua('/article/${g.id}')">
-            <img src="${articleImg(g, i)}" alt="${esc(g.title)}" loading="lazy" style="height:170px">
-            <div class="card-body" style="padding:0.85rem 1rem">
-              <h3 style="font-size:0.9rem;margin:0">${esc(g.title)}</h3>
-              <div class="article-meta">${g.author_name ? `<span>${esc(g.author_name)}</span>` : ''}${g.published_at ? `<span>${new Date(g.published_at).toLocaleDateString('en',{year:'numeric',month:'short'})}</span>` : ''}</div>
-            </div>
-          </div>`).join('');
-      } else {
-        galleryDiv.innerHTML = '';
-      }
+      let galleryAll = [];
+    let galleryCat = 'all';
+
+    async function loadGallery() {
+      const section = document.getElementById('gallerySection');
+      const bar = document.getElementById('galleryFilterBar');
+      const grid = document.getElementById('galleryGrid');
+      galleryAll = await api.request('/public/gallery').catch(() => []);
+      if (!galleryAll.length) { section.style.display = 'none'; return; }
+
+      const cats = ['all'].concat([...new Set(galleryAll.map(g => g.category))]);
+      bar.innerHTML = cats.map(c =>
+        `<button class="filter-chip${c === 'all' ? ' active' : ''}" data-gcat="${esc(c)}">${c === 'all' ? 'All' : esc(c.replace(/_/g, ' '))}</button>`
+      ).join('');
+
+      bar.addEventListener('click', e => {
+        const chip = e.target.closest('.filter-chip');
+        if (!chip) return;
+        bar.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        galleryCat = chip.dataset.gcat;
+        renderGallery();
+      });
+
+      renderGallery();
+    }
+
+    function renderGallery() {
+      const grid = document.getElementById('galleryGrid');
+      const empty = document.getElementById('galleryEmpty');
+      const items = galleryCat === 'all' ? galleryAll : galleryAll.filter(g => g.category === galleryCat);
+      empty.style.display = items.length ? 'none' : 'block';
+      grid.innerHTML = items.map(g => `
+        <figure class="gallery-item" onclick="location.href=ua('/article/${g.id}')">
+          <img src="${articleImg(g, 0)}" alt="${esc(g.title)}" loading="lazy">
+          <figcaption class="gallery-caption">
+            <strong>${esc(g.title)}</strong>
+            <span>${esc((g.category || '').replace(/_/g, ' '))}${g.published_at ? ' &middot; ' + new Date(g.published_at).toLocaleDateString('en', { year: 'numeric', month: 'short' }) : ''}</span>
+          </figcaption>
+        </figure>`).join('');
+    }
 
       // Stats
       document.getElementById('statTotal').textContent = allArticles.length;
@@ -229,6 +283,7 @@
       });
 
       render();
+      loadGallery();
     }
 
     function render() {

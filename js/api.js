@@ -654,19 +654,28 @@ var esc = esc || window._esc;
     if (tag === 'A' || tag === 'LINK') attr = 'href';
     else if (tag === 'FORM') attr = 'action';
     else if (tag === 'SCRIPT' || tag === 'IMG') attr = 'src';
-    if (!attr) return;
-    const v = el.getAttribute(attr);
-    if (!v || v.indexOf('://') !== -1 || v.startsWith('//') || v.startsWith('#')
-      || v.startsWith('mailto:') || v.startsWith('tel:') || v.startsWith('javascript:')
-      || v.startsWith('data:')) return;
-    if (v.startsWith('/')) {
-      if (v === window.UAS_BASE || v.startsWith(window.UAS_BASE + '/')) return;
-      el.setAttribute(attr, window.UAS_BASE + v);
+    if (attr) {
+      const v = el.getAttribute(attr);
+      if (v && v.indexOf('://') === -1 && !v.startsWith('//') && !v.startsWith('#')
+        && !v.startsWith('mailto:') && !v.startsWith('tel:') && !v.startsWith('javascript:')
+        && !v.startsWith('data:')) {
+        if (v.startsWith('/')) {
+          if (v === window.UAS_BASE || v.startsWith(window.UAS_BASE + '/')) return;
+          el.setAttribute(attr, window.UAS_BASE + v);
+        }
+      }
+    }
+    // Inline styles may carry url(/...) or url(img/...) references set by scripts
+    const st = el.getAttribute && el.getAttribute('style');
+    if (st && st.indexOf('url(') !== -1) {
+      const fixed = st.replace(/url\((['"]?)\/([^'")]+)\1\)/g, 'url(' + window.UAS_BASE + '/$2)');
+      if (fixed !== st) el.setAttribute('style', fixed);
     }
   }
 
   function scan(root) {
-    (root.querySelectorAll ? root.querySelectorAll('a[href], form[action], img[src], link[href], script[src]') : []).forEach(rewrite);
+    if (root.nodeType === 1) rewrite(root);
+    (root.querySelectorAll ? root.querySelectorAll('a[href], form[action], img[src], link[href], script[src], [style]') : []).forEach(rewrite);
   }
 
   scan(document);
