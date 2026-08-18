@@ -49,6 +49,10 @@ const api = {
   _user: null,
   _capabilities: [],
 
+  _setCaps(data) {
+    this._capabilities = (data.capabilities || []).map(c => typeof c === 'string' ? c : c.slug).filter(Boolean);
+  },
+
   async request(path, opts = {}) {
     const url = API_BASE + path;
     const headers = { 'Content-Type': 'application/json' };
@@ -70,7 +74,7 @@ const api = {
       body: { email, password },
     });
     this._user = data.user;
-    this._capabilities = data.capabilities;
+    this._setCaps(data);
     return data;
   },
 
@@ -86,7 +90,7 @@ const api = {
   async me() {
     const data = await this.request('/auth/me');
     this._user = data.user;
-    this._capabilities = data.capabilities;
+    this._setCaps(data);
     return data;
   },
 
@@ -99,7 +103,7 @@ const api = {
   async loginAs(userId) {
     const data = await this.request('/admin/login-as', { method: 'POST', body: { user_id: userId } });
     this._user = data.user;
-    this._capabilities = data.capabilities || [];
+    this._setCaps(data);
     this._roles = data.roles || [];
     return data;
   },
