@@ -8,56 +8,71 @@
   <title>Dashboard — UAS</title>
   <link rel="stylesheet" href="css/base.css">
   <style>
+    /* ── Hero ── */
     .dash-hero {
-      background: var(--accent);
-      color: #fff;
-      padding: 2rem 0 1.5rem;
-      margin-bottom: 2rem;
+      background: linear-gradient(135deg, var(--accent) 0%, #0d3b54 100%);
+      color: #fff; padding: 1.5rem 0 1.25rem; margin-bottom: 1.5rem;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
     }
-    .dash-hero .container { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
+    .dash-hero .container { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
     .dash-avatar {
-      width: 64px; height: 64px; border-radius: 50%;
-      background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.3);
+      width: 52px; height: 52px; border-radius: 14px;
+      background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.18);
       display: flex; align-items: center; justify-content: center;
-      font-size: 1.5rem; font-weight: 700; color: #fff; flex-shrink: 0;
-      font-family: var(--font-heading);
+      font-size: 1.15rem; font-weight: 700; color: #fff; flex-shrink: 0;
+      font-family: var(--font-heading); backdrop-filter: blur(4px);
     }
-    .dash-hero-text h1 { font-size: 1.6rem; font-weight: 700; color: #fff; margin-bottom: 0.15rem; }
-    .dash-hero-text p { color: rgba(255,255,255,0.7); font-size: 0.9rem; }
-    .dash-hero-roles { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.5rem; }
+    .dash-hero-text { flex: 1; min-width: 0; }
+    .dash-hero-text h1 { font-size: 1.25rem; font-weight: 700; color: #fff; margin-bottom: 0.1rem; }
+    .dash-hero-text p { color: rgba(255,255,255,0.55); font-size: 0.82rem; margin: 0; }
+    .dash-hero-meta { display: flex; gap: 1.25rem; margin-top: 0.35rem; flex-wrap: wrap; }
+    .dash-hero-meta span { font-size: 0.72rem; color: rgba(255,255,255,0.5); display: flex; align-items: center; gap: 0.25rem; }
+    .dash-hero-meta strong { color: rgba(255,255,255,0.85); }
+    .dash-hero-roles { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.4rem; }
     .dash-hero-role {
-      padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600;
-      background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.9);
-      border: 1px solid rgba(255,255,255,0.2);
+      padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.68rem; font-weight: 600;
+      background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.85);
+      border: 1px solid rgba(255,255,255,0.12);
     }
-    .dash-hero-actions { margin-left: auto; display: flex; gap: 0.5rem; }
-    .dash-hero .btn { background: rgba(255,255,255,0.15); color: #fff; border-color: rgba(255,255,255,0.3); }
-    .dash-hero .btn:hover { background: rgba(255,255,255,0.25); }
+    .dash-hero-actions { display: flex; gap: 0.4rem; margin-left: auto; flex-shrink: 0; }
+    .dash-hero .btn { background: rgba(255,255,255,0.1); color: #fff; border-color: rgba(255,255,255,0.15); font-size: 0.78rem; }
+    .dash-hero .btn:hover { background: rgba(255,255,255,0.2); }
 
+    /* ── Tabs ── */
     .dash-tabs {
       display: flex; gap: 0; border-bottom: 1px solid var(--border);
-      margin-bottom: 2rem; overflow-x: auto; background: var(--bg-card);
+      margin-bottom: 1.5rem; overflow-x: auto; background: var(--bg-card);
       border-radius: var(--radius-lg) var(--radius-lg) 0 0;
       border: 1px solid var(--border); border-bottom: none;
+      scrollbar-width: none; -ms-overflow-style: none;
     }
+    .dash-tabs::-webkit-scrollbar { display: none; }
     .dash-tab {
-      padding: 0.75rem 1.25rem; border-bottom: 2px solid transparent; color: var(--text-dim);
-      cursor: pointer; font-size: 0.88rem; white-space: nowrap; background: none;
+      padding: 0.65rem 1rem; border-bottom: 2px solid transparent; color: var(--text-dim);
+      cursor: pointer; font-size: 0.82rem; white-space: nowrap; background: none;
       border-top: none; border-left: none; border-right: none; font-family: inherit;
-      font-weight: 500; transition: all 0.15s;
+      font-weight: 500; transition: all 0.15s; position: relative;
     }
     .dash-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--bg-card); }
     .dash-tab:hover:not(.active) { color: var(--text); background: var(--accent-glow); }
+    .dash-tab .tab-count {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+      font-size: 0.65rem; font-weight: 700; margin-left: 0.3rem;
+      background: var(--danger); color: #fff; vertical-align: middle;
+    }
+    .dash-tab .tab-count:empty, .dash-tab .tab-count[data-count="0"] { display: none; }
     .dash-panel { display: none; }
     .dash-panel.active { display: block; }
 
-    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    /* ── Stat Grid ── */
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 0.85rem; margin-bottom: 1.5rem; }
     .stat-card {
-      padding: 1.25rem; background: var(--bg-card); border: 1px solid var(--border);
+      padding: 1.1rem 1rem; background: var(--bg-card); border: 1px solid var(--border);
       border-radius: var(--radius-lg); text-align: center; position: relative; overflow: hidden;
-      transition: border-color 0.2s, box-shadow 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s; cursor: pointer;
     }
-    .stat-card:hover { border-color: var(--border-focus); box-shadow: var(--shadow-md); }
+    .stat-card:hover { border-color: var(--border-focus); box-shadow: var(--shadow-md); transform: translateY(-1px); }
     .stat-card::before {
       content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
     }
@@ -67,11 +82,11 @@
     .stat-card.pending::before { background: var(--danger); }
     .stat-card.resolutions::before { background: var(--info); }
     .stat-card.projects::before { background: #7c3aed; }
-.stat-card.polls::before { background: var(--gold); }
-.stat-card:hover { cursor: pointer; }
+    .stat-card.polls::before { background: var(--gold); }
+    .stat-card.finance::before { background: var(--success); }
     .stat-icon {
-      width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center;
-      justify-content: center; margin: 0 auto 0.75rem; font-size: 1.1rem;
+      width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center;
+      justify-content: center; margin: 0 auto 0.6rem; font-size: 1rem;
     }
     .stat-card.members .stat-icon { background: rgba(27,73,101,0.1); color: var(--accent); }
     .stat-card.programmes .stat-icon { background: rgba(45,106,79,0.1); color: var(--success); }
@@ -79,164 +94,180 @@
     .stat-card.pending .stat-icon { background: rgba(185,28,28,0.1); color: var(--danger); }
     .stat-card.resolutions .stat-icon { background: rgba(30,96,145,0.1); color: var(--info); }
     .stat-card.projects .stat-icon { background: rgba(124,58,237,0.1); color: #7c3aed; }
-.stat-card.polls .stat-icon { background: rgba(184,134,11,0.1); color: var(--gold); }
-    .stat-value { font-size: 2rem; font-weight: 700; color: var(--text); line-height: 1; }
-    .stat-label { font-size: 0.8rem; color: var(--text-dim); margin-top: 0.35rem; }
+    .stat-card.polls .stat-icon { background: rgba(184,134,11,0.1); color: var(--gold); }
+    .stat-card.finance .stat-icon { background: rgba(45,106,79,0.1); color: var(--success); }
+    .stat-value { font-size: 1.75rem; font-weight: 700; color: var(--text); line-height: 1; }
+    .stat-label { font-size: 0.75rem; color: var(--text-dim); margin-top: 0.3rem; }
+    .stat-trend { display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.68rem; font-weight: 600; margin-top: 0.25rem; }
+    .stat-trend.up { color: var(--success); }
+    .stat-trend.down { color: var(--danger); }
+    .stat-trend.neutral { color: var(--text-dim); }
 
+    /* ── Cards & Grids ── */
     .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-    .section-header h3 { font-size: 1.15rem; font-weight: 700; margin: 0; }
-    .section-header .btn { font-size: 0.8rem; }
-
-    .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+    .section-header h3 { font-size: 1.05rem; font-weight: 700; margin: 0; }
+    .section-header .btn { font-size: 0.78rem; }
+    .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.5rem; }
     @media (max-width: 768px) { .dash-grid { grid-template-columns: 1fr; } }
-
     .dash-card {
       background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
-      padding: 1.25rem; transition: border-color 0.2s, box-shadow 0.2s;
+      padding: 1.1rem; transition: border-color 0.2s, box-shadow 0.2s;
     }
     .dash-card:hover { border-color: var(--border-focus); box-shadow: var(--shadow-md); }
     .dash-card-header {
       display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border);
+      margin-bottom: 0.85rem; padding-bottom: 0.65rem; border-bottom: 1px solid var(--border);
     }
-    .dash-card-header h4 { font-size: 0.95rem; font-weight: 600; margin: 0; }
+    .dash-card-header h4 { font-size: 0.88rem; font-weight: 600; margin: 0; }
 
+    /* ── Calendar Items ── */
     .cal-item {
-      display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 0;
+      display: flex; align-items: center; gap: 0.65rem; padding: 0.55rem 0;
       border-bottom: 1px solid var(--border);
     }
     .cal-item:last-child { border-bottom: none; }
-    .cal-dot {
-      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-    }
+    .cal-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
     .cal-dot.deadline { background: var(--danger); }
     .cal-dot.event { background: var(--gold); }
     .cal-dot.other { background: var(--accent); }
-    .cal-item-text { flex: 1; font-size: 0.88rem; }
-    .cal-item-date { font-size: 0.78rem; color: var(--text-dim); white-space: nowrap; }
+    .cal-item-text { flex: 1; font-size: 0.82rem; }
+    .cal-item-date { font-size: 0.72rem; color: var(--text-dim); white-space: nowrap; }
 
+    /* ── Pending Items ── */
     .pending-item {
-      display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem;
+      display: flex; align-items: center; gap: 0.65rem; padding: 0.65rem;
       border-radius: var(--radius); border: 1px solid var(--border);
-      margin-bottom: 0.5rem; transition: border-color 0.15s; background: var(--bg-card);
+      margin-bottom: 0.4rem; transition: border-color 0.15s; background: var(--bg-card);
     }
     .pending-item:hover { border-color: var(--border-focus); }
     .pending-type-badge {
-      padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.68rem; font-weight: 600;
-      text-transform: uppercase; letter-spacing: 0.03em; min-width: 70px; text-align: center;
+      padding: 0.15rem 0.45rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.03em; min-width: 65px; text-align: center;
     }
     .pending-type-badge.article { background: rgba(27,73,101,0.1); color: var(--accent); }
     .pending-type-badge.event { background: rgba(184,134,11,0.1); color: var(--gold); }
     .pending-type-badge.document { background: rgba(45,106,79,0.1); color: var(--success); }
     .pending-type-badge.resolution { background: rgba(30,96,145,0.1); color: var(--info); }
-    .pending-title { flex: 1; font-weight: 500; font-size: 0.9rem; }
-    .pending-meta { font-size: 0.78rem; color: var(--text-dim); text-align: right; white-space: nowrap; }
-    .pending-age { font-size: 0.72rem; color: var(--text-faint); }
+    .pending-type-badge.poll { background: rgba(184,134,11,0.1); color: var(--gold); }
+    .pending-title { flex: 1; font-weight: 500; font-size: 0.85rem; }
+    .pending-meta { font-size: 0.72rem; color: var(--text-dim); text-align: right; white-space: nowrap; }
+    .pending-age { font-size: 0.68rem; color: var(--text-faint); }
     .pending-age.overdue { color: var(--danger); font-weight: 600; }
-    .pending-actions { display: flex; gap: 0.35rem; flex-shrink: 0; }
+    .pending-actions { display: flex; gap: 0.3rem; flex-shrink: 0; }
 
+    /* ── Assignment Cards ── */
     .asg-card {
-      padding: 1rem; margin-bottom: 0.75rem; background: var(--bg-card);
+      padding: 0.85rem; margin-bottom: 0.6rem; background: var(--bg-card);
       border: 1px solid var(--border); border-radius: var(--radius); transition: border-color 0.15s;
     }
     .asg-card:hover { border-color: var(--border-focus); }
-    .asg-card h4 { font-size: 0.95rem; margin-bottom: 0.25rem; }
-    .asg-card p { font-size: 0.85rem; color: var(--text-dim); margin: 0; }
+    .asg-card h4 { font-size: 0.88rem; margin-bottom: 0.2rem; }
+    .asg-card p { font-size: 0.8rem; color: var(--text-dim); margin: 0; }
 
+    /* ── Resolution Cards ── */
     .resolution-card {
-      padding: 1.25rem; margin-bottom: 0.75rem; background: var(--bg-card);
+      padding: 1rem; margin-bottom: 0.6rem; background: var(--bg-card);
       border: 1px solid var(--border); border-radius: var(--radius-lg); transition: border-color 0.15s, box-shadow 0.15s;
     }
     .resolution-card:hover { border-color: var(--border-focus); box-shadow: var(--shadow-md); }
-    .resolution-card h4 { font-size: 1rem; margin-bottom: 0.35rem; }
-    .vote-bar { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.75rem; }
-    .vote-bar .bar { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .resolution-card h4 { font-size: 0.92rem; margin-bottom: 0.3rem; }
+    .vote-bar { display: flex; gap: 0.4rem; align-items: center; margin-top: 0.6rem; }
+    .vote-bar .bar { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
     .vote-bar .bar-fill { height: 100%; background: var(--success); border-radius: 3px; transition: width 0.3s; }
-    .vote-bar .counts { font-size: 0.8rem; color: var(--text-dim); display: flex; gap: 0.5rem; align-items: center; }
-    .btn-vote { padding: 0.3rem 0.6rem; font-size: 0.75rem; }
+    .vote-bar .counts { font-size: 0.75rem; color: var(--text-dim); display: flex; gap: 0.4rem; align-items: center; }
+    .btn-vote { padding: 0.25rem 0.5rem; font-size: 0.72rem; }
 
+    /* ── Roles & Caps ── */
     .role-card {
-      display: inline-flex; align-items: center; gap: 0.5rem;
-      padding: 0.6rem 1rem; margin: 0.3rem; border-radius: var(--radius);
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.5rem 0.85rem; margin: 0.25rem; border-radius: var(--radius);
       background: var(--accent-glow); border: 1px solid var(--border);
-      font-size: 0.88rem; font-weight: 500; color: var(--accent);
+      font-size: 0.82rem; font-weight: 500; color: var(--accent);
     }
-    .cap-grid { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.75rem; }
+    .cap-grid { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.6rem; }
     .cap-tag {
-      font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 4px;
+      font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: 4px;
       background: var(--border); color: var(--text-dim); font-family: monospace;
     }
 
-    .create-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+    /* ── Quick Actions ── */
+    .create-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.85rem; }
     .create-card {
-      padding: 1.25rem; background: var(--bg-card); border: 1px solid var(--border);
+      padding: 1rem; background: var(--bg-card); border: 1px solid var(--border);
       border-radius: var(--radius-lg); cursor: pointer; text-align: center;
       transition: all 0.2s;
     }
     .create-card:hover { border-color: var(--accent); box-shadow: var(--shadow-md); transform: translateY(-2px); }
     .create-card .icon-circle {
-      width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center;
-      justify-content: center; margin: 0 auto 0.75rem; font-size: 1.2rem;
+      width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; margin: 0 auto 0.6rem; font-size: 1.1rem;
       background: var(--accent-glow); color: var(--accent);
     }
-    .create-card h4 { font-size: 0.95rem; margin-bottom: 0.25rem; }
-    .create-card p { font-size: 0.8rem; color: var(--text-dim); margin: 0; }
+    .create-card h4 { font-size: 0.88rem; margin-bottom: 0.15rem; }
+    .create-card p { font-size: 0.75rem; color: var(--text-dim); margin: 0; }
 
+    /* ── Submissions ── */
     .sub-item {
-      display: flex; align-items: center; gap: 0.75rem; padding: 0.55rem 0;
-      border-bottom: 1px solid var(--border); font-size: 0.88rem;
+      display: flex; align-items: center; gap: 0.65rem; padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border); font-size: 0.82rem;
     }
     .sub-item:last-child { border-bottom: none; }
 
+    /* ── Empty State ── */
     .empty-state {
-      text-align: center; padding: 2.5rem 1rem; color: var(--text-dim);
+      text-align: center; padding: 2rem 0.75rem; color: var(--text-dim);
     }
-    .empty-state .icon { font-size: 2rem; margin-bottom: 0.75rem; opacity: 0.4; }
-    .empty-state p { font-size: 0.9rem; }
+    .empty-state .icon { font-size: 1.75rem; margin-bottom: 0.6rem; opacity: 0.35; }
+    .empty-state h4 { font-size: 0.92rem; font-weight: 600; margin-bottom: 0.3rem; color: var(--text); }
+    .empty-state p { font-size: 0.82rem; max-width: 300px; margin: 0 auto 0.75rem; }
+    .empty-state .btn { font-size: 0.78rem; }
 
+    /* ── Filter Bar ── */
     .filter-bar {
-      display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.25rem;
-      padding: 0.75rem; background: var(--bg-card); border: 1px solid var(--border);
+      display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1rem;
+      padding: 0.6rem; background: var(--bg-card); border: 1px solid var(--border);
       border-radius: var(--radius);
     }
-    .filter-bar label { font-size: 0.8rem; font-weight: 600; color: var(--text-dim); align-self: center; }
+    .filter-bar label { font-size: 0.75rem; font-weight: 600; color: var(--text-dim); align-self: center; }
     .filter-btn {
-      padding: 0.3rem 0.7rem; border-radius: 999px; border: 1px solid var(--border);
-      background: transparent; color: var(--text-dim); font-size: 0.78rem; cursor: pointer;
+      padding: 0.25rem 0.6rem; border-radius: 999px; border: 1px solid var(--border);
+      background: transparent; color: var(--text-dim); font-size: 0.72rem; cursor: pointer;
       font-family: inherit; transition: all 0.15s;
     }
     .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
     .filter-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
+    /* ── Mini Calendar ── */
     .mini-calendar { width: 100%; }
     .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-    .cal-header h4 { font-size: 0.95rem; margin: 0; }
-    .cal-nav { display: flex; gap: 0.25rem; }
+    .cal-header h4 { font-size: 0.88rem; margin: 0; }
+    .cal-nav { display: flex; gap: 0.2rem; }
     .cal-nav button {
       background: none; border: 1px solid var(--border); border-radius: var(--radius);
-      padding: 0.2rem 0.5rem; cursor: pointer; font-size: 0.8rem; color: var(--text-dim);
+      padding: 0.15rem 0.4rem; cursor: pointer; font-size: 0.75rem; color: var(--text-dim);
     }
     .cal-nav button:hover { border-color: var(--accent); color: var(--accent); }
     .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-    .cal-day-header { background: var(--accent-glow); padding: 0.3rem; text-align: center; font-size: 0.7rem; font-weight: 600; color: var(--text-dim); }
+    .cal-day-header { background: var(--accent-glow); padding: 0.25rem; text-align: center; font-size: 0.65rem; font-weight: 600; color: var(--text-dim); }
     .cal-day {
-      background: var(--bg-card); padding: 0.25rem; min-height: 48px; font-size: 0.75rem;
+      background: var(--bg-card); padding: 0.2rem; min-height: 42px; font-size: 0.7rem;
       position: relative; cursor: default;
     }
-    .cal-day.other-month { opacity: 0.35; }
+    .cal-day.other-month { opacity: 0.3; }
     .cal-day.today { background: var(--accent-glow); }
     .cal-day-num { font-weight: 600; margin-bottom: 2px; }
     .cal-day-dot {
-      width: 5px; height: 5px; border-radius: 50%; display: inline-block; margin: 0 1px;
+      width: 4px; height: 4px; border-radius: 50%; display: inline-block; margin: 0 1px;
     }
     .cal-day-dot.article { background: var(--accent); }
     .cal-day-dot.event { background: var(--gold); }
     .cal-day-dot.document { background: var(--success); }
     .cal-day-dot.resolution { background: var(--info); }
     .cal-day-dot.assignment { background: var(--danger); }
-    .cal-legend { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.5rem; font-size: 0.72rem; color: var(--text-dim); }
-    .cal-legend-item { display: flex; align-items: center; gap: 0.25rem; }
+    .cal-legend { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.4rem; font-size: 0.68rem; color: var(--text-dim); }
+    .cal-legend-item { display: flex; align-items: center; gap: 0.2rem; }
 
+    /* ── Modal ── */
     .modal-overlay {
       display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
       z-index: 1000; align-items: center; justify-content: center; padding: 1rem;
@@ -244,121 +275,118 @@
     .modal-overlay.open { display: flex; }
     .modal {
       background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
-      max-width: 640px; width: 100%; max-height: 80vh; overflow-y: auto; padding: 1.5rem;
+      max-width: 640px; width: 100%; max-height: 80vh; overflow-y: auto; padding: 1.25rem;
       box-shadow: 0 20px 60px rgba(0,0,0,0.3);
     }
     .modal-header {
       display: flex; justify-content: space-between; align-items: flex-start;
-      margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border);
+      margin-bottom: 0.85rem; padding-bottom: 0.65rem; border-bottom: 1px solid var(--border);
     }
-    .modal-header h3 { font-size: 1.15rem; font-weight: 700; margin: 0; }
+    .modal-header h3 { font-size: 1.05rem; font-weight: 700; margin: 0; }
     .modal-close {
-      background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-dim);
+      background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--text-dim);
       padding: 0; line-height: 1; flex-shrink: 0;
     }
     .modal-close:hover { color: var(--text); }
-    .modal-body { font-size: 0.9rem; line-height: 1.6; }
-    .modal-body .field { margin-bottom: 0.75rem; }
-    .modal-body .field-label { font-size: 0.75rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.25rem; }
+    .modal-body { font-size: 0.85rem; line-height: 1.6; }
+    .modal-body .field { margin-bottom: 0.65rem; }
+    .modal-body .field-label { font-size: 0.72rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.2rem; }
 
-    .comment-thread { margin-top: 1rem; }
+    /* ── Comments ── */
+    .comment-thread { margin-top: 0.85rem; }
     .comment-item {
-      display: flex; gap: 0.75rem; padding: 0.75rem 0;
+      display: flex; gap: 0.65rem; padding: 0.65rem 0;
       border-bottom: 1px solid var(--border);
     }
     .comment-item:last-child { border-bottom: none; }
     .comment-avatar {
-      width: 32px; height: 32px; border-radius: 50%; background: var(--accent-glow);
+      width: 28px; height: 28px; border-radius: 50%; background: var(--accent-glow);
       display: flex; align-items: center; justify-content: center;
-      font-size: 0.72rem; font-weight: 700; color: var(--accent); flex-shrink: 0;
+      font-size: 0.65rem; font-weight: 700; color: var(--accent); flex-shrink: 0;
     }
     .comment-content { flex: 1; }
-    .comment-meta { font-size: 0.78rem; color: var(--text-dim); margin-bottom: 0.25rem; }
+    .comment-meta { font-size: 0.72rem; color: var(--text-dim); margin-bottom: 0.15rem; }
     .comment-meta strong { color: var(--text); }
-    .comment-body { font-size: 0.88rem; }
+    .comment-body { font-size: 0.82rem; }
     .comment-input {
-      display: flex; gap: 0.5rem; margin-top: 0.75rem; align-items: flex-start;
+      display: flex; gap: 0.4rem; margin-top: 0.65rem; align-items: flex-start;
     }
     .comment-input textarea {
-      flex: 1; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);
-      font-family: inherit; font-size: 0.88rem; resize: vertical; min-height: 60px;
+      flex: 1; padding: 0.4rem; border: 1px solid var(--border); border-radius: var(--radius);
+      font-family: inherit; font-size: 0.82rem; resize: vertical; min-height: 50px;
       background: var(--bg); color: var(--text);
     }
 
-    .create-form { max-width: 560px; }
-    .create-form .form-group { margin-bottom: 0.85rem; }
+    /* ── Create Form ── */
+    .create-form { max-width: 520px; }
+    .create-form .form-group { margin-bottom: 0.75rem; }
 
+    /* ── Working Groups ── */
     .wg-card {
-      padding: 1rem; margin-bottom: 0.75rem; background: var(--bg-card);
+      padding: 0.85rem; margin-bottom: 0.6rem; background: var(--bg-card);
       border: 1px solid var(--border); border-radius: var(--radius); transition: border-color 0.15s;
     }
     .wg-card:hover { border-color: var(--border-focus); }
-    .wg-card h4 { font-size: 0.95rem; margin-bottom: 0.25rem; }
-    .wg-card .wg-meta { font-size: 0.8rem; color: var(--text-dim); }
+    .wg-card h4 { font-size: 0.88rem; margin-bottom: 0.2rem; }
+    .wg-card .wg-meta { font-size: 0.75rem; color: var(--text-dim); }
     .wg-badge {
-      display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px;
-      font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
+      display: inline-block; padding: 0.12rem 0.4rem; border-radius: 999px;
+      font-size: 0.62rem; font-weight: 600; text-transform: uppercase;
       background: var(--accent-glow); color: var(--accent);
     }
     .wg-badge.committee { background: rgba(184,134,11,0.1); color: var(--gold); }
     .wg-badge.task_force { background: rgba(45,106,79,0.1); color: var(--success); }
 
+    /* ── Budget Bars ── */
     .budget-bar {
-      height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 0.35rem;
+      height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 0.3rem;
     }
     .budget-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
     .budget-bar-fill.income { background: var(--success); }
     .budget-bar-fill.expense { background: var(--danger); }
 
-    .stat-trend { display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.72rem; font-weight: 600; margin-top: 0.25rem; }
-    .stat-trend.up { color: var(--success); }
-    .stat-trend.down { color: var(--danger); }
-    .stat-trend.neutral { color: var(--text-dim); }
-    .hero-meta { display: flex; gap: 1.5rem; margin-top: 0.5rem; flex-wrap: wrap; }
-    .hero-meta-item { font-size: 0.78rem; color: rgba(255,255,255,0.6); display: flex; align-items: center; gap: 0.3rem; }
-    .hero-meta-item strong { color: rgba(255,255,255,0.9); }
-
+    /* ── Upcoming Strip ── */
     .upcoming-strip {
-      display: flex; gap: 1rem; overflow-x: auto; padding-bottom: 0.5rem;
+      display: flex; gap: 0.85rem; overflow-x: auto; padding-bottom: 0.4rem;
       scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
     }
-    .upcoming-strip::-webkit-scrollbar { height: 4px; }
-    .upcoming-strip::-webkit-scrollbar-track { background: var(--border); border-radius: 2px; }
-    .upcoming-strip::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 2px; }
+    .upcoming-strip::-webkit-scrollbar { display: none; }
     .upcoming-event-card {
-      min-width: 260px; max-width: 320px; flex-shrink: 0; scroll-snap-align: start;
-      padding: 1rem; background: var(--bg-card); border: 1px solid var(--border);
+      min-width: 240px; max-width: 300px; flex-shrink: 0; scroll-snap-align: start;
+      padding: 0.85rem; background: var(--bg-card); border: 1px solid var(--border);
       border-radius: var(--radius-lg); transition: border-color 0.2s, box-shadow 0.2s;
       cursor: pointer;
     }
     .upcoming-event-card:hover { border-color: var(--accent); box-shadow: var(--shadow-md); }
     .upcoming-event-date {
-      display: inline-flex; align-items: center; gap: 0.3rem;
-      padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.72rem; font-weight: 600;
-      background: rgba(184,134,11,0.1); color: var(--gold); margin-bottom: 0.5rem;
+      display: inline-flex; align-items: center; gap: 0.25rem;
+      padding: 0.15rem 0.45rem; border-radius: 6px; font-size: 0.68rem; font-weight: 600;
+      background: rgba(184,134,11,0.1); color: var(--gold); margin-bottom: 0.4rem;
     }
-    .upcoming-event-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.25rem; color: var(--text); }
-    .upcoming-event-meta { font-size: 0.78rem; color: var(--text-dim); display: flex; flex-direction: column; gap: 0.15rem; }
-    .upcoming-event-rsvp { margin-top: 0.5rem; font-size: 0.75rem; color: var(--accent); font-weight: 600; }
+    .upcoming-event-title { font-weight: 600; font-size: 0.88rem; margin-bottom: 0.2rem; color: var(--text); }
+    .upcoming-event-meta { font-size: 0.72rem; color: var(--text-dim); display: flex; flex-direction: column; gap: 0.1rem; }
+    .upcoming-event-rsvp { margin-top: 0.4rem; font-size: 0.7rem; color: var(--accent); font-weight: 600; }
 
-    .activity-feed { max-height: 400px; overflow-y: auto; }
+    /* ── Activity Feed ── */
+    .activity-feed { max-height: 360px; overflow-y: auto; }
     .activity-item {
-      display: flex; gap: 0.75rem; padding: 0.65rem 0;
+      display: flex; gap: 0.65rem; padding: 0.55rem 0;
       border-bottom: 1px solid var(--border); align-items: flex-start;
     }
     .activity-item:last-child { border-bottom: none; }
     .activity-avatar {
-      width: 32px; height: 32px; border-radius: 50%; background: var(--accent-glow);
+      width: 28px; height: 28px; border-radius: 50%; background: var(--accent-glow);
       display: flex; align-items: center; justify-content: center;
-      font-size: 0.68rem; font-weight: 700; color: var(--accent); flex-shrink: 0;
+      font-size: 0.62rem; font-weight: 700; color: var(--accent); flex-shrink: 0;
     }
     .activity-content { flex: 1; min-width: 0; }
-    .activity-text { font-size: 0.85rem; line-height: 1.4; }
+    .activity-text { font-size: 0.8rem; line-height: 1.35; }
     .activity-text strong { font-weight: 600; }
-    .activity-time { font-size: 0.72rem; color: var(--text-faint); margin-top: 0.15rem; }
+    .activity-time { font-size: 0.68rem; color: var(--text-faint); margin-top: 0.1rem; }
     .activity-type-badge {
-      display: inline-block; padding: 0.1rem 0.35rem; border-radius: 3px;
-      font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em;
+      display: inline-block; padding: 0.08rem 0.3rem; border-radius: 3px;
+      font-size: 0.6rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em;
     }
     .activity-type-badge.create { background: rgba(45,106,79,0.1); color: var(--success); }
     .activity-type-badge.update { background: rgba(27,73,101,0.1); color: var(--accent); }
@@ -367,13 +395,32 @@
     .activity-type-badge.approve { background: rgba(45,106,79,0.1); color: var(--success); }
     .activity-type-badge.submit { background: rgba(184,134,11,0.1); color: var(--gold); }
 
-    .empty-state {
-      text-align: center; padding: 2.5rem 1rem; color: var(--text-dim);
+    /* ── Delegations ── */
+    .delegation-item {
+      display: flex; align-items: center; gap: 0.65rem; padding: 0.65rem;
+      border-radius: var(--radius); border: 1px solid var(--border);
+      margin-bottom: 0.4rem; background: var(--bg-card); transition: border-color 0.15s;
     }
-    .empty-state .icon { font-size: 2rem; margin-bottom: 0.75rem; opacity: 0.4; }
-    .empty-state h4 { font-size: 1rem; font-weight: 600; margin-bottom: 0.35rem; color: var(--text); }
-    .empty-state p { font-size: 0.88rem; max-width: 320px; margin: 0 auto 1rem; }
-    .empty-state .btn { font-size: 0.82rem; }
+    .delegation-item:hover { border-color: var(--border-focus); }
+    .delegation-avatar {
+      width: 32px; height: 32px; border-radius: 50%; background: var(--accent-glow);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; font-weight: 700; color: var(--accent); flex-shrink: 0;
+    }
+    .delegation-info { flex: 1; min-width: 0; }
+    .delegation-name { font-weight: 600; font-size: 0.85rem; }
+    .delegation-scope { font-size: 0.72rem; color: var(--text-dim); }
+
+    /* ── Mobile ── */
+    @media (max-width: 600px) {
+      .dash-hero .container { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+      .dash-hero-actions { margin-left: 0; width: 100%; }
+      .dash-hero-actions .btn { flex: 1; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .create-grid { grid-template-columns: 1fr 1fr; }
+      .dash-tabs { gap: 0; }
+      .dash-tab { padding: 0.55rem 0.65rem; font-size: 0.75rem; }
+    }
   </style>
 </head>
 <body>
@@ -400,7 +447,7 @@
       <div class="dash-hero-text">
         <h1 id="dashTitle">Dashboard</h1>
         <p id="dashSubtitle"></p>
-        <div class="hero-meta" id="heroMeta"></div>
+        <div class="dash-hero-meta" id="heroMeta"></div>
         <div class="dash-hero-roles" id="dashRoles"></div>
       </div>
       <div class="dash-hero-actions">
@@ -413,16 +460,12 @@
   <div class="container">
     <div class="dash-tabs" id="dashTabs">
       <button class="dash-tab active" data-panel="overview">Overview</button>
-      <button class="dash-tab" data-panel="pending">Pending Items</button>
-      <button class="dash-tab" data-panel="resolutions">Resolutions</button>
+      <button class="dash-tab" data-panel="pending">Pending <span class="tab-count" id="pendingTabCount"></span></button>
+      <button class="dash-tab" data-panel="governance">Governance</button>
       <button class="dash-tab" data-panel="finance">Finance</button>
-      <button class="dash-tab" data-panel="budget">Budget</button>
-      <button class="dash-tab" data-panel="groups">Groups</button>
-      <button class="dash-tab" data-panel="meetings">Meetings</button>
-      <button class="dash-tab" data-panel="polls">Polls</button>
-      <button class="dash-tab" data-panel="delegations">Delegations</button>
+      <button class="dash-tab" data-panel="org">Org</button>
       <button class="dash-tab" data-panel="roles">My Roles</button>
-      <button class="dash-tab" data-panel="create">Submit Item</button>
+      <button class="dash-tab" data-panel="create">Submit</button>
     </div>
 
     <!-- Overview Panel -->
@@ -496,102 +539,99 @@
       </div>
     </div>
 
-    <!-- Resolutions Panel -->
-    <div class="dash-panel" id="panel-resolutions">
+    <!-- Governance Panel (Resolutions + Polls + Delegations) -->
+    <div class="dash-panel" id="panel-governance">
       <div class="section-header">
-        <h3>Resolutions & Polls</h3>
-        <button class="btn btn-primary btn-sm" onclick="showCreateResolution()" id="createResBtn" style="display:none">New Resolution</button>
+        <h3>Governance</h3>
+        <div style="display:flex;gap:0.4rem">
+          <button class="btn btn-primary btn-sm" onclick="showCreateResolution()" id="createResBtn" style="display:none">New Resolution</button>
+          <button class="btn btn-primary btn-sm" onclick="showPollForm()" id="createPollBtn" style="display:none">New Poll</button>
+          <button class="btn btn-primary btn-sm" onclick="showDelegationForm()" id="newDelegationBtn" style="display:none">New Delegation</button>
+        </div>
       </div>
-      <div id="resolutionsList"></div>
+      <div class="dash-tabs" id="govTabs" style="margin-bottom:1rem;background:transparent;border:none;border-radius:0">
+        <button class="dash-tab active" data-gov="resolutions">Resolutions</button>
+        <button class="dash-tab" data-gov="polls">Polls</button>
+        <button class="dash-tab" data-gov="delegations">Delegations</button>
+      </div>
+      <div id="gov-resolutions">
+        <div id="resolutionsList"></div>
+      </div>
+      <div id="gov-polls" style="display:none">
+        <div id="pollsList"></div>
+      </div>
+      <div id="gov-delegations" style="display:none">
+        <div class="dash-grid" style="margin-bottom:0">
+          <div class="dash-card">
+            <div class="dash-card-header"><h4>My Delegations</h4></div>
+            <div id="outgoingDelegations"></div>
+          </div>
+          <div class="dash-card">
+            <div class="dash-card-header"><h4>Incoming Delegations</h4></div>
+            <div id="incomingDelegations"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Finance Panel -->
+    <!-- Finance Panel (Finance + Budget) -->
     <div class="dash-panel" id="panel-finance">
       <div class="section-header">
-        <h3>Financial Summary</h3>
-        <button class="btn btn-primary btn-sm" onclick="showFinanceForm()" id="recordFinanceBtn" style="display:none">Record Transaction</button>
+        <h3>Finance</h3>
+        <div style="display:flex;gap:0.4rem">
+          <button class="btn btn-primary btn-sm" onclick="showFinanceForm()" id="recordFinanceBtn" style="display:none">Record Transaction</button>
+          <button class="btn btn-primary btn-sm" onclick="showBudgetItemForm()" id="createBudgetBtn" style="display:none">Add Line Item</button>
+        </div>
       </div>
-      <div class="stat-grid" id="financeStatGrid"></div>
-      <div class="dash-grid">
-        <div class="dash-card">
-          <div class="dash-card-header">
-            <h4>By Category</h4>
+      <div class="dash-tabs" id="finTabs" style="margin-bottom:1rem;background:transparent;border:none;border-radius:0">
+        <button class="dash-tab active" data-fin="summary">Summary</button>
+        <button class="dash-tab" data-fin="budget">Budget Items</button>
+      </div>
+      <div id="fin-summary">
+        <div class="stat-grid" id="financeStatGrid"></div>
+        <div class="dash-grid">
+          <div class="dash-card">
+            <div class="dash-card-header"><h4>By Category</h4></div>
+            <div id="financeCategoryBreakdown"></div>
           </div>
-          <div id="financeCategoryBreakdown"></div>
-        </div>
-        <div class="dash-card">
-          <div class="dash-card-header">
-            <h4>Recent Transactions</h4>
+          <div class="dash-card">
+            <div class="dash-card-header"><h4>Recent Transactions</h4></div>
+            <div id="financeRecent"></div>
           </div>
-          <div id="financeRecent"></div>
         </div>
       </div>
+      <div id="fin-budget" style="display:none">
+        <div id="budgetItemsList"></div>
+      </div>
     </div>
 
-    <!-- Budget Panel -->
-    <div class="dash-panel" id="panel-budget">
+    <!-- Org Panel (Groups + Meetings) -->
+    <div class="dash-panel" id="panel-org">
       <div class="section-header">
-        <h3>Budget Line Items</h3>
-        <button class="btn btn-primary btn-sm" onclick="showBudgetItemForm()" id="createBudgetBtn" style="display:none">Add Line Item</button>
-      </div>
-      <p class="text-dim text-sm" style="margin-bottom:1rem">Budget line items belong to a programme, event, or project. Record income and expenses against each item.</p>
-      <div id="budgetItemsList"></div>
-    </div>
-
-    <!-- Working Groups Panel -->
-    <div class="dash-panel" id="panel-groups">
-      <div class="section-header">
-        <h3>Working Groups & Committees</h3>
-        <button class="btn btn-primary btn-sm" onclick="showWorkingGroupForm()" id="createWgBtn" style="display:none">New Group</button>
-      </div>
-      <div id="workingGroupsList"></div>
-    </div>
-
-    <!-- Meetings Panel -->
-    <div class="dash-panel" id="panel-meetings">
-      <div class="section-header">
-        <h3>Meetings</h3>
-        <button class="btn btn-primary btn-sm" onclick="showMeetingForm()" id="createMeetingBtn" style="display:none">Schedule Meeting</button>
-      </div>
-      <div class="meetings-filters" style="margin-bottom:1rem">
-        <select id="meetingStatusFilter" onchange="renderMeetings()">
-          <option value="">All statuses</option>
-          <option value="scheduled">Scheduled</option>
-          <option value="in_progress">In Progress</option>
-          <option value="completed">Completed</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-      </div>
-      <div id="meetingsList"></div>
-    </div>
-
-    <!-- Polls Panel -->
-    <div class="dash-panel" id="panel-polls">
-      <div class="section-header">
-        <h3>Polls</h3>
-        <button class="btn btn-primary btn-sm" onclick="showPollForm()" id="createPollBtn" style="display:none">New Poll</button>
-      </div>
-      <div id="pollsList"></div>
-    </div>
-
-    <!-- Delegations Panel -->
-    <div class="dash-panel" id="panel-delegations">
-      <div class="section-header">
-        <h3>Delegations</h3>
-        <p>Transfer your voting right to another voter — they cast your votes on resolutions and polls while the delegation is active. You can revoke at any time.</p>
-      </div>
-      <div class="dash-card mb-2">
-        <div class="dash-card-header">
-          <h4>My Delegations</h4>
-          <button class="btn btn-primary btn-sm" onclick="showDelegationForm()" id="newDelegationBtn">New Delegation</button>
+        <h3>Organisation</h3>
+        <div style="display:flex;gap:0.4rem">
+          <button class="btn btn-primary btn-sm" onclick="showWorkingGroupForm()" id="createWgBtn" style="display:none">New Group</button>
+          <button class="btn btn-primary btn-sm" onclick="showMeetingForm()" id="createMeetingBtn" style="display:none">Schedule Meeting</button>
         </div>
-        <div id="outgoingDelegations"></div>
       </div>
-      <div class="dash-card">
-        <div class="dash-card-header">
-          <h4>Incoming Delegations</h4>
+      <div class="dash-tabs" id="orgTabs" style="margin-bottom:1rem;background:transparent;border:none;border-radius:0">
+        <button class="dash-tab active" data-org="groups">Groups</button>
+        <button class="dash-tab" data-org="meetings">Meetings</button>
+      </div>
+      <div id="org-groups">
+        <div id="workingGroupsList"></div>
+      </div>
+      <div id="org-meetings" style="display:none">
+        <div class="meetings-filters" style="margin-bottom:0.85rem">
+          <select id="meetingStatusFilter" onchange="renderMeetings()">
+            <option value="">All statuses</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
         </div>
-        <div id="incomingDelegations"></div>
+        <div id="meetingsList"></div>
       </div>
     </div>
 
@@ -944,15 +984,15 @@
       const el = document.getElementById('heroMeta');
       const parts = [];
       if (health.member_since) {
-        parts.push('<span class="hero-meta-item">Member since <strong>' + new Date(health.member_since).toLocaleDateString('en', { year: 'numeric', month: 'short' }) + '</strong></span>');
+        parts.push('<span>Member since <strong>' + new Date(health.member_since).toLocaleDateString('en', { year: 'numeric', month: 'short' }) + '</strong></span>');
       }
       if (health.last_login) {
         const d = new Date(health.last_login.replace(' ', 'T'));
         const ago = fmtTimeAgo(d);
-        parts.push('<span class="hero-meta-item">Last login <strong>' + ago + '</strong></span>');
+        parts.push('<span>Last login <strong>' + ago + '</strong></span>');
       }
       if (health.members) {
-        parts.push('<span class="hero-meta-item"><strong>' + (health.members.active || 0) + '</strong> members</span>');
+        parts.push('<span><strong>' + (health.members.active || 0) + '</strong> members</span>');
       }
       el.innerHTML = parts.join('');
     }
@@ -1580,6 +1620,8 @@
       const counts = {};
       pending.forEach(i => { counts[i.item_type] = (counts[i.item_type] || 0) + 1; });
       document.getElementById('pendingCounts').textContent = pending.length + ' items';
+      const badge = document.getElementById('pendingTabCount');
+      if (badge) { badge.textContent = pending.length || ''; badge.dataset.count = pending.length; }
     }
 
     function renderPendingCalendar() {
@@ -2135,10 +2177,43 @@
         if (!tab) return;
         switchPendingScope(tab.dataset.scope);
       });
+      // Governance sub-tabs
+      const govTabs = document.getElementById('govTabs');
+      if (govTabs) govTabs.addEventListener('click', e => {
+        const tab = e.target.closest('.dash-tab');
+        if (!tab || !tab.dataset.gov) return;
+        govTabs.querySelectorAll('.dash-tab').forEach(t => t.classList.toggle('active', t.dataset.gov === tab.dataset.gov));
+        ['resolutions','polls','delegations'].forEach(s => {
+          const el = document.getElementById('gov-' + s);
+          if (el) el.style.display = s === tab.dataset.gov ? '' : 'none';
+        });
+      });
+      // Finance sub-tabs
+      const finTabs = document.getElementById('finTabs');
+      if (finTabs) finTabs.addEventListener('click', e => {
+        const tab = e.target.closest('.dash-tab');
+        if (!tab || !tab.dataset.fin) return;
+        finTabs.querySelectorAll('.dash-tab').forEach(t => t.classList.toggle('active', t.dataset.fin === tab.dataset.fin));
+        ['summary','budget'].forEach(s => {
+          const el = document.getElementById('fin-' + s);
+          if (el) el.style.display = s === tab.dataset.fin ? '' : 'none';
+        });
+      });
+      // Org sub-tabs
+      const orgTabs = document.getElementById('orgTabs');
+      if (orgTabs) orgTabs.addEventListener('click', e => {
+        const tab = e.target.closest('.dash-tab');
+        if (!tab || !tab.dataset.org) return;
+        orgTabs.querySelectorAll('.dash-tab').forEach(t => t.classList.toggle('active', t.dataset.org === tab.dataset.org));
+        ['groups','meetings'].forEach(s => {
+          const el = document.getElementById('org-' + s);
+          if (el) el.style.display = s === tab.dataset.org ? '' : 'none';
+        });
+      });
     }
 
     function switchTab(panel) {
-      document.querySelectorAll('.dash-tab').forEach(t => t.classList.toggle('active', t.dataset.panel === panel));
+      document.querySelectorAll('#dashTabs .dash-tab').forEach(t => t.classList.toggle('active', t.dataset.panel === panel));
       document.querySelectorAll('.dash-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + panel));
     }
 
