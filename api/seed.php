@@ -78,15 +78,17 @@ foreach ($boardMembers as $i => $bm) {
       $boardCaps = [
         'members.view', 'members.approve', 'members.manage',
         'admin.system',
-        'partners.manage', 'links.manage', 'assignments.manage',
+        'partners.manage', 'links.manage', 'assignments.manage', 'assignments.create',
+        'calendar.manage',
         'resolutions.create', 'resolutions.vote', 'resolutions.manage',
-        'events.approve', 'events.publish', 'events.cancel', 'events.rsvp', 'events.manage_rsvps',
-        'articles.review', 'articles.approve', 'articles.publish',
-        'programmes.approve', 'projects.approve',
+        'events.create', 'events.approve', 'events.publish', 'events.cancel', 'events.rsvp', 'events.manage_rsvps',
+        'articles.submit', 'articles.review', 'articles.approve', 'articles.publish',
+        'programmes.create', 'programmes.manage', 'programmes.approve',
+        'projects.create', 'projects.manage', 'projects.approve',
         'finance.view', 'finance.record', 'finance.approve',
-        'documents.review', 'documents.approve', 'documents.publish',
+        'documents.upload', 'documents.review', 'documents.approve', 'documents.publish',
         'roles.create', 'roles.manage',
-        'reports.review', 'reports.approve', 'reports.publish',
+        'reports.create', 'reports.review', 'reports.approve', 'reports.publish',
       ];
       foreach ($boardCaps as $slug) {
         $stmt = db()->prepare('SELECT id FROM capabilities WHERE slug = ?');

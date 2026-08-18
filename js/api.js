@@ -116,7 +116,26 @@ const api = {
   // Roles
   async getRoles() { return this.request('/roles'); },
   async createRole(data) { return this.request('/roles', { method: 'POST', body: data }); },
+  async updateRole(id, data) { return this.request('/roles/' + id, { method: 'PUT', body: data }); },
+  async deleteRole(id) { return this.request('/roles/' + id, { method: 'DELETE' }); },
   async getRoleCapabilities(roleId) { return this.request('/roles/' + roleId + '/capabilities'); },
+  async addRoleCapability(roleId, capSlug, scopeType, scopeId) {
+    return this.request('/roles/' + roleId + '/capabilities', { method: 'POST', body: { capability: capSlug, scope_type: scopeType, scope_id: scopeId } });
+  },
+  async removeRoleCapability(roleId, capId) {
+    return this.request('/roles/' + roleId + '/capabilities/' + capId, { method: 'DELETE' });
+  },
+  async getRoleUsers(roleId) { return this.request('/roles/' + roleId + '/users'); },
+  async assignRoleToUser(roleId, userId, effectiveTo) {
+    return this.request('/roles/' + roleId + '/users', { method: 'POST', body: { user_id: userId, effective_to: effectiveTo } });
+  },
+  async revokeRoleFromUser(roleId, userId) {
+    return this.request('/roles/' + roleId + '/users/' + userId, { method: 'DELETE' });
+  },
+
+  // Users (admin)
+  async getUsers() { return this.request('/users'); },
+  async getUserRoles(userId) { return this.request('/users/' + userId + '/roles'); },
 
   // Capabilities
   async getCapabilities() { return this.request('/capabilities'); },

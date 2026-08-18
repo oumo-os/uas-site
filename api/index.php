@@ -277,20 +277,103 @@ try {
   // --- ROLES ---
   elseif ($path === '/roles' && $method === 'GET') {
     require_login();
-    $stmt = db()->prepare('SELECT * FROM roles WHERE status = "active" ORDER BY title');
+    $stmt = db()->prepare('SELECT r.*, (SELECT COUNT(*) FROM role_assignments ra WHERE ra.role_id = r.id AND ra.status = "active") AS member_count FROM roles r WHERE r.status = "active" ORDER BY r.title');
     $stmt->execute();
     json_response($stmt->fetchAll());
   }
   elseif ($path === '/roles' && $method === 'POST') {
     $user = require_cap('roles.create');
     $data = input_json();
-    $roleId = create_role($data['title'], $data['description'] ?? '', $data['capability_ids'] ?? [], $user['id']);
+    $scope = $data['scope'] ?? null;
+    $roleId = create_role($data['title'], $data['description'] ?? '', $data['capabilities'] ?? [], $user['id'], $scope);
     json_response(['id' => $roleId], 201);
+  }
+  elseif (preg_match('#^/roles/(\d+)$#', $path, $m) && $method === 'PUT') {
+    $user = require_cap('roles.manage');
+    $data = input_json();
+    $roleId = (int) $m[1];
+    $sets = [];
+    $args = [];
+    foreach (['title', 'description', 'scope', 'status'] as $f) {
+      if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = $data[$f]; }
+    }
+    if ($sets) {
+      $args[] = $roleId;
+      db()->prepare('UPDATE roles SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($args);
+    }
+    audit_log('role_update', 'role', $roleId, $data);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/roles/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    $user = require_cap('roles.manage');
+    $roleId = (int) $m[1];
+    db()->prepare("UPDATE roles SET status = 'inactive' WHERE id = ?")->execute([$roleId]);
+    db()->prepare("UPDATE role_assignments SET status = 'inactive' WHERE role_id = ? AND status = 'active'")->execute([$roleId]);
+    audit_log('role_deactivate', 'role', $roleId);
+    json_response(['ok' => true]);
   }
   elseif (preg_match('#^/roles/(\d+)/capabilities$#', $path, $m) && $method === 'GET') {
     require_login();
-    $stmt = db()->prepare('SELECT c.* FROM role_capabilities rc JOIN capabilities c ON c.id = rc.capability_id WHERE rc.role_id = ?');
+    $stmt = db()->prepare('SELECT c.*, rc.scope_type, rc.scope_id FROM role_capabilities rc JOIN capabilities c ON c.id = rc.capability_id WHERE rc.role_id = ? ORDER BY c.category, c.slug');
     $stmt->execute([$m[1]]);
+    json_response($stmt->fetchAll());
+  }
+  elseif (preg_match('#^/roles/(\d+)/capabilities$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('roles.manage');
+    $roleId = (int) $m[1];
+    $data = input_json();
+    $capSlug = $data['capability'] ?? '';
+    $scopeType = $data['scope_type'] ?? null;
+    $scopeId = $data['scope_id'] ? (int) $data['scope_id'] : null;
+    $stmt = db()->prepare('SELECT id FROM capabilities WHERE slug = ?');
+    $stmt->execute([$capSlug]);
+    $capId = (int) $stmt->fetchColumn();
+    if (!$capId) json_error('Capability not found', 404);
+    assign_capability($roleId, $capId, $user['id'], $scopeType, $scopeId);
+    json_response(['ok' => true], 201);
+  }
+  elseif (preg_match('#^/roles/(\d+)/capabilities/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    $user = require_cap('roles.manage');
+    // Delete the specific role_capabilities row by ID
+    $stmt = db()->prepare('DELETE FROM role_capabilities WHERE id = ? AND role_id = ?');
+    $stmt->execute([(int) $m[2], (int) $m[1]]);
+    audit_log('cap_revoke', 'role', (int) $m[1], ['capability_id' => (int) $m[2]]);
+    json_response(['ok' => true]);
+  }
+  // --- ROLE ASSIGNMENTS ---
+  elseif (preg_match('#^/roles/(\d+)/users$#', $path, $m) && $method === 'GET') {
+    require_login();
+    $roleId = (int) $m[1];
+    $stmt = db()->prepare('SELECT ra.*, u.name, u.email FROM role_assignments ra JOIN users u ON u.id = ra.user_id WHERE ra.role_id = ? AND ra.status = "active" ORDER BY u.name');
+    $stmt->execute([$roleId]);
+    json_response($stmt->fetchAll());
+  }
+  elseif (preg_match('#^/roles/(\d+)/users$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('roles.manage');
+    $roleId = (int) $m[1];
+    $data = input_json();
+    $targetUserId = (int) ($data['user_id'] ?? 0);
+    if (!$targetUserId) json_error('user_id is required', 400);
+    $effectiveTo = $data['effective_to'] ?? null;
+    assign_role($roleId, $targetUserId, $user['id'], null, $effectiveTo);
+    json_response(['ok' => true], 201);
+  }
+  elseif (preg_match('#^/roles/(\d+)/users/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    $user = require_cap('roles.manage');
+    revoke_role((int) $m[1], (int) $m[2]);
+    json_response(['ok' => true]);
+  }
+  // --- USERS (for assignment dropdowns) ---
+  elseif ($path === '/users' && $method === 'GET') {
+    require_cap('roles.manage');
+    $stmt = db()->prepare('SELECT id, name, email, status FROM users WHERE status = "active" ORDER BY name');
+    $stmt->execute();
+    json_response($stmt->fetchAll());
+  }
+  elseif (preg_match('#^/users/(\d+)/roles$#', $path, $m) && $method === 'GET') {
+    require_login();
+    $stmt = db()->prepare('SELECT r.*, ra.effective_from, ra.effective_to, ra.assigned_by FROM role_assignments ra JOIN roles r ON r.id = ra.role_id WHERE ra.user_id = ? AND ra.status = "active" ORDER BY r.title');
+    $stmt->execute([(int) $m[1]]);
     json_response($stmt->fetchAll());
   }
 
@@ -326,7 +409,7 @@ try {
     json_response($res);
   }
   elseif (preg_match('#^/resolutions/(\d+)/submit$#', $path, $m) && $method === 'POST') {
-    $user = require_login();
+    $user = require_cap('resolutions.manage');
     submit_resolution((int) $m[1], $user['id']);
     json_response(['ok' => true]);
   }
@@ -408,10 +491,17 @@ try {
     json_response($stmt->fetchAll());
   }
   elseif ($path === '/projects' && $method === 'POST') {
-    $user = require_cap('projects.create');
     $data = input_json();
+    $progId = $data['programme_id'] ?? null;
+    // Check global projects.create OR scoped to this programme
+    $user = current_user();
+    if (!$user) json_error('Authentication required', 401);
+    if ($user['status'] !== 'active') json_error('Account is not active', 403);
+    if (!user_has_cap($user['id'], 'projects.create') && !($progId && user_has_cap($user['id'], 'projects.create', 'programme', (int)$progId))) {
+      json_error('Insufficient permissions: projects.create', 403);
+    }
     db()->prepare('INSERT INTO projects (programme_id, title, description, lead_id, objectives, deadline, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      ->execute([$data['programme_id'] ?? null, $data['title'], $data['description'] ?? null, $data['lead_id'] ?? null, $data['objectives'] ?? null, $data['deadline'] ?? null, $user['id']]);
+      ->execute([$progId, $data['title'], $data['description'] ?? null, $data['lead_id'] ?? null, $data['objectives'] ?? null, $data['deadline'] ?? null, $user['id']]);
     $id = (int) db()->lastInsertId();
     audit_log('project_create', 'project', $id);
     json_response(['id' => $id], 201);
@@ -425,10 +515,17 @@ try {
     json_response($stmt->fetchAll());
   }
   elseif ($path === '/events' && $method === 'POST') {
-    $user = require_cap('events.create');
     $data = input_json();
+    $progId = $data['programme_id'] ?? null;
+    // Check global events.create OR scoped to this programme
+    $user = current_user();
+    if (!$user) json_error('Authentication required', 401);
+    if ($user['status'] !== 'active') json_error('Account is not active', 403);
+    if (!user_has_cap($user['id'], 'events.create') && !($progId && user_has_cap($user['id'], 'events.create', 'programme', (int)$progId))) {
+      json_error('Insufficient permissions: events.create', 403);
+    }
     db()->prepare('INSERT INTO events (programme_id, project_id, title, description, organizer_id, date, end_date, location, capacity, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      ->execute([$data['programme_id'] ?? null, $data['project_id'] ?? null, $data['title'], $data['description'] ?? null, $user['id'], $data['date'], $data['end_date'] ?? null, $data['location'] ?? null, $data['capacity'] ?? null, $user['id']]);
+      ->execute([$progId, $data['project_id'] ?? null, $data['title'], $data['description'] ?? null, $user['id'], $data['date'], $data['end_date'] ?? null, $data['location'] ?? null, $data['capacity'] ?? null, $user['id']]);
     $id = (int) db()->lastInsertId();
     transition('event', $id, 'submitted', $user['id']);
     audit_log('event_create', 'event', $id);
@@ -436,8 +533,16 @@ try {
     json_response(['id' => $id], 201);
   }
   elseif (preg_match('#^/events/(\d+)/approve$#', $path, $m) && $method === 'POST') {
-    $user = require_cap('events.approve');
-    transition('event', (int) $m[1], 'approved', $user['id']);
+    $eid = (int) $m[1];
+    // Check global events.approve OR scoped to the event's programme
+    $user = require_login();
+    $stmt = db()->prepare('SELECT programme_id FROM events WHERE id = ?');
+    $stmt->execute([$eid]);
+    $progId = $stmt->fetchColumn();
+    if (!user_has_cap($user['id'], 'events.approve') && !($progId && user_has_cap($user['id'], 'events.approve', 'programme', (int)$progId))) {
+      json_error('Insufficient permissions: events.approve', 403);
+    }
+    transition('event', $eid, 'approved', $user['id']);
     json_response(['ok' => true]);
   }
   elseif (preg_match('#^/events/(\d+)/publish$#', $path, $m) && $method === 'POST') {
@@ -943,7 +1048,7 @@ try {
     json_response($stmt->fetchAll());
   }
   elseif ($path === '/assignments' && $method === 'POST') {
-    $user = require_login();
+    $user = require_cap('assignments.create');
     $data = input_json();
     db()->prepare('INSERT INTO assignments (title, description, assignee_id, assigner_id, role_id, due_date, priority, related_type, related_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
       ->execute([$data['title'], $data['description'] ?? null, $data['assignee_id'] ?? null, $user['id'], $data['role_id'] ?? null, $data['due_date'] ?? null, $data['priority'] ?? 'medium', $data['related_type'] ?? null, $data['related_id'] ?? null]);
@@ -1022,7 +1127,7 @@ try {
     json_response($stmt->fetchAll());
   }
   elseif ($path === '/calendar' && $method === 'POST') {
-    $user = require_login();
+    $user = require_cap('calendar.manage');
     $data = input_json();
     db()->prepare('INSERT INTO calendar_items (title, type, owner_id, deadline, priority, related_type, related_id, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       ->execute([$data['title'], $data['type'], $user['id'], $data['deadline'], $data['priority'] ?? 'medium', $data['related_type'] ?? null, $data['related_id'] ?? null, $data['notes'] ?? null]);
