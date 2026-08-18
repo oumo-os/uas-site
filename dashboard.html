@@ -269,53 +269,146 @@
 
     /* ── Modal ── */
     .modal-overlay {
-      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0);
       z-index: 1000; align-items: center; justify-content: center; padding: 1rem;
+      transition: background 0.25s ease;
     }
-    .modal-overlay.open { display: flex; }
+    .modal-overlay.open { display: flex; background: rgba(0,0,0,0.5); }
     .modal {
       background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
-      max-width: 640px; width: 100%; max-height: 80vh; overflow-y: auto; padding: 1.25rem;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      max-width: 640px; width: 100%; max-height: 85vh; overflow-y: auto; padding: 1.5rem;
+      box-shadow: 0 25px 80px rgba(0,0,0,0.35);
+      transform: translateY(20px) scale(0.97); opacity: 0;
+      transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), opacity 0.2s ease;
     }
+    .modal-overlay.open .modal { transform: translateY(0) scale(1); opacity: 1; }
     .modal-header {
       display: flex; justify-content: space-between; align-items: flex-start;
-      margin-bottom: 0.85rem; padding-bottom: 0.65rem; border-bottom: 1px solid var(--border);
+      margin-bottom: 1.25rem; padding-bottom: 0.85rem; border-bottom: 1px solid var(--border);
     }
-    .modal-header h3 { font-size: 1.05rem; font-weight: 700; margin: 0; }
+    .modal-header h3 { font-size: 1.1rem; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 0.5rem; }
+    .modal-header .modal-badge {
+      padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.65rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.03em;
+    }
     .modal-close {
-      background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--text-dim);
-      padding: 0; line-height: 1; flex-shrink: 0;
+      background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-dim);
+      padding: 0.2rem; line-height: 1; flex-shrink: 0; border-radius: var(--radius);
+      transition: all 0.15s; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
     }
-    .modal-close:hover { color: var(--text); }
-    .modal-body { font-size: 0.85rem; line-height: 1.6; }
-    .modal-body .field { margin-bottom: 0.65rem; }
-    .modal-body .field-label { font-size: 0.72rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.2rem; }
+    .modal-close:hover { color: var(--text); background: var(--border); }
+    .modal-body { font-size: 0.88rem; line-height: 1.6; }
+    .modal-body .field { margin-bottom: 0.75rem; }
+    .modal-body .field-label { font-size: 0.72rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.2rem; display: block; }
+    .modal-body .field-value { color: var(--text); }
+    .modal-body .field-group {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;
+      padding: 0.75rem; background: var(--bg); border-radius: var(--radius); border: 1px solid var(--border);
+    }
+    @media (max-width: 600px) { .modal-body .field-group { grid-template-columns: 1fr; } }
+    .modal-body .field-group .field { margin-bottom: 0; }
+    .modal-actions {
+      display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1.25rem;
+      padding-top: 1rem; border-top: 1px solid var(--border);
+    }
+    .modal-actions .btn { min-width: 80px; }
+    .modal-section { margin-top: 1rem; }
+    .modal-section-title {
+      font-size: 0.78rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase;
+      letter-spacing: 0.04em; margin-bottom: 0.65rem; display: flex; align-items: center; gap: 0.4rem;
+    }
+
+    /* ── Forms ── */
+    .uas-form .form-group { margin-bottom: 0.85rem; }
+    .uas-form .form-label { font-size: 0.78rem; font-weight: 600; color: var(--text-dim); margin-bottom: 0.3rem; display: block; }
+    .uas-form .form-required { color: var(--danger); margin-left: 0.15rem; }
+    .uas-form .form-input,
+    .uas-form .form-select,
+    .uas-form .form-textarea {
+      width: 100%; padding: 0.6rem 0.75rem; border: 1px solid var(--border);
+      border-radius: var(--radius); background: var(--bg); color: var(--text);
+      font-family: inherit; font-size: 0.88rem; transition: border-color 0.15s, box-shadow 0.15s;
+      box-sizing: border-box;
+    }
+    .uas-form .form-input:focus,
+    .uas-form .form-select:focus,
+    .uas-form .form-textarea:focus {
+      outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(27,73,101,0.1);
+    }
+    .uas-form .form-textarea { resize: vertical; min-height: 80px; }
+    .uas-form .form-error {
+      font-size: 0.72rem; color: var(--danger); margin-top: 0.2rem; min-height: 0;
+    }
+    .uas-form .form-error:not(:empty) { min-height: 1rem; }
+    .uas-form .form-help { font-size: 0.72rem; color: var(--text-faint); margin-top: 0.2rem; }
+    .uas-form .form-actions { margin-top: 1.25rem; display: flex; gap: 0.5rem; }
+    .uas-form .form-actions .btn { min-width: 100px; }
+    .uas-form .form-input.is-invalid,
+    .uas-form .form-select.is-invalid,
+    .uas-form .form-textarea.is-invalid { border-color: var(--danger); }
+    .uas-form .form-input.is-invalid:focus,
+    .uas-form .form-select.is-invalid:focus,
+    .uas-form .form-textarea.is-invalid:focus { box-shadow: 0 0 0 3px rgba(185,28,28,0.1); }
+
+    /* ── Toast ── */
+    .toast-container {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 2000;
+      display: flex; flex-direction: column-reverse; gap: 0.5rem;
+      pointer-events: none;
+    }
+    .toast {
+      padding: 0.75rem 1rem; border-radius: var(--radius); font-size: 0.82rem;
+      font-weight: 500; color: #fff; pointer-events: auto;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+      transform: translateX(120%); opacity: 0;
+      transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.2s ease;
+      max-width: 360px;
+    }
+    .toast.show { transform: translateX(0); opacity: 1; }
+    .toast.success { background: #16a34a; }
+    .toast.error { background: #dc2626; }
+    .toast.info { background: var(--accent); }
+    .toast.warning { background: #d97706; }
 
     /* ── Comments ── */
-    .comment-thread { margin-top: 0.85rem; }
+    .comment-thread { margin-top: 1rem; }
     .comment-item {
-      display: flex; gap: 0.65rem; padding: 0.65rem 0;
+      display: flex; gap: 0.75rem; padding: 0.75rem 0;
       border-bottom: 1px solid var(--border);
     }
     .comment-item:last-child { border-bottom: none; }
     .comment-avatar {
-      width: 28px; height: 28px; border-radius: 50%; background: var(--accent-glow);
+      width: 30px; height: 30px; border-radius: 50%; background: var(--accent-glow);
       display: flex; align-items: center; justify-content: center;
       font-size: 0.65rem; font-weight: 700; color: var(--accent); flex-shrink: 0;
     }
     .comment-content { flex: 1; }
-    .comment-meta { font-size: 0.72rem; color: var(--text-dim); margin-bottom: 0.15rem; }
+    .comment-meta { font-size: 0.72rem; color: var(--text-dim); margin-bottom: 0.2rem; }
     .comment-meta strong { color: var(--text); }
-    .comment-body { font-size: 0.82rem; }
+    .comment-body { font-size: 0.85rem; }
     .comment-input {
-      display: flex; gap: 0.4rem; margin-top: 0.65rem; align-items: flex-start;
+      display: flex; gap: 0.5rem; margin-top: 0.75rem; align-items: flex-start;
     }
     .comment-input textarea {
-      flex: 1; padding: 0.4rem; border: 1px solid var(--border); border-radius: var(--radius);
-      font-family: inherit; font-size: 0.82rem; resize: vertical; min-height: 50px;
-      background: var(--bg); color: var(--text);
+      flex: 1; padding: 0.5rem 0.65rem; border: 1px solid var(--border); border-radius: var(--radius);
+      font-family: inherit; font-size: 0.85rem; resize: vertical; min-height: 50px;
+      background: var(--bg); color: var(--text); transition: border-color 0.15s;
     }
+    .comment-input textarea:focus { outline: none; border-color: var(--accent); }
+
+    /* ── Detail Modal Extras ── */
+    .detail-status {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600;
+      text-transform: capitalize;
+    }
+    .detail-status.submitted { background: rgba(184,134,11,0.1); color: var(--gold); }
+    .detail-status.approved, .detail-status.active, .detail-status.published { background: rgba(45,106,79,0.1); color: var(--success); }
+    .detail-status.rejected, .detail-status.inactive, .detail-status.failed { background: rgba(185,28,28,0.1); color: var(--danger); }
+    .detail-status.draft { background: rgba(120,120,120,0.12); color: var(--text-dim); }
+    .detail-status.voting { background: rgba(30,96,145,0.1); color: var(--info); }
+    .detail-status.open { background: rgba(45,106,79,0.1); color: var(--success); }
+    .detail-status.closed { background: rgba(120,120,120,0.12); color: var(--text-dim); }
 
     /* ── Create Form ── */
     .create-form { max-width: 520px; }
@@ -693,6 +786,9 @@
     </div>
   </div>
 
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
   <footer class="site-footer">
     <div class="container">
       <div class="footer-grid">
@@ -920,14 +1016,14 @@
 
     async function asgAction(id, action) {
       try { await api[action === 'start' ? 'startAssignment' : 'completeAssignment'](id); load(); }
-      catch(e) { alert(e.error || 'Failed'); }
+      catch(e) { toast(e.error || 'Failed', 'error'); }
     }
 
     async function asgSubmit(id) {
       const evidence = prompt('Describe what was done / link evidence:');
       if (evidence === null) return;
       try { await api.submitAssignment(id, evidence); load(); }
-      catch(e) { alert(e.error || 'Failed'); }
+      catch(e) { toast(e.error || 'Failed', 'error'); }
     }
 
     function renderMySubmissions(list) {
@@ -1231,7 +1327,7 @@
             <pre style="white-space:pre-line;font-family:inherit">${esc(m.minutes || 'No minutes posted yet')}</pre>
           </div>
         `);
-      } catch (e) { alert(e.error || 'Failed to load meeting'); }
+      } catch (e) { toast(e.error || 'Failed to load meeting', 'error'); }
     }
 
     async function changeMeetingStatus(id, status) {
@@ -1239,7 +1335,7 @@
         await api.request('/meetings/' + id + '/status', { method: 'POST', body: { status } });
         const list = await api.request('/meetings');
         renderMeetings(list);
-      } catch (e) { alert(e.error || 'Failed'); }
+      } catch (e) { toast(e.error || 'Failed', 'error'); }
     }
 
     async function showMeetingMinutes(id) {
@@ -1268,10 +1364,10 @@
       }
       try {
         await api.request('/meetings/' + id + '/minutes', { method: 'POST', body: { minutes, decisions } });
-        closeModal();
+        closeModal(); toast('Minutes saved', 'success');
         const list = await api.request('/meetings');
         renderMeetings(list);
-      } catch (e) { alert(e.error || 'Failed to save minutes'); }
+      } catch (e) { toast(e.error || 'Failed to save minutes', 'error'); }
     }
 
     async function showMeetingAttendance(id) {
@@ -1295,10 +1391,10 @@
       }
       try {
         await api.request('/meetings/' + id + '/attendance', { method: 'POST', body: { attendees } });
-        closeModal();
+        closeModal(); toast('Attendance saved', 'success');
         const list = await api.request('/meetings');
         renderMeetings(list);
-      } catch (e) { alert(e.error || 'Failed to save attendance'); }
+      } catch (e) { toast(e.error || 'Failed to save attendance', 'error'); }
     }
 
     async function showMeetingForm() {
@@ -1318,7 +1414,7 @@
 
     async function createMeeting() {
       const title = document.getElementById('mTitle').value.trim();
-      if (!title) return alert('Title is required');
+      if (!title) return toast('Title is required', 'warning');
       const agenda = (document.getElementById('mAgenda').value || '').split('\n').map(s => s.trim()).filter(Boolean).map(t => ({ title: t }));
       try {
         await api.request('/meetings', { method: 'POST', body: {
@@ -1328,10 +1424,10 @@
           location: document.getElementById('mLoc').value || null,
           agenda,
         }});
-        closeModal();
+        closeModal(); toast('Meeting scheduled', 'success');
         const list = await api.request('/meetings');
         renderMeetings(list);
-      } catch (e) { alert(e.error || 'Failed to schedule meeting'); }
+      } catch (e) { toast(e.error || 'Failed to schedule meeting', 'error'); }
     }
 
     // ================= POLLS =================
@@ -1412,7 +1508,7 @@
             ${votersBlock}
           </div>
         `);
-      } catch (e) { alert(e.error || 'Failed to load poll'); }
+      } catch (e) { toast(e.error || 'Failed to load poll', 'error'); }
     }
 
     async function renderDelegations() {
@@ -1463,9 +1559,9 @@
       const scope = document.getElementById('dgScope').value;
       try {
         await api.request('/delegations', { method: 'POST', body: { delegatee_id: delegateeId, scope } });
-        closeModal();
+        closeModal(); toast('Delegation created', 'success');
         load();
-      } catch (e) { alert(e.error || 'Failed to delegate'); }
+      } catch (e) { toast(e.error || 'Failed to delegate', 'error'); }
     }
 
     async function revokeDelegation(id) {
@@ -1473,7 +1569,7 @@
       try {
         await api.request('/delegations/' + id + '/revoke', { method: 'POST' });
         load();
-      } catch (e) { alert(e.error || 'Failed to revoke'); }
+      } catch (e) { toast(e.error || 'Failed to revoke', 'error'); }
     }
 
     function delegatedHint() {
@@ -1491,12 +1587,12 @@
     async function castPollVote(id, optionIndex) {
       try {
         await api.request('/polls/' + id + '/vote', { method: 'POST', body: { option_index: optionIndex } });
-        closeModal();
+        closeModal(); toast('Vote cast', 'success');
         const polls = await api.request('/polls');
         renderPolls(polls);
         const pending = await api.getPending({ scope: pendingScope }).catch(() => []);
         renderPending(pending);
-      } catch (e) { alert(e.error || 'Failed to cast vote'); }
+      } catch (e) { toast(e.error || 'Failed to cast vote', 'error'); }
     }
 
     async function openPoll(id) {
@@ -1504,7 +1600,7 @@
         await api.request('/polls/' + id + '/open', { method: 'POST' });
         const polls = await api.request('/polls');
         renderPolls(polls);
-      } catch (e) { alert(e.error || 'Failed to open poll'); }
+      } catch (e) { toast(e.error || 'Failed to open poll', 'error'); }
     }
 
     async function closePoll(id) {
@@ -1512,7 +1608,7 @@
         await api.request('/polls/' + id + '/close', { method: 'POST' });
         const polls = await api.request('/polls');
         renderPolls(polls);
-      } catch (e) { alert(e.error || 'Failed to close poll'); }
+      } catch (e) { toast(e.error || 'Failed to close poll', 'error'); }
     }
 
     async function resolvePoll(id) {
@@ -1520,7 +1616,7 @@
         await api.request('/polls/' + id + '/resolve', { method: 'POST' });
         const polls = await api.request('/polls');
         renderPolls(polls);
-      } catch (e) { alert(e.error || 'Failed to resolve poll'); }
+      } catch (e) { toast(e.error || 'Failed to resolve poll', 'error'); }
     }
 
     async function deletePoll(id) {
@@ -1529,7 +1625,7 @@
         await api.request('/polls/' + id, { method: 'DELETE' });
         const polls = await api.request('/polls');
         renderPolls(polls);
-      } catch (e) { alert(e.error || 'Failed to delete poll'); }
+      } catch (e) { toast(e.error || 'Failed to delete poll', 'error'); }
     }
 
     async function showPollForm() {
@@ -1551,8 +1647,8 @@
     async function createPoll() {
       const title = document.getElementById('pTitle').value.trim();
       const options = (document.getElementById('pOptions').value || '').split('\n').map(s => s.trim()).filter(Boolean);
-      if (!title) return alert('Title is required');
-      if (options.length < 2) return alert('At least 2 options are required');
+      if (!title) return toast('Title is required', 'warning');
+      if (options.length < 2) return toast('At least 2 options are required', 'warning');
       try {
         await api.request('/polls', { method: 'POST', body: {
           title,
@@ -1564,10 +1660,10 @@
           allow_anonymous: document.getElementById('pAnon').checked,
           ends_at: document.getElementById('pEnds').value || null,
         }});
-        closeModal();
+        closeModal(); toast('Poll created', 'success');
         const polls = await api.request('/polls');
         renderPolls(polls);
-      } catch (e) { alert(e.error || 'Failed to create poll'); }
+      } catch (e) { toast(e.error || 'Failed to create poll', 'error'); }
     }
 
     function renderRoles(roles) {
@@ -1779,13 +1875,13 @@
 
     async function rejectArticle(id) {
       const reason = prompt('Rejection reason (shown to the author):');
-      if (reason === null || !reason.trim()) return alert('A reason is required');
+      if (reason === null || !reason.trim()) return toast('A reason is required', 'warning');
       try {
         await api.request('/articles/' + id + '/reject', { method: 'POST', body: { reason: reason.trim() } });
         const pending = await api.getPending();
         renderOverview(pending);
         renderPending(pending);
-      } catch(e) { alert(e.error || 'Failed'); }
+      } catch(e) { toast(e.error || 'Failed', 'error'); }
     }
 
     async function actOnItem(type, action, id) {
@@ -1814,7 +1910,7 @@
           const resolutions = await api.getResolutions();
           renderResolutions(resolutions);
         }
-      } catch(e) { alert(e.error || 'Action failed'); }
+      } catch(e) { toast(e.error || 'Action failed', 'error'); }
     }
 
     function renderResolutions(resolutions) {
@@ -1898,7 +1994,7 @@
         await api.addResolutionComment(resId, body);
         textarea.value = '';
         loadComments(resId);
-      } catch(e) { alert(e.error || 'Failed to post comment'); }
+      } catch(e) { toast(e.error || 'Failed to post comment', 'error'); }
     }
 
     async function vote(id, value) {
@@ -1907,7 +2003,7 @@
         const resolutions = await api.getResolutions();
         renderResolutions(resolutions);
       } catch(e) {
-        alert(e.error || 'Vote failed');
+        toast(e.error || 'Vote failed', 'error');
       }
     }
 
@@ -2133,7 +2229,7 @@
       openModal('Record Transaction', FormBuilder.render(fields, { id: formId, submitLabel: 'Record' }));
       FormBuilder.init(formId, fields, async (data) => {
         await api.recordFinance(data);
-        closeModal();
+        closeModal(); toast('Transaction recorded', 'success');
         load();
       });
     }
@@ -2161,7 +2257,7 @@
         if (!data.file) throw { error: 'Please select a file' };
         const uploadResult = await api.uploadFile(data.file);
         await api.uploadDocument({ title: data.title, category: data.category, visibility: data.visibility, file_path: uploadResult.url });
-        closeModal();
+        closeModal(); toast('Document uploaded', 'success');
         load();
       });
     }
@@ -2350,7 +2446,7 @@
 
     async function submitBudgetItem() {
       const parentVal = document.getElementById('biParent').value;
-      if (!parentVal) return alert('Please select a programme, event, or project');
+      if (!parentVal) return toast('Please select a programme, event, or project', 'warning');
       const [parentType, parentId] = parentVal.split(':');
       try {
         await api.createBudgetItem({
@@ -2364,9 +2460,9 @@
           event_id: parentType === 'event' ? parseInt(parentId) : null,
           project_id: parentType === 'project' ? parseInt(parentId) : null,
         });
-        closeModal();
+        closeModal(); toast('Budget item created', 'success');
         load();
-      } catch(e) { alert(e.error || 'Failed'); }
+      } catch(e) { toast(e.error || 'Failed', 'error'); }
     }
 
     function showWorkingGroupForm() {
@@ -2399,22 +2495,55 @@
           term_start: document.getElementById('wgStart').value || null,
           term_end: document.getElementById('wgEnd').value || null,
         });
-        closeModal();
+        closeModal(); toast('Working group created', 'success');
         load();
-      } catch(e) { alert(e.error || 'Failed'); }
+      } catch(e) { toast(e.error || 'Failed', 'error'); }
     }
 
     // Modal functions
-    function openModal(title, html) {
-      document.getElementById('modalTitle').textContent = title;
+    // ── Toast notifications ──
+    function toast(message, type = 'info', duration = 3500) {
+      const container = document.getElementById('toastContainer');
+      const el = document.createElement('div');
+      el.className = 'toast ' + type;
+      el.textContent = message;
+      container.appendChild(el);
+      requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
+      setTimeout(() => {
+        el.classList.remove('show');
+        setTimeout(() => el.remove(), 300);
+      }, duration);
+    }
+
+    // ── Modal ──
+    function openModal(title, html, opts = {}) {
+      const h3 = document.getElementById('modalTitle');
+      h3.innerHTML = '';
+      h3.textContent = title;
+      if (opts.badge) {
+        const b = document.createElement('span');
+        b.className = 'modal-badge detail-status ' + (opts.badgeClass || '');
+        b.textContent = opts.badge;
+        h3.appendChild(b);
+      }
       document.getElementById('modalBody').innerHTML = html;
-      document.getElementById('detailModal').classList.add('open');
+      const overlay = document.getElementById('detailModal');
+      overlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+      // Focus first input
+      setTimeout(() => { const inp = overlay.querySelector('input, select, textarea'); if (inp) inp.focus(); }, 100);
     }
     function closeModal() {
       document.getElementById('detailModal').classList.remove('open');
+      document.body.style.overflow = '';
     }
     document.getElementById('detailModal').addEventListener('click', e => {
       if (e.target === e.currentTarget) closeModal();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && document.getElementById('detailModal').classList.contains('open')) {
+        closeModal();
+      }
     });
 
     async function showItemDetail(type, id) {
@@ -2580,7 +2709,7 @@
         }
 
         openModal(data.title || data.name || type.charAt(0).toUpperCase() + type.slice(1), html);
-      } catch(e) { alert('Could not load details'); }
+      } catch(e) { toast('Could not load details', 'error'); }
     }
 
     async function modalAction(type, action, id) {
@@ -2602,17 +2731,17 @@
           if (action === 'start') await api.startAssignment(id);
           if (action === 'complete') await api.completeAssignment(id);
         }
-        closeModal();
+        closeModal(); toast('Action completed', 'success');
         load();
-      } catch(e) { alert(e.error || 'Action failed'); }
+      } catch(e) { toast(e.error || 'Action failed', 'error'); }
     }
 
     async function modalVote(id, value) {
       try {
         await api.castVote(id, value);
-        closeModal();
+        closeModal(); toast('Vote recorded', 'success');
         load();
-      } catch(e) { alert(e.error || 'Vote failed'); }
+      } catch(e) { toast(e.error || 'Vote failed', 'error'); }
     }
 
     async function modalRejectArticle(id) {
@@ -2620,9 +2749,9 @@
       if (reason === null || !reason.trim()) return;
       try {
         await api.request('/articles/' + id + '/reject', { method: 'POST', body: { reason: reason.trim() } });
-        closeModal();
+        closeModal(); toast('Article rejected', 'success');
         load();
-      } catch(e) { alert(e.error || 'Failed'); }
+      } catch(e) { toast(e.error || 'Failed', 'error'); }
     }
 
     async function modalAssignmentSubmit(id) {
@@ -2630,9 +2759,9 @@
       if (evidence === null) return;
       try {
         await api.submitAssignment(id, evidence);
-        closeModal();
+        closeModal(); toast('Assignment submitted', 'success');
         load();
-      } catch(e) { alert(e.error || 'Failed'); }
+      } catch(e) { toast(e.error || 'Failed', 'error'); }
     }
 
     async function modalPostComment(resId) {
@@ -2643,7 +2772,7 @@
         await api.addResolutionComment(resId, body);
         // Refresh modal with updated comments
         showItemDetail('resolution', resId);
-      } catch(e) { alert(e.error || 'Failed to post comment'); }
+      } catch(e) { toast(e.error || 'Failed to post comment', 'error'); }
     }
 
     async function showResolutionDetail(id) {
