@@ -20,5 +20,13 @@ RewriteRule ^article/(\d+)/?$ article.html?id=$1 [QSA,L]
 # Event detail: /event/3 -> event.html?id=3
 RewriteRule ^event/(\d+)/?$ event.html?id=$1 [QSA,L]
 
+# Absorb preload-scanner requests that raced the dynamic <base> on deep routes
+# (e.g. /article/css/base.css -> /css/base.css). The scanner resolves relative
+# asset refs against the page URL before the base-setting script runs; these
+# stale requests are harmless but noisy, so map them to the app root instead.
+RewriteRule ^[^/]+/css/(.*)$ css/$1 [L]
+RewriteRule ^[^/]+/js/(.*)$ js/$1 [L]
+RewriteRule ^[^/]+/img/(.*)$ img/$1 [L]
+
 # API: /api/... -> api/index.php
 RewriteRule ^api/(.*)$ api/index.php?route=$1 [QSA,L]
