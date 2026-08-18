@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/img/uas-emblem.png">
+  <title>Join UAS — Uganda Astronomical Society</title>
+  <meta name="description" content="Join UAS — free membership for students, regular members, and honorary astronomers.">
+  <meta property="og:title" content="Join UAS — Uganda Astronomical Society">
+  <meta property="og:description" content="Join UAS — free membership for students, regular members, and honorary astronomers.">
+  <meta property="og:image" content="/img/uas-emblem.png">
+  <meta property="og:type" content="website">
+  <link rel="stylesheet" href="/css/base.css">
+  <style>
+    .page-hero {
+      position:relative; min-height:55vh; display:flex; flex-direction:column;
+      justify-content:center; align-items:center; text-align:center;
+      padding:6rem 1.5rem 4rem; background:url('/img/header-join.jpg') center/cover no-repeat; color:#fff;
+    }
+    .page-hero::before { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(15,23,42,0.55) 0%,rgba(15,23,42,0.85) 100%); }
+    .page-hero > * { position:relative; z-index:1; }
+    .page-hero h1 { font-size:3rem; font-weight:700; color:#fff; margin-bottom:0.75rem; }
+    .page-hero p { font-size:1.1rem; color:rgba(255,255,255,0.85); max-width:600px; margin-bottom:2rem; line-height:1.7; }
+    .page-hero .btn { font-size:1rem; padding:0.75rem 2rem; }
+
+    .section { padding:5rem 0; }
+    .section-alt { background:var(--bg-card); border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+    .section-title { font-size:1.8rem; font-weight:700; text-align:center; margin-bottom:0.5rem; }
+    .section-subtitle { text-align:center; color:var(--text-dim); margin-bottom:2.5rem; font-size:0.95rem; max-width:600px; margin-left:auto; margin-right:auto; }
+
+    .benefits-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1.5rem; max-width:1000px; margin:0 auto; }
+    .benefit-card {
+      padding:2rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg);
+      text-align:center; transition:all 0.3s;
+    }
+    .benefit-card:hover { border-color:var(--border-focus); box-shadow:var(--shadow-md); transform:translateY(-3px); }
+    .benefit-icon { width:56px; height:56px; border-radius:14px; display:flex; align-items:center; justify-content:center; margin:0 auto 1rem; }
+    .benefit-card:nth-child(1) .benefit-icon { background:rgba(27,73,101,0.1); color:var(--accent); }
+    .benefit-card:nth-child(2) .benefit-icon { background:rgba(45,106,79,0.1); color:var(--success); }
+    .benefit-card:nth-child(3) .benefit-icon { background:rgba(184,134,11,0.1); color:var(--gold); }
+    .benefit-card:nth-child(4) .benefit-icon { background:rgba(30,96,145,0.1); color:var(--info); }
+    .benefit-card:nth-child(5) .benefit-icon { background:rgba(124,58,237,0.1); color:#7c3aed; }
+    .benefit-card:nth-child(6) .benefit-icon { background:rgba(153,27,27,0.1); color:var(--danger); }
+    .benefit-card h3 { font-size:1.05rem; margin-bottom:0.5rem; }
+    .benefit-card p { font-size:0.88rem; color:var(--text-dim); line-height:1.6; }
+
+    .expect-list { max-width:700px; margin:0 auto; }
+    .expect-item {
+      display:flex; gap:1.25rem; padding:1.5rem; background:var(--bg-card); border:1px solid var(--border);
+      border-radius:var(--radius-lg); margin-bottom:1rem; transition:all 0.3s;
+    }
+    .expect-item:hover { border-color:var(--border-focus); box-shadow:var(--shadow-md); }
+    .expect-num { width:40px; height:40px; border-radius:10px; background:var(--accent-glow); color:var(--accent); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:1rem; flex-shrink:0; }
+    .expect-content h3 { font-size:1rem; margin-bottom:0.3rem; }
+    .expect-content p { font-size:0.88rem; color:var(--text-dim); line-height:1.6; }
+
+    .tiers-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1.5rem; max-width:900px; margin:0 auto; }
+    .tier-card {
+      padding:2rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg);
+      text-align:center; transition:all 0.3s; position:relative;
+    }
+    .tier-card.featured { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+    .tier-card.featured::before { content:'Most Popular'; position:absolute; top:-12px; left:50%; transform:translateX(-50%); background:var(--accent); color:#fff; padding:0.2rem 0.75rem; border-radius:999px; font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; }
+    .tier-card:hover { border-color:var(--border-focus); box-shadow:var(--shadow-md); transform:translateY(-3px); }
+    .tier-card h3 { font-size:1.1rem; margin-bottom:0.5rem; }
+    .tier-card .price { font-size:2rem; font-weight:700; color:var(--accent); margin-bottom:0.25rem; }
+    .tier-card .price-note { font-size:0.78rem; color:var(--text-dim); margin-bottom:1.25rem; }
+    .tier-card ul { list-style:none; padding:0; margin:0 0 1.5rem; text-align:left; }
+    .tier-card ul li { padding:0.5rem 0; border-bottom:1px solid var(--border); font-size:0.88rem; color:var(--text-dim); display:flex; align-items:center; gap:0.5rem; }
+    .tier-card ul li:last-child { border-bottom:none; }
+    .tier-card ul li svg { width:16px; height:16px; color:var(--success); flex-shrink:0; }
+
+    .cta-section { padding:5rem 0; text-align:center; background:var(--accent); color:#fff; }
+    .cta-section h2 { font-size:2rem; font-weight:700; color:#fff; margin-bottom:0.75rem; }
+    .cta-section p { color:rgba(255,255,255,0.85); max-width:500px; margin:0 auto 2rem; font-size:1rem; }
+    .cta-section .btn-primary { background:#fff; color:var(--accent); border-color:#fff; }
+    .cta-section .btn-primary:hover { background:rgba(255,255,255,0.9); }
+
+    @media (max-width:768px) {
+      .page-hero { min-height:45vh; padding:4rem 1rem 3rem; }
+      .page-hero h1 { font-size:2rem; }
+      .benefits-grid { grid-template-columns:1fr; max-width:400px; }
+      .tiers-grid { grid-template-columns:1fr; max-width:400px; }
+      .section { padding:3rem 0; }
+      .section-title { font-size:1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="container">
+      <a href="/" class="nav-brand"><img src="/img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
+      <button class="nav-burger" aria-label="Toggle navigation menu" onclick="this.closest('.nav').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+      <div class="nav-links">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/about" class="nav-link">About</a>
+        <a href="/programmes" class="nav-link">Programmes</a>
+        <a href="/events" class="nav-link">Events</a>
+        <a href="/knowledge" class="nav-link">Knowledge</a>
+        <a href="/contact" class="nav-link">Contact</a>
+      </div>
+      <div class="nav-right"><div class="nav-user" id="navUser"></div></div>
+    </div>
+  </nav>
+
+  <section class="page-hero">
+    <h1>Join UAS</h1>
+    <p>Become part of Uganda's growing astronomy community. Whether you're a student, educator, researcher, or stargazer — there's a place for you.</p>
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;justify-content:center">
+      <a href="/login" class="btn btn-primary btn-lg">Become a Member</a>
+      <a href="/about" class="btn btn-outline btn-lg" style="border-color:rgba(255,255,255,0.5);color:#fff">Learn About Us</a>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2 class="section-title">Why Join UAS?</h2>
+      <p class="section-subtitle">Membership gives you access to a community and resources dedicated to advancing astronomy in Uganda.</p>
+      <div class="benefits-grid">
+        <div class="benefit-card">
+          <div class="benefit-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span></div>
+          <h3>Observing Sessions</h3>
+          <p>Join monthly public observing nights and special celestial event viewings across Uganda.</p>
+        </div>
+        <div class="benefit-card">
+          <div class="benefit-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></span></div>
+          <h3>Knowledge Base</h3>
+          <p>Access articles, observing reports, educational materials, and member-only content.</p>
+        </div>
+        <div class="benefit-card">
+          <div class="benefit-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span></div>
+          <h3>Community Network</h3>
+          <p>Connect with astronomers, educators, students, and enthusiasts across the country.</p>
+        </div>
+        <div class="benefit-card">
+          <div class="benefit-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span></div>
+          <h3>Workshops & Training</h3>
+          <p>Participate in telescope handling, astrophotography, data analysis, and research methods.</p>
+        </div>
+        <div class="benefit-card">
+          <div class="benefit-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span></div>
+          <h3>Research Opportunities</h3>
+          <p>Collaborate on projects, contribute to publications, and present at UAS events.</p>
+        </div>
+        <div class="benefit-card">
+          <div class="benefit-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span></div>
+          <h3>Global Connections</h3>
+          <p>Access partnerships with international astronomical organizations and events.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-alt">
+    <div class="container">
+      <h2 class="section-title">What to Expect</h2>
+      <p class="section-subtitle">From sign-up to your first observing session — here's the journey</p>
+      <div class="expect-list">
+        <div class="expect-item">
+          <div class="expect-num">1</div>
+          <div class="expect-content">
+            <h3>Create Your Account</h3>
+            <p>Sign up with your name, email, and choose a membership category (Regular, Student, or Honorary). No fees required.</p>
+          </div>
+        </div>
+        <div class="expect-item">
+          <div class="expect-num">2</div>
+          <div class="expect-content">
+            <h3>Complete Your Profile</h3>
+            <p>Add your institution, location, bio, and interests. This helps other members find you and suggests relevant events.</p>
+          </div>
+        </div>
+        <div class="expect-item">
+          <div class="expect-num">3</div>
+          <div class="expect-content">
+            <h3>Explore Events & Programmes</h3>
+            <p>Browse upcoming observing sessions, workshops, and lectures. RSVP to events that interest you.</p>
+          </div>
+        </div>
+        <div class="expect-item">
+          <div class="expect-num">4</div>
+          <div class="expect-content">
+            <h3>Join the Community</h3>
+            <p>Connect with fellow members, join working groups, and participate in discussions through the resolution forum.</p>
+          </div>
+        </div>
+        <div class="expect-item">
+          <div class="expect-num">5</div>
+          <div class="expect-content">
+            <h3>Contribute & Grow</h3>
+            <p>Share your knowledge, contribute articles, assist with outreach, and help advance astronomy in Uganda.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2 class="section-title">Membership Categories</h2>
+      <p class="section-subtitle">Choose the category that fits you best</p>
+      <div class="tiers-grid">
+        <div class="tier-card">
+          <h3>Student</h3>
+          <div class="price">Free</div>
+          <div class="price-note">For enrolled students</div>
+          <ul>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> All observing sessions</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Knowledge base access</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Community forum</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Mentorship programme</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Workshop discounts</li>
+          </ul>
+          <a href="/login" class="btn btn-outline" style="width:100%">Join as Student</a>
+        </div>
+        <div class="tier-card featured">
+          <h3>Regular</h3>
+          <div class="price">Free</div>
+          <div class="price-note">For astronomy enthusiasts</div>
+          <ul>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> All observing sessions</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Knowledge base access</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Community forum</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Working group access</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Voting rights</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Research collaboration</li>
+          </ul>
+          <a href="/login" class="btn btn-primary" style="width:100%">Join as Regular</a>
+        </div>
+        <div class="tier-card">
+          <h3>Honorary</h3>
+          <div class="price">By Invitation</div>
+          <div class="price-note">For distinguished contributors</div>
+          <ul>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> All Regular benefits</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Board meeting access</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Advisory role</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Special recognition</li>
+          </ul>
+          <a href="/contact" class="btn btn-outline" style="width:100%">Contact Us</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-section">
+    <div class="container">
+      <h2>Ready to Look Up?</h2>
+      <p>Join hundreds of Ugandans exploring the universe. Your journey starts with a single step.</p>
+      <a href="/login" class="btn btn-primary btn-lg">Create Your Account</a>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">Uganda Astronomical Society</div>
+          <p class="footer-desc">A public scientific society advancing astronomy, space science and scientific discovery in Uganda since 2024.</p>
+        </div>
+        <div>
+          <div class="footer-heading">Explore</div>
+          <ul class="footer-links">
+            <li><a href="/about">About UAS</a></li>
+            <li><a href="/programmes">Programmes</a></li>
+            <li><a href="/events">Events</a></li>
+            <li><a href="/knowledge">Knowledge Base</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Community</div>
+          <ul class="footer-links">
+            <li><a href="/members">Members</a></li>
+            <li><a href="/ecosystem">Ecosystem</a></li>
+            <li><a href="/library">Library</a></li>
+            <li><a href="/contact">Contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Connect</div>
+          <ul class="footer-links">
+            <li><a href="mailto:contact@astronomy.ug">contact@astronomy.ug</a></li>
+            <li><a href="/login">Member Login</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2026 Uganda Astronomical Society. All rights reserved.</span>
+        <span>Kampala, Uganda</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/js/api.js"></script>
+  <script>
+    async function load() {
+      try { await api.me(); } catch(e) {}
+      updateNavUser();
+    }
+
+    load();
+  </script>
+</body>
+</html>

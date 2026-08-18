@@ -3,30 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="img/uas-emblem.png">
+  <link rel="icon" type="image/png" href="/img/uas-emblem.png">
   <title>My Profile — Uganda Astronomical Society</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="/css/base.css">
 </head>
 <body>
-  <nav class="nav">
-    <div class="container" style="display:flex;align-items:center;width:100%">
-      <a href="/" class="nav-brand">UAS</a>
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="container">
+      <a href="/" class="nav-brand"><img src="/img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
+      <button class="nav-burger" onclick="this.closest('.nav').classList.toggle('open')" aria-label="Menu">&#9776;</button>
       <div class="nav-links">
         <a href="/" class="nav-link">Home</a>
         <a href="/about" class="nav-link">About</a>
         <a href="/programmes" class="nav-link">Programmes</a>
         <a href="/events" class="nav-link">Events</a>
         <a href="/knowledge" class="nav-link">Knowledge</a>
-        <a href="/library" class="nav-link">Library</a>
-        <a href="/ecosystem" class="nav-link">Ecosystem</a>
-        <a href="/members" class="nav-link">Members</a>
         <a href="/contact" class="nav-link">Contact</a>
-        <a href="/search" class="nav-link">Search</a>
-        <a href="/dashboard" class="nav-link">Dashboard</a>
         <a href="/profile" class="nav-link active">Profile</a>
       </div>
-      <div class="nav-user" id="navUser"></div>
+      <div class="nav-right"><div class="nav-user" id="navUser"></div></div>
     </div>
   </nav>
 
@@ -102,13 +97,47 @@
     </div>
   </div>
 
-  <footer>
+  <footer class="site-footer">
     <div class="container">
-      <p>&copy; 2026 Uganda Astronomical Society. All rights reserved.</p>
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">Uganda Astronomical Society</div>
+          <p class="footer-desc">A public scientific society advancing astronomy, space science and scientific discovery in Uganda since 2024.</p>
+        </div>
+        <div>
+          <div class="footer-heading">Explore</div>
+          <ul class="footer-links">
+            <li><a href="/about">About UAS</a></li>
+            <li><a href="/programmes">Programmes</a></li>
+            <li><a href="/events">Events</a></li>
+            <li><a href="/knowledge">Knowledge Base</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Community</div>
+          <ul class="footer-links">
+            <li><a href="/members">Members</a></li>
+            <li><a href="/ecosystem">Ecosystem</a></li>
+            <li><a href="/library">Library</a></li>
+            <li><a href="/contact">Contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Connect</div>
+          <ul class="footer-links">
+            <li><a href="mailto:contact@astronomy.ug">contact@astronomy.ug</a></li>
+            <li><a href="/login">Member Login</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2026 Uganda Astronomical Society. All rights reserved.</span>
+        <span>Kampala, Uganda</span>
+      </div>
     </div>
   </footer>
 
-  <script src="js/api.js"></script>
+  <script src="/js/api.js"></script>
   <script>
     async function load() {
       let prof;
@@ -145,7 +174,7 @@
           contributions: document.getElementById('fContributions').value.trim(),
           profile_visible: document.getElementById('fVisible').checked,
         });
-        msg.textContent = 'Saved ✓';
+        msg.innerHTML = 'Saved <span class="icon-inline icon-sm" style="color:var(--success)"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>';
         api._user.name = document.getElementById('fName').value.trim() || api._user.name;
         document.getElementById('pvName').textContent = api._user.name;
         document.getElementById('pvAvatar').textContent = api._user.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
@@ -161,19 +190,13 @@
       if (!current || !next) { alert('Fill in both fields'); return; }
       try {
         await api.changePassword({ current_password: current, new_password: next });
-        msg.textContent = 'Password updated ✓';
+        msg.innerHTML = 'Password updated <span class="icon-inline icon-sm" style="color:var(--success)"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>';
         document.getElementById('pwCurrent').value = '';
         document.getElementById('pwNew').value = '';
       } catch(e) { alert(e.error || 'Failed'); }
     }
 
-    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
-    function updateNavUser() {
-      const el = document.getElementById('navUser');
-      el.innerHTML = api._user
-        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
-        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
-    }
+
     load();
   </script>
 </body>

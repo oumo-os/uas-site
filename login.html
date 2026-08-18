@@ -3,99 +3,162 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="img/uas-emblem.png">
-  <title>Login — UAS</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/base.css">
+  <link rel="icon" type="image/png" href="/img/uas-emblem.png">
+  <title>Login — Uganda Astronomical Society</title>
+  <meta name="description" content="Member login — access your UAS dashboard, events, and resources.">
+  <meta property="og:title" content="Login — Uganda Astronomical Society">
+  <meta property="og:description" content="Member login — access your UAS dashboard, events, and resources.">
+  <meta property="og:image" content="/img/uas-emblem.png">
+  <meta property="og:type" content="website">
+  <link rel="stylesheet" href="/css/base.css">
   <style>
     .auth-page {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 2rem 1rem;
+      min-height:100vh; display:flex; align-items:center; justify-content:center;
+      padding:2rem 1rem; background:url('/img/login-bg.jpg') center/cover no-repeat; position:relative;
     }
+    .auth-page::before { content:''; position:absolute; inset:0; background:rgba(15,23,42,0.7); }
+
+    .auth-layout { display:grid; grid-template-columns:1fr 1fr; gap:4rem; max-width:900px; width:100%; position:relative; z-index:1; }
+
+    .auth-left { display:flex; flex-direction:column; justify-content:center; color:#fff; }
+    .auth-left h1 { font-size:2.4rem; font-weight:700; color:#fff; margin-bottom:0.75rem; line-height:1.2; }
+    .auth-left p { font-size:1.05rem; color:rgba(255,255,255,0.8); line-height:1.7; margin-bottom:2rem; }
+    .auth-left .perks { list-style:none; padding:0; margin:0; }
+    .auth-left .perks li { display:flex; align-items:flex-start; gap:0.75rem; margin-bottom:1rem; font-size:0.92rem; color:rgba(255,255,255,0.85); }
+    .auth-left .perks li .icon-circle { width:28px; height:28px; border-radius:50%; background:rgba(255,255,255,0.15); display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px; }
+    .auth-left .perks li .icon-circle svg { width:14px; height:14px; }
+
     .auth-card {
-      width: 100%;
-      max-width: 420px;
+      background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg);
+      padding:2rem; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.3);
     }
-    .auth-header { text-align: center; margin-bottom: 2rem; }
-    .auth-header h1 { font-size: 1.8rem; font-weight: 800; margin-bottom: 0.25rem; }
-    .auth-header p { color: var(--text-dim); }
-    .auth-tabs { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+    .auth-header { text-align:center; margin-bottom:1.5rem; }
+    .auth-header img { width:56px; height:auto; border-radius:var(--radius); margin-bottom:0.75rem; }
+    .auth-header h2 { font-size:1.3rem; font-weight:700; margin-bottom:0.2rem; }
+    .auth-header p { color:var(--text-dim); font-size:0.88rem; }
+
+    .auth-tabs { display:flex; gap:0; margin-bottom:1.5rem; border-bottom:1px solid var(--border); }
     .auth-tab {
-      flex: 1; padding: 0.6rem; text-align: center;
-      border-bottom: 2px solid transparent; color: var(--text-dim);
-      cursor: pointer; font-size: 0.9rem; background: none; border-top: none;
-      border-left: none; border-right: none; font-family: inherit;
+      flex:1; padding:0.65rem; text-align:center; border-bottom:2px solid transparent;
+      color:var(--text-dim); cursor:pointer; font-size:0.9rem; background:none; border-top:none;
+      border-left:none; border-right:none; font-family:inherit; transition:all 0.2s;
     }
-    .auth-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-    .auth-form { display: none; }
-    .auth-form.active { display: block; }
-    .error-msg { color: var(--danger); font-size: 0.85rem; margin-top: 0.5rem; display: none; }
+    .auth-tab:hover { color:var(--text); }
+    .auth-tab.active { color:var(--accent); border-bottom-color:var(--accent); font-weight:500; }
+
+    .auth-form { display:none; }
+    .auth-form.active { display:block; }
+    .auth-form .form-group { margin-bottom:1rem; }
+    .auth-form label { display:block; font-size:0.85rem; font-weight:500; margin-bottom:0.35rem; color:var(--text); }
+    .auth-form input, .auth-form select {
+      width:100%; padding:0.65rem 0.85rem; border:1px solid var(--border); border-radius:var(--radius);
+      background:var(--bg); color:var(--text); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s;
+    }
+    .auth-form input:focus, .auth-form select:focus { outline:none; border-color:var(--accent); }
+    .auth-form select { appearance:auto; }
+
+    .error-msg { color:var(--danger); font-size:0.85rem; margin-top:0.5rem; display:none; padding:0.5rem 0.75rem; background:rgba(153,27,27,0.1); border-radius:var(--radius); }
+    .auth-footer { text-align:center; margin-top:1.25rem; font-size:0.85rem; color:var(--text-dim); }
+    .auth-footer a { color:var(--accent); text-decoration:none; }
+    .auth-footer a:hover { text-decoration:underline; }
+
+    @media (max-width:768px) {
+      .auth-layout { grid-template-columns:1fr; gap:2rem; }
+      .auth-left { display:none; }
+      .auth-card { max-width:420px; margin:0 auto; }
+    }
   </style>
 </head>
 <body>
   <div class="auth-page">
-    <div class="auth-card">
-      <div class="auth-header">
-        <img src="img/uas-emblem.png" alt="UAS emblem" style="width:64px;height:auto;border-radius:var(--radius);margin-bottom:0.75rem">
-        <h1>UAS</h1>
-        <p>Uganda Astronomical Society</p>
+    <div class="auth-layout">
+      <div class="auth-left">
+        <h1>Welcome to the<br>Uganda Astronomical Society</h1>
+        <p>Join a community of astronomers, educators, students, and space enthusiasts advancing astronomy across Uganda.</p>
+        <ul class="perks">
+          <li>
+            <span class="icon-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <span>Access to observing sessions, workshops, and lectures</span>
+          </li>
+          <li>
+            <span class="icon-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <span>Connect with astronomers and institutions nationwide</span>
+          </li>
+          <li>
+            <span class="icon-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <span>Contribute to research and outreach programmes</span>
+          </li>
+          <li>
+            <span class="icon-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></span>
+            <span>Member-only resources and the UAS knowledge base</span>
+          </li>
+        </ul>
       </div>
 
-      <div class="auth-tabs">
-        <button class="auth-tab active" onclick="showTab('login')">Login</button>
-        <button class="auth-tab" onclick="showTab('register')">Register</button>
+      <div class="auth-card">
+        <div class="auth-header">
+          <img src="/img/uas-emblem.png" alt="UAS">
+          <h2>Uganda Astronomical Society</h2>
+          <p>Sign in to your account or create one</p>
+        </div>
+
+        <div class="auth-tabs">
+          <button class="auth-tab active" onclick="showTab('login')">Login</button>
+          <button class="auth-tab" onclick="showTab('register')">Register</button>
+        </div>
+
+        <!-- Login -->
+        <form id="loginForm" class="auth-form active" onsubmit="handleLogin(event)">
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="loginEmail" required autocomplete="email" placeholder="you@example.com">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="loginPass" required autocomplete="current-password" placeholder="Your password">
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%;padding:0.7rem" id="loginBtn">Login</button>
+          <div class="error-msg" id="loginError"></div>
+        </form>
+
+        <!-- Register -->
+        <form id="registerForm" class="auth-form" onsubmit="handleRegister(event)">
+          <div class="form-group">
+            <label>Full Name *</label>
+            <input type="text" id="regName" required placeholder="John Doe">
+          </div>
+          <div class="form-group">
+            <label>Email *</label>
+            <input type="email" id="regEmail" required placeholder="you@example.com">
+          </div>
+          <div class="form-group">
+            <label>Password *</label>
+            <input type="password" id="regPass" required minlength="6" placeholder="Min 6 characters">
+          </div>
+          <div class="form-group">
+            <label>Institution</label>
+            <input type="text" id="regInstitution" placeholder="University, school, or organization">
+          </div>
+          <div class="form-group">
+            <label>Membership Category</label>
+            <select id="regCategory">
+              <option value="regular">Regular Member</option>
+              <option value="student">Student</option>
+              <option value="honorary">Honorary</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%;padding:0.7rem" id="regBtn">Create Account</button>
+          <div class="error-msg" id="regError"></div>
+        </form>
+
+        <div class="auth-footer">
+          <a href="/join">Learn more about membership &rarr;</a>
+        </div>
       </div>
-
-      <!-- Login -->
-      <form id="loginForm" class="auth-form active" onsubmit="handleLogin(event)">
-        <div class="form-group">
-          <label class="form-label">Email</label>
-          <input type="email" class="form-input" id="loginEmail" required autocomplete="email">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Password</label>
-          <input type="password" class="form-input" id="loginPass" required autocomplete="current-password">
-        </div>
-        <button type="submit" class="btn btn-primary" style="width:100%" id="loginBtn">Login</button>
-        <div class="error-msg" id="loginError"></div>
-      </form>
-
-      <!-- Register -->
-      <form id="registerForm" class="auth-form" onsubmit="handleRegister(event)">
-        <div class="form-group">
-          <label class="form-label">Full Name</label>
-          <input type="text" class="form-input" id="regName" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Email</label>
-          <input type="email" class="form-input" id="regEmail" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Password</label>
-          <input type="password" class="form-input" id="regPass" required minlength="6">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Institution (optional)</label>
-          <input type="text" class="form-input" id="regInstitution">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Membership Category</label>
-          <select class="form-select" id="regCategory">
-            <option value="regular">Regular</option>
-            <option value="student">Student</option>
-            <option value="honorary">Honorary</option>
-          </select>
-        </div>
-        <button type="submit" class="btn btn-primary" style="width:100%" id="regBtn">Register</button>
-        <div class="error-msg" id="regError"></div>
-      </form>
     </div>
   </div>
 
-  <script src="js/api.js"></script>
+  <script src="/js/api.js"></script>
   <script>
     function showTab(tab) {
       document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
@@ -132,11 +195,11 @@
       e.preventDefault();
       const btn = document.getElementById('regBtn');
       const err = document.getElementById('regError');
-      btn.disabled = true; btn.textContent = 'Registering...'; err.style.display = 'none';
+      btn.disabled = true; btn.textContent = 'Creating account...'; err.style.display = 'none';
       try {
         await api.register(
           document.getElementById('regName').value,
-          document.getElementById('regEmail').value,
+          document.getElementById('email')?.value || document.getElementById('regEmail').value,
           document.getElementById('regPass').value,
           {
             institution: document.getElementById('regInstitution').value || undefined,
@@ -148,11 +211,10 @@
         err.textContent = e.error || 'Registration failed';
         err.style.display = 'block';
       } finally {
-        btn.disabled = false; btn.textContent = 'Register';
+        btn.disabled = false; btn.textContent = 'Create Account';
       }
     }
 
-    // Auto-redirect if already logged in
     (async () => {
       try { await api.me(); window.location.href = ua('/dashboard'); } catch(e) {}
     })();

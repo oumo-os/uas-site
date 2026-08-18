@@ -3,34 +3,60 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="img/uas-emblem.png">
+  <link rel="icon" type="image/png" href="/img/uas-emblem.png">
   <title>Library — Uganda Astronomical Society</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/base.css">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="UAS document library — reports, policies, guides, and resources.">
+  <meta property="og:title" content="Library — Uganda Astronomical Society">
+  <meta property="og:description" content="UAS document library — reports, policies, guides, and resources.">
+  <meta property="og:image" content="/img/uas-emblem.png">
+  <meta property="og:type" content="website">
+  <link rel="stylesheet" href="/css/base.css">
   <style>
     .page-header { padding: 3rem 0 2rem; text-align: center; }
-    .page-header h1 { font-size: 2.2rem; font-weight: 800; }
+    .page-header h1 { font-size: 2.2rem; font-weight: 700; }
     .page-header p { color: var(--text-dim); max-width: 600px; margin: 0.5rem auto 0; }
     .doc-row {
       display: flex; align-items: center; gap: 1rem;
       padding: 1rem 1.25rem; margin-bottom: 0.75rem;
-      border: 1px solid var(--border); border-radius: var(--radius-lg);
       background: var(--bg-card);
-      transition: border-color 0.15s;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
-    .doc-row:hover { border-color: var(--accent); }
+    .doc-row:hover {
+      border-color: var(--accent);
+      box-shadow: var(--shadow-md);
+    }
     .doc-icon { font-size: 1.4rem; }
     .doc-info { flex: 1; }
     .doc-info h3 { font-size: 0.95rem; margin-bottom: 0.2rem; }
     .doc-info p { font-size: 0.8rem; color: var(--text-dim); }
     .doc-meta { font-size: 0.72rem; color: var(--text-faint); }
     .cat-filter { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-bottom: 2rem; }
+    .cat-filter button {
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .cat-filter button:hover, .cat-filter button.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-glow);
+    }
   </style>
 </head>
 <body>
-  <nav class="nav">
-    <div class="container" style="display:flex;align-items:center;width:100%">
-      <a href="/" class="nav-brand">UAS</a>
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="container">
+      <a href="/" class="nav-brand"><img src="/img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
+      <button class="nav-burger" onclick="this.closest('.nav').classList.toggle('open')" aria-label="Menu">&#9776;</button>
       <div class="nav-links">
         <a href="/" class="nav-link">Home</a>
         <a href="/about" class="nav-link">About</a>
@@ -38,14 +64,9 @@
         <a href="/events" class="nav-link">Events</a>
         <a href="/knowledge" class="nav-link">Knowledge</a>
         <a href="/library" class="nav-link active">Library</a>
-        <a href="/ecosystem" class="nav-link">Ecosystem</a>
-        <a href="/members" class="nav-link">Members</a>
         <a href="/contact" class="nav-link">Contact</a>
-        <a href="/search" class="nav-link">Search</a>
-        <a href="/dashboard" class="nav-link">Dashboard</a>
-        <a href="/profile" class="nav-link">Profile</a>
         </div>
-      <div class="nav-user" id="navUser"></div>
+      <div class="nav-right"><div class="nav-user" id="navUser"></div></div>
     </div>
   </nav>
 
@@ -59,13 +80,47 @@
     <div id="docsList"></div>
   </div>
 
-  <footer>
+  <footer class="site-footer">
     <div class="container">
-      <p>&copy; 2026 Uganda Astronomical Society. All rights reserved.</p>
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">Uganda Astronomical Society</div>
+          <p class="footer-desc">A public scientific society advancing astronomy, space science and scientific discovery in Uganda since 2024.</p>
+        </div>
+        <div>
+          <div class="footer-heading">Explore</div>
+          <ul class="footer-links">
+            <li><a href="/about">About UAS</a></li>
+            <li><a href="/programmes">Programmes</a></li>
+            <li><a href="/events">Events</a></li>
+            <li><a href="/knowledge">Knowledge Base</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Community</div>
+          <ul class="footer-links">
+            <li><a href="/members">Members</a></li>
+            <li><a href="/ecosystem">Ecosystem</a></li>
+            <li><a href="/library">Library</a></li>
+            <li><a href="/contact">Contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Connect</div>
+          <ul class="footer-links">
+            <li><a href="mailto:contact@astronomy.ug">contact@astronomy.ug</a></li>
+            <li><a href="/login">Member Login</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2026 Uganda Astronomical Society. All rights reserved.</span>
+        <span>Kampala, Uganda</span>
+      </div>
     </div>
   </footer>
 
-  <script src="js/api.js"></script>
+  <script src="/js/api.js"></script>
   <script>
     let allDocs = [];
     let activeCat = '';
@@ -74,7 +129,11 @@
       try { await api.me(); } catch(e) {}
       updateNavUser();
 
-      allDocs = await api.request('/public/documents').catch(() => []);
+      // Show internal docs for logged-in users, public docs for everyone
+      allDocs = api._user
+        ? await api.getMemberDocuments().catch(() => [])
+        : await api.getPublicDocuments().catch(() => []);
+
       const cats = [...new Set(allDocs.map(d => d.category).filter(Boolean))];
       document.getElementById('catFilter').innerHTML = `
         <button class="btn btn-sm ${!activeCat ? 'btn-primary' : 'btn-outline'}" onclick="filterCat('')">All</button>
@@ -98,7 +157,7 @@
       if (!list.length) { div.innerHTML = '<p class="text-center text-dim" style="padding:3rem 0">No documents published yet.</p>'; return; }
       div.innerHTML = list.map(d => `
         <div class="doc-row">
-          <span class="doc-icon">📄</span>
+          <span class="doc-icon"><span class='icon-inline icon-sm'><svg viewBox='0 0 24 24'><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/><polyline points='14 2 14 8 20 8'/></svg></span></span>
           <div class="doc-info">
             <h3>${esc(d.title)}</h3>
             <p>${esc(d.category || 'document')} ${d.owner_name ? `&middot; ${esc(d.owner_name)}` : ''}</p>
@@ -108,13 +167,7 @@
       `).join('');
     }
 
-    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
-    function updateNavUser() {
-      const el = document.getElementById('navUser');
-      el.innerHTML = api._user
-        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
-        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
-    }
+
     load();
   </script>
 </body>

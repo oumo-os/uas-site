@@ -3,145 +3,354 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="img/uas-emblem.png">
+  <link rel="icon" type="image/png" href="/img/uas-emblem.png">
   <title>About — Uganda Astronomical Society</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/base.css">
+  <meta name="description" content="Learn about UAS vision, mission, leadership, and our journey since 2024.">
+  <meta property="og:title" content="About — Uganda Astronomical Society">
+  <meta property="og:description" content="Learn about UAS vision, mission, leadership, and our journey since 2024.">
+  <meta property="og:image" content="/img/uas-emblem.png">
+  <meta property="og:type" content="website">
+  <link rel="stylesheet" href="/css/base.css">
   <style>
-    .page-header { padding: 3rem 0 2rem; text-align: center; }
-    .page-header h1 { font-size: 2.2rem; font-weight: 800; }
-    .page-header p { color: var(--text-dim); max-width: 600px; margin: 0.5rem auto 0; }
-    .content-section { padding: 2rem 0; }
-    .content-section h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem; }
-    .content-section p { color: var(--text-dim); margin-bottom: 1rem; line-height: 1.7; }
-    .values-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
-    .value-card { padding: 1.25rem; }
-    .value-card h3 { font-size: 1rem; margin-bottom: 0.5rem; color: var(--accent); }
-    .value-card p { font-size: 0.9rem; color: var(--text-dim); margin: 0; }
-    .leadership-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
-    .leader-card { text-align: center; padding: 1.5rem; }
-    .leader-avatar {
-      width: 80px; height: 80px;
-      border-radius: 50%;
-      background: var(--accent-glow);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 2rem; font-weight: 700; color: var(--accent);
-      margin: 0 auto 0.75rem;
+    .about-hero {
+      position: relative; min-height: 50vh; display: flex; flex-direction: column;
+      justify-content: center; align-items: center; text-align: center;
+      padding: 6rem 1.5rem 4rem; background: url('/img/header-about.jpg') center/cover no-repeat; color: #fff;
     }
-    .leader-card h4 { font-size: 1rem; margin-bottom: 0.25rem; }
-    .leader-card .role { font-size: 0.85rem; color: var(--accent); }
+    .about-hero::before { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(15,23,42,0.6) 0%,rgba(15,23,42,0.85) 100%); }
+    .about-hero > * { position:relative; z-index:1; }
+    .about-hero h1 { font-size:2.8rem; font-weight:700; color:#fff; margin-bottom:0.75rem; }
+    .about-hero p { font-size:1.1rem; color:rgba(255,255,255,0.85); max-width:600px; }
+
+    .section { padding:4rem 0; }
+    .section-alt { background:var(--bg-card); border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+    .section-title { font-size:1.8rem; font-weight:700; text-align:center; margin-bottom:0.5rem; }
+    .section-subtitle { text-align:center; color:var(--text-dim); margin-bottom:2.5rem; font-size:0.95rem; max-width:600px; margin-left:auto; margin-right:auto; }
+
+    .about-content { max-width:800px; margin:0 auto; }
+    .about-content h2 { font-size:1.4rem; font-weight:700; color:var(--text); margin-bottom:1rem; border-left:3px solid var(--accent); padding-left:0.75rem; }
+    .about-content p { color:var(--text-dim); line-height:1.8; margin-bottom:1rem; font-size:0.95rem; }
+
+    .vision-mission { display:grid; grid-template-columns:1fr 1fr; gap:2rem; max-width:900px; margin:0 auto; }
+    .vm-card {
+      padding:2rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg);
+      position:relative; overflow:hidden;
+    }
+    .vm-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--accent); }
+    .vm-card:nth-child(2)::before { background:var(--gold); }
+    .vm-icon { width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; margin-bottom:1rem; }
+    .vm-card:nth-child(1) .vm-icon { background:rgba(27,73,101,0.1); color:var(--accent); }
+    .vm-card:nth-child(2) .vm-icon { background:rgba(184,134,11,0.1); color:var(--gold); }
+    .vm-card h3 { font-size:1.1rem; font-weight:700; margin-bottom:0.75rem; }
+    .vm-card p { color:var(--text-dim); line-height:1.7; font-size:0.92rem; }
+
+    .objectives-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; }
+    .objective-card {
+      padding:1.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg);
+      transition:all 0.3s;
+    }
+    .objective-card:hover { border-color:var(--border-focus); box-shadow:var(--shadow-md); transform:translateY(-2px); }
+    .obj-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; margin-bottom:0.75rem; }
+    .obj-icon svg { width:20px; height:20px; }
+    .objective-card:nth-child(1) .obj-icon { background:rgba(27,73,101,0.1); color:var(--accent); }
+    .objective-card:nth-child(2) .obj-icon { background:rgba(45,106,79,0.1); color:var(--success); }
+    .objective-card:nth-child(3) .obj-icon { background:rgba(30,96,145,0.1); color:var(--info); }
+    .objective-card:nth-child(4) .obj-icon { background:rgba(184,134,11,0.1); color:var(--gold); }
+    .objective-card:nth-child(5) .obj-icon { background:rgba(153,27,27,0.1); color:var(--danger); }
+    .objective-card:nth-child(6) .obj-icon { background:rgba(124,58,237,0.1); color:#7c3aed; }
+    .objective-card h4 { font-size:0.95rem; font-weight:600; margin-bottom:0.35rem; }
+    .objective-card p { font-size:0.85rem; color:var(--text-dim); line-height:1.5; margin:0; }
+
+    .timeline { max-width:700px; margin:0 auto; position:relative; padding-left:2rem; }
+    .timeline::before { content:''; position:absolute; left:7px; top:0; bottom:0; width:2px; background:var(--border); }
+    .timeline-item { position:relative; padding-bottom:2rem; }
+    .timeline-item:last-child { padding-bottom:0; }
+    .timeline-dot { position:absolute; left:-2rem; top:4px; width:16px; height:16px; border-radius:50%; background:var(--accent); border:3px solid var(--bg); box-shadow:0 0 0 2px var(--accent); }
+    .timeline-year { font-size:0.8rem; color:var(--accent); font-weight:600; margin-bottom:0.25rem; }
+    .timeline-text { color:var(--text-dim); font-size:0.92rem; line-height:1.6; }
+
+    .leadership-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1rem; }
+    .leader-card {
+      text-align:center; padding:1.5rem; background:var(--bg-card); border:1px solid var(--border);
+      border-radius:var(--radius-lg); transition:all 0.3s;
+    }
+    .leader-card:hover { border-color:var(--border-focus); box-shadow:var(--shadow-md); transform:translateY(-2px); }
+    .leader-avatar {
+      width:80px; height:80px; border-radius:50%; background:var(--accent-glow);
+      display:flex; align-items:center; justify-content:center;
+      font-size:1.5rem; font-weight:700; color:var(--accent); margin:0 auto 0.75rem;
+    }
+    .leader-card h4 { font-size:0.95rem; margin-bottom:0.25rem; }
+    .leader-card .role { font-size:0.82rem; color:var(--accent); margin-bottom:0.25rem; }
+    .leader-card .institution { font-size:0.78rem; color:var(--text-dim); }
+
+    .cta-section { padding:4rem 0; text-align:center; background:var(--accent); color:#fff; }
+    .cta-section h2 { font-size:1.8rem; font-weight:700; color:#fff; margin-bottom:0.75rem; }
+    .cta-section p { color:rgba(255,255,255,0.85); max-width:500px; margin:0 auto 2rem; font-size:1rem; }
+    .cta-section .btn-primary { background:#fff; color:var(--accent); border-color:#fff; }
+    .cta-section .btn-primary:hover { background:rgba(255,255,255,0.9); }
+    .cta-section .btn-outline { border-color:rgba(255,255,255,0.5); color:#fff; }
+    .cta-section .btn-outline:hover { border-color:#fff; background:rgba(255,255,255,0.1); }
+
+    @media (max-width:768px) {
+      .about-hero { min-height:40vh; padding:4rem 1rem 3rem; }
+      .about-hero h1 { font-size:1.8rem; }
+      .vision-mission { grid-template-columns:1fr; }
+      .objectives-grid { grid-template-columns:1fr; }
+      .leadership-grid { grid-template-columns:repeat(2,1fr); }
+      .section { padding:2.5rem 0; }
+    }
   </style>
 </head>
 <body>
-  <nav class="nav">
-    <div class="container" style="display:flex;align-items:center;width:100%">
-      <a href="/" class="nav-brand">UAS</a>
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="container">
+      <a href="/" class="nav-brand"><img src="/img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
+      <button class="nav-burger" aria-label="Toggle navigation menu" onclick="this.closest('.nav').classList.toggle('open')" aria-label="Menu">&#9776;</button>
       <div class="nav-links">
         <a href="/" class="nav-link">Home</a>
         <a href="/about" class="nav-link active">About</a>
         <a href="/programmes" class="nav-link">Programmes</a>
         <a href="/events" class="nav-link">Events</a>
         <a href="/knowledge" class="nav-link">Knowledge</a>
-        <a href="/library" class="nav-link">Library</a>
-        <a href="/ecosystem" class="nav-link">Ecosystem</a>
-        <a href="/members" class="nav-link">Members</a>
         <a href="/contact" class="nav-link">Contact</a>
-        <a href="/search" class="nav-link">Search</a>
-        <a href="/dashboard" class="nav-link">Dashboard</a>
-        <a href="/profile" class="nav-link">Profile</a>
-        </div>
-      <div class="nav-user" id="navUser"></div>
+      </div>
+      <div class="nav-right"><div class="nav-user" id="navUser"></div></div>
     </div>
   </nav>
 
-  <div class="container">
-    <div class="page-header">
-      <h1>About UAS</h1>
-      <p>The Uganda Astronomical Society is the national body for astronomy education, research, and outreach in Uganda.</p>
-    </div>
+  <section class="about-hero">
+    <h1>About UAS</h1>
+    <p>A public scientific society advancing astronomy, space science and scientific discovery in Uganda.</p>
+  </section>
 
-    <section class="content-section">
-      <h2>History</h2>
-      <p>The Uganda Astronomical Society was established to build a vibrant astronomy community in Uganda. From early star-gazing sessions at Makerere University to national outreach programmes reaching schools across the country, UAS has grown into the country's leading astronomical organisation.</p>
-      <p>UAS brings together amateur and professional astronomers, educators, students, and space enthusiasts under a shared vision: making astronomy accessible to every Ugandan.</p>
-    </section>
-
-    <section class="content-section">
-      <h2>Vision</h2>
-      <p>A Uganda where every citizen has the opportunity to explore, understand, and appreciate the universe — and where Ugandan scientists contribute meaningfully to global astronomical knowledge.</p>
-    </section>
-
-    <section class="content-section">
-      <h2>Mission</h2>
-      <p>To advance astronomical education, research, and public engagement in Uganda through community building, institutional partnerships, and accessible science communication.</p>
-    </section>
-
-    <section class="content-section">
-      <h2>Objectives</h2>
-      <div class="values-grid">
-        <div class="card value-card"><h3>Education</h3><p>Deliver astronomy education programmes in schools and universities across Uganda.</p></div>
-        <div class="card value-card"><h3>Research</h3><p>Support and promote astronomical research by Ugandan scientists and students.</p></div>
-        <div class="card value-card"><h3>Outreach</h3><p>Engage the public through observing events, talks, and media.</p></div>
-        <div class="card value-card"><h3>Community</h3><p>Build a connected network of astronomers, educators, and enthusiasts.</p></div>
-        <div class="card value-card"><h3>Advocacy</h3><p>Promote the value of astronomy and space science in national development.</p></div>
-        <div class="card value-card"><h3>Collaboration</h3><p>Partner with regional and international astronomical organisations.</p></div>
-      </div>
-    </section>
-
-    <section class="content-section">
-      <h2>Governance</h2>
-      <p>UAS is governed by a Board of Directors elected by the membership. The Board sets policy, approves programmes, and ensures the Society fulfils its mission. Day-to-day operations are managed through designated roles with specific capabilities — ensuring clear authority and accountability.</p>
-      <p>Board decisions are recorded as formal resolutions. When the Board resolves to create a role, assign capabilities, or approve a programme, those changes are applied transparently through the governance system.</p>
-    </section>
-
-    <section class="content-section">
-      <h2>Leadership</h2>
-      <div class="leadership-grid" id="leadershipGrid"></div>
-    </section>
-  </div>
-
-  <footer>
+  <section class="section">
     <div class="container">
-      <p>&copy; 2026 Uganda Astronomical Society. All rights reserved.</p>
+      <div class="about-content">
+        <h2>Our Story</h2>
+        <p>The Uganda Astronomical Society was founded in 2023 by Obwengye Cosmus as an amateur astronomy association — an organic response to public curiosity about the night sky, rather than a government, commercial or academic initiative. That origin remains part of the Society's institutional identity.</p>
+        <p>Within three years, UAS has grown into a national public-science community with an expanding membership base, established public astronomy programming, participation in Uganda's National World Space Week, and active engagement with the country's emerging space-science ecosystem. The September 2025 total lunar eclipse and the October World Space Week activities at Makerere University demonstrated public interest and national ecosystem participation. The May 2026 Stargazing Weekend at La Brise Resort confirmed genuine public demand for organised astronomy experiences — and exposed the Society's limitations in logistics, finance, equipment management, communications and volunteer coordination.</p>
+        <p>That growth has been carried by individual initiative and voluntary effort. The problem UAS must now solve is no longer public interest; it is organisational capacity. Membership growth, event demand and the Society's expanding role in national World Space Week programming have all outpaced its inherited, informal structure.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-alt">
+    <div class="container">
+      <div class="vision-mission">
+        <div class="vm-card">
+          <div class="vm-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span></div>
+          <h3>Our Vision</h3>
+          <p>A scientifically curious, astronomy-literate and space-aware Uganda participating confidently in the understanding and peaceful exploration of the Universe.</p>
+        </div>
+        <div class="vm-card">
+          <div class="vm-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span></div>
+          <h3>Our Mission</h3>
+          <p>To foster scientific curiosity, knowledge and participation in astronomy and the broader space sciences through observation, education, research, citizen science, public engagement and collaboration, while cultivating a vibrant Ugandan space culture.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2 class="section-title">Core Principles</h2>
+      <p class="section-subtitle">The values that guide everything we do</p>
+      <div class="objectives-grid">
+        <div class="objective-card">
+          <div class="obj-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></span></div>
+          <h4>Scientific Integrity</h4>
+          <p>Evidence, observation and critical inquiry are foundational to everything we do.</p>
+        </div>
+        <div class="objective-card">
+          <div class="obj-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span></div>
+          <h4>Accessibility</h4>
+          <p>Astronomy is open to everyone regardless of professional background or economic status.</p>
+        </div>
+        <div class="objective-card">
+          <div class="obj-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span></div>
+          <h4>Curiosity</h4>
+          <p>Questions and wonder are legitimate starting points for scientific learning.</p>
+        </div>
+        <div class="objective-card">
+          <div class="obj-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span></div>
+          <h4>Participation</h4>
+          <p>Members observe, contribute to citizen science, and take part in discovery — not merely consume it.</p>
+        </div>
+        <div class="objective-card">
+          <div class="obj-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span></div>
+          <h4>Inclusion</h4>
+          <p>Pathways exist for students, amateurs, professionals, educators and institutions alike.</p>
+        </div>
+        <div class="objective-card">
+          <div class="obj-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span></div>
+          <h4>African Context</h4>
+          <p>Ugandan and African astronomical knowledge, history and cultural relationships with the sky are treated with serious attention.</p>
+        </div>
+        <div class="objective-card">
+          <div class="obj-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span></div>
+          <h4>Collaboration</h4>
+          <p>UAS strengthens the ecosystem by connecting existing capability rather than duplicating it.</p>
+        </div>
+        <div class="objective-card">
+          <div class="obj-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></span></div>
+          <h4>Peaceful Exploration</h4>
+          <p>The Society supports the peaceful advancement and application of space science.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-alt">
+    <div class="container">
+      <div class="about-content">
+        <h2>What UAS Is and Is Not</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:1rem">
+          <div>
+            <h4 style="color:var(--success);margin-bottom:0.75rem">UAS Is</h4>
+            <p>A public scientific gateway through which Ugandans encounter astronomy, develop scientific curiosity, and find pathways into the broader space sciences, engineering and technology — anchored in astronomy as its core mandate.</p>
+          </div>
+          <div>
+            <h4 style="color:var(--danger);margin-bottom:0.75rem">UAS Is Not</h4>
+            <ul style="color:var(--text-dim);font-size:0.92rem;line-height:1.8;padding-left:1.2rem">
+              <li>Uganda's national space agency</li>
+              <li>A government regulator</li>
+              <li>An aerospace engineering or rocket-development company</li>
+              <li>A commercial satellite operator</li>
+              <li>A substitute for specialised academic or professional institutions</li>
+            </ul>
+            <p style="margin-top:0.75rem;font-style:italic;font-size:0.88rem">UAS plays a complementary role within the national ecosystem.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2 class="section-title">Our Journey</h2>
+      <p class="section-subtitle">Five stages of institutional development</p>
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-year">Stage I — 2023</div>
+          <div class="timeline-text"><strong>Formation:</strong> Amateur astronomy association founded by Obwengye Cosmus. An organic response to public curiosity about the night sky.</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-year">Stage II — 2025</div>
+          <div class="timeline-text"><strong>Public Discovery:</strong> The September total lunar eclipse and October World Space Week activities at Makerere University demonstrated public interest and national ecosystem participation.</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-year">Stage III — Early 2026</div>
+          <div class="timeline-text"><strong>Community Expansion:</strong> Renewed social-media engagement produced a significant influx of members into the Society's WhatsApp community.</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-year">Stage IV — May 2026</div>
+          <div class="timeline-text"><strong>Proof of Concept:</strong> The La Brise Resort Stargazing Weekend confirmed genuine public demand — and exposed limitations in logistics, finance, equipment and volunteer coordination.</div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot"></div>
+          <div class="timeline-year">Stage V — 2026 onward</div>
+          <div class="timeline-text"><strong>Institutionalisation:</strong> UAS builds identity, governance, membership, programmes, partnerships and institutional capacity. This is the stage we are in now.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-alt">
+    <div class="container">
+      <h2 class="section-title">Governance</h2>
+      <p class="section-subtitle">Four levels of institutional accountability</p>
+      <div class="about-content" style="margin-bottom:2rem">
+        <p>UAS operates through four institutional levels: Governance → Administration → Programmes → Activities. General Membership elects a Governing Executive, which directs Executive Officers, who coordinate Programme Leads, who mobilise Working Groups and Volunteers for specific activities.</p>
+      </div>
+      <h3 style="text-align:center;font-size:1.1rem;margin-bottom:1.5rem">Governing Officers</h3>
+      <div class="leadership-grid" id="leadershipGrid"></div>
+    </div>
+  </section>
+
+  <section class="cta-section">
+    <div class="container">
+      <h2>Join Our Mission</h2>
+      <p>Be part of Uganda's growing astronomy community. Whether you're a student, educator, researcher, or stargazer — there's a place for you.</p>
+      <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
+        <a href="/login" class="btn btn-primary btn-lg">Become a Member</a>
+        <a href="/contact" class="btn btn-outline btn-lg">Contact Us</a>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">Uganda Astronomical Society</div>
+          <p class="footer-desc">A public scientific society advancing astronomy, space science and scientific discovery in Uganda since 2024.</p>
+        </div>
+        <div>
+          <div class="footer-heading">Explore</div>
+          <ul class="footer-links">
+            <li><a href="/about">About UAS</a></li>
+            <li><a href="/programmes">Programmes</a></li>
+            <li><a href="/events">Events</a></li>
+            <li><a href="/knowledge">Knowledge Base</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Community</div>
+          <ul class="footer-links">
+            <li><a href="/members">Members</a></li>
+            <li><a href="/ecosystem">Ecosystem</a></li>
+            <li><a href="/library">Library</a></li>
+            <li><a href="/contact">Contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Connect</div>
+          <ul class="footer-links">
+            <li><a href="mailto:contact@astronomy.ug">contact@astronomy.ug</a></li>
+            <li><a href="/login">Member Login</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2026 Uganda Astronomical Society. All rights reserved.</span>
+        <span>Kampala, Uganda</span>
+      </div>
     </div>
   </footer>
 
-  <script src="js/api.js"></script>
+  <script src="/js/api.js"></script>
   <script>
+    const officers = [
+      { name: 'Obwengye Cosmus', role: 'President', resp: 'Institutional leadership, representation, strategic direction, continuity, oversight of major partnerships.' },
+      { name: 'Dr. Christopher Byaruhanga Malcom', role: 'General Secretary', resp: 'Administration, records, correspondence, meetings, documentation, resolutions, institutional memory, governance development.' },
+      { name: 'Vacant', role: 'Vice President', resp: 'Supports the President; delegated leadership; cross-functional coordination; institutional continuity.' },
+      { name: 'Vacant', role: 'Treasurer', resp: 'Financial governance, records, budgeting, accountability, financial reporting.' },
+    ];
+
     async function load() {
       try { await api.me(); } catch(e) {}
       updateNavUser();
 
-      const roles = await api.getRoles().catch(() => []);
       const grid = document.getElementById('leadershipGrid');
-
-      // Get members with roles
-      const members = await api.getMembers().catch(() => []);
-      const activeMembers = members.filter(m => m.status === 'active');
-
-      if (activeMembers.length) {
-        grid.innerHTML = activeMembers.slice(0, 8).map(m => {
-          const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-          return `
-            <div class="card leader-card">
-              <div class="leader-avatar">${initials}</div>
-              <h4>${esc(m.name)}</h4>
-              <div class="role">${esc(m.institution || 'UAS Member')}</div>
-            </div>
-          `;
-        }).join('');
-      } else {
-        grid.innerHTML = '<p class="text-dim">Leadership information coming soon.</p>';
-      }
+      grid.innerHTML = officers.map(o => {
+        const initials = o.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        const isVacant = o.name === 'Vacant';
+        return `
+          <div class="leader-card" style="${isVacant ? 'opacity:0.7;border-style:dashed' : ''}">
+            <div class="leader-avatar" style="${isVacant ? 'background:var(--border);color:var(--text-dim)' : ''}">${isVacant ? '?' : initials}</div>
+            <h4>${esc(o.name)}</h4>
+            <div class="role">${esc(o.role)}</div>
+            <div class="institution" style="font-size:0.78rem;line-height:1.5;margin-top:0.5rem">${esc(o.resp)}</div>
+          </div>
+        `;
+      }).join('');
     }
 
-    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
-    function updateNavUser() {
-      const el = document.getElementById('navUser');
-      el.innerHTML = api._user
-        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
-        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
-    }
 
     load();
   </script>

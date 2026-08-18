@@ -41,6 +41,8 @@ foreach ($extraMembers as $m) {
     ->execute([$m['name'], $m['email'], $hash, $m['institution'], $m['location'], $m['interests'] . ' — passionate about ' . $m['interests']]);
   $uid = (int) db()->lastInsertId();
   $year = 'UAS-2026-' . str_pad((string) $uid, 4, '0', STR_PAD_LEFT);
+  $n = (int) db()->query("SELECT COALESCE(MAX(CAST(SUBSTRING(membership_number, 10) AS UNSIGNED)), 0) + 1 FROM members")->fetchColumn();
+  $year = 'UAS-2026-' . str_pad((string) max($n, $uid + 1), 4, '0', STR_PAD_LEFT);
   db()->prepare("INSERT INTO members (user_id, membership_number, category, status, joined_date, interests, profile_visible) VALUES (?, ?, ?, 'active', ?, ?, 1)")
     ->execute([$uid, $year, $m['category'], $m['joined'], $m['interests']]);
   if (!$memberRoleId) {

@@ -3,181 +3,710 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="img/uas-emblem.png">
+  <link rel="icon" type="image/png" href="/img/uas-emblem.png">
   <title>Dashboard — UAS</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="/css/base.css">
   <style>
-    .dash-header { padding: 1.5rem 0; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
-    .dash-header h1 { font-size: 1.5rem; font-weight: 700; }
-    .dash-header p { color: var(--text-dim); font-size: 0.9rem; }
-    .dash-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; overflow-x: auto; }
-    .dash-tab {
-      padding: 0.6rem 1rem; border-bottom: 2px solid transparent; color: var(--text-dim);
-      cursor: pointer; font-size: 0.85rem; white-space: nowrap; background: none;
-      border-top: none; border-left: none; border-right: none; font-family: inherit;
+    .dash-hero {
+      background: var(--accent);
+      color: #fff;
+      padding: 2rem 0 1.5rem;
+      margin-bottom: 2rem;
     }
-    .dash-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .dash-hero .container { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
+    .dash-avatar {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; font-weight: 700; color: #fff; flex-shrink: 0;
+      font-family: var(--font-heading);
+    }
+    .dash-hero-text h1 { font-size: 1.6rem; font-weight: 700; color: #fff; margin-bottom: 0.15rem; }
+    .dash-hero-text p { color: rgba(255,255,255,0.7); font-size: 0.9rem; }
+    .dash-hero-roles { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.5rem; }
+    .dash-hero-role {
+      padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600;
+      background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.9);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .dash-hero-actions { margin-left: auto; display: flex; gap: 0.5rem; }
+    .dash-hero .btn { background: rgba(255,255,255,0.15); color: #fff; border-color: rgba(255,255,255,0.3); }
+    .dash-hero .btn:hover { background: rgba(255,255,255,0.25); }
+
+    .dash-tabs {
+      display: flex; gap: 0; border-bottom: 1px solid var(--border);
+      margin-bottom: 2rem; overflow-x: auto; background: var(--bg-card);
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      border: 1px solid var(--border); border-bottom: none;
+    }
+    .dash-tab {
+      padding: 0.75rem 1.25rem; border-bottom: 2px solid transparent; color: var(--text-dim);
+      cursor: pointer; font-size: 0.88rem; white-space: nowrap; background: none;
+      border-top: none; border-left: none; border-right: none; font-family: inherit;
+      font-weight: 500; transition: all 0.15s;
+    }
+    .dash-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--bg-card); }
+    .dash-tab:hover:not(.active) { color: var(--text); background: var(--accent-glow); }
     .dash-panel { display: none; }
     .dash-panel.active { display: block; }
-    .health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-    .health-card { padding: 1rem; text-align: center; }
-    .health-card .value { font-size: 1.8rem; font-weight: 700; color: var(--accent); }
-    .health-card .label { font-size: 0.8rem; color: var(--text-dim); margin-top: 0.25rem; }
-    .section-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem; }
-    .role-badge {
-      display: inline-flex; align-items: center; gap: 0.3rem;
-      padding: 0.25rem 0.6rem; border-radius: 6px;
-      background: var(--accent-glow); color: var(--accent);
-      font-size: 0.8rem; font-weight: 500; margin: 0.2rem;
+
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .stat-card {
+      padding: 1.25rem; background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); text-align: center; position: relative; overflow: hidden;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .cap-list { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-    .cap-tag { font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 4px; background: var(--border); color: var(--text-dim); }
-    .resolution-card { padding: 1rem; margin-bottom: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); }
-    .resolution-card h4 { font-size: 0.95rem; margin-bottom: 0.25rem; }
-    .vote-bar { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem; }
+    .stat-card:hover { border-color: var(--border-focus); box-shadow: var(--shadow-md); }
+    .stat-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    }
+    .stat-card.members::before { background: var(--accent); }
+    .stat-card.programmes::before { background: var(--success); }
+    .stat-card.events::before { background: var(--gold); }
+    .stat-card.pending::before { background: var(--danger); }
+    .stat-card.resolutions::before { background: var(--info); }
+    .stat-card.projects::before { background: #7c3aed; }
+    .stat-icon {
+      width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center;
+      justify-content: center; margin: 0 auto 0.75rem; font-size: 1.1rem;
+    }
+    .stat-card.members .stat-icon { background: rgba(27,73,101,0.1); color: var(--accent); }
+    .stat-card.programmes .stat-icon { background: rgba(45,106,79,0.1); color: var(--success); }
+    .stat-card.events .stat-icon { background: rgba(184,134,11,0.1); color: var(--gold); }
+    .stat-card.pending .stat-icon { background: rgba(185,28,28,0.1); color: var(--danger); }
+    .stat-card.resolutions .stat-icon { background: rgba(30,96,145,0.1); color: var(--info); }
+    .stat-card.projects .stat-icon { background: rgba(124,58,237,0.1); color: #7c3aed; }
+    .stat-value { font-size: 2rem; font-weight: 700; color: var(--text); line-height: 1; }
+    .stat-label { font-size: 0.8rem; color: var(--text-dim); margin-top: 0.35rem; }
+
+    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .section-header h3 { font-size: 1.15rem; font-weight: 700; margin: 0; }
+    .section-header .btn { font-size: 0.8rem; }
+
+    .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+    @media (max-width: 768px) { .dash-grid { grid-template-columns: 1fr; } }
+
+    .dash-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+      padding: 1.25rem; transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .dash-card:hover { border-color: var(--border-focus); box-shadow: var(--shadow-md); }
+    .dash-card-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border);
+    }
+    .dash-card-header h4 { font-size: 0.95rem; font-weight: 600; margin: 0; }
+
+    .cal-item {
+      display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .cal-item:last-child { border-bottom: none; }
+    .cal-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .cal-dot.deadline { background: var(--danger); }
+    .cal-dot.event { background: var(--gold); }
+    .cal-dot.other { background: var(--accent); }
+    .cal-item-text { flex: 1; font-size: 0.88rem; }
+    .cal-item-date { font-size: 0.78rem; color: var(--text-dim); white-space: nowrap; }
+
+    .pending-item {
+      display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem;
+      border-radius: var(--radius); border: 1px solid var(--border);
+      margin-bottom: 0.5rem; transition: border-color 0.15s; background: var(--bg-card);
+    }
+    .pending-item:hover { border-color: var(--border-focus); }
+    .pending-type-badge {
+      padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.68rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.03em; min-width: 70px; text-align: center;
+    }
+    .pending-type-badge.article { background: rgba(27,73,101,0.1); color: var(--accent); }
+    .pending-type-badge.event { background: rgba(184,134,11,0.1); color: var(--gold); }
+    .pending-type-badge.document { background: rgba(45,106,79,0.1); color: var(--success); }
+    .pending-type-badge.resolution { background: rgba(30,96,145,0.1); color: var(--info); }
+    .pending-title { flex: 1; font-weight: 500; font-size: 0.9rem; }
+    .pending-meta { font-size: 0.78rem; color: var(--text-dim); text-align: right; white-space: nowrap; }
+    .pending-age { font-size: 0.72rem; color: var(--text-faint); }
+    .pending-age.overdue { color: var(--danger); font-weight: 600; }
+    .pending-actions { display: flex; gap: 0.35rem; flex-shrink: 0; }
+
+    .asg-card {
+      padding: 1rem; margin-bottom: 0.75rem; background: var(--bg-card);
+      border: 1px solid var(--border); border-radius: var(--radius); transition: border-color 0.15s;
+    }
+    .asg-card:hover { border-color: var(--border-focus); }
+    .asg-card h4 { font-size: 0.95rem; margin-bottom: 0.25rem; }
+    .asg-card p { font-size: 0.85rem; color: var(--text-dim); margin: 0; }
+
+    .resolution-card {
+      padding: 1.25rem; margin-bottom: 0.75rem; background: var(--bg-card);
+      border: 1px solid var(--border); border-radius: var(--radius-lg); transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .resolution-card:hover { border-color: var(--border-focus); box-shadow: var(--shadow-md); }
+    .resolution-card h4 { font-size: 1rem; margin-bottom: 0.35rem; }
+    .vote-bar { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.75rem; }
     .vote-bar .bar { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
     .vote-bar .bar-fill { height: 100%; background: var(--success); border-radius: 3px; transition: width 0.3s; }
-    .vote-bar .counts { font-size: 0.8rem; color: var(--text-dim); }
+    .vote-bar .counts { font-size: 0.8rem; color: var(--text-dim); display: flex; gap: 0.5rem; align-items: center; }
     .btn-vote { padding: 0.3rem 0.6rem; font-size: 0.75rem; }
-    .create-form { max-width: 500px; }
-    .create-form .form-group { margin-bottom: 0.75rem; }
+
+    .role-card {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.6rem 1rem; margin: 0.3rem; border-radius: var(--radius);
+      background: var(--accent-glow); border: 1px solid var(--border);
+      font-size: 0.88rem; font-weight: 500; color: var(--accent);
+    }
+    .cap-grid { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.75rem; }
+    .cap-tag {
+      font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 4px;
+      background: var(--border); color: var(--text-dim); font-family: monospace;
+    }
+
+    .create-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+    .create-card {
+      padding: 1.25rem; background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); cursor: pointer; text-align: center;
+      transition: all 0.2s;
+    }
+    .create-card:hover { border-color: var(--accent); box-shadow: var(--shadow-md); transform: translateY(-2px); }
+    .create-card .icon-circle {
+      width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; margin: 0 auto 0.75rem; font-size: 1.2rem;
+      background: var(--accent-glow); color: var(--accent);
+    }
+    .create-card h4 { font-size: 0.95rem; margin-bottom: 0.25rem; }
+    .create-card p { font-size: 0.8rem; color: var(--text-dim); margin: 0; }
+
+    .sub-item {
+      display: flex; align-items: center; gap: 0.75rem; padding: 0.55rem 0;
+      border-bottom: 1px solid var(--border); font-size: 0.88rem;
+    }
+    .sub-item:last-child { border-bottom: none; }
+
+    .empty-state {
+      text-align: center; padding: 2.5rem 1rem; color: var(--text-dim);
+    }
+    .empty-state .icon { font-size: 2rem; margin-bottom: 0.75rem; opacity: 0.4; }
+    .empty-state p { font-size: 0.9rem; }
+
+    .filter-bar {
+      display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.25rem;
+      padding: 0.75rem; background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .filter-bar label { font-size: 0.8rem; font-weight: 600; color: var(--text-dim); align-self: center; }
+    .filter-btn {
+      padding: 0.3rem 0.7rem; border-radius: 999px; border: 1px solid var(--border);
+      background: transparent; color: var(--text-dim); font-size: 0.78rem; cursor: pointer;
+      font-family: inherit; transition: all 0.15s;
+    }
+    .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .filter-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    .mini-calendar { width: 100%; }
+    .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+    .cal-header h4 { font-size: 0.95rem; margin: 0; }
+    .cal-nav { display: flex; gap: 0.25rem; }
+    .cal-nav button {
+      background: none; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 0.2rem 0.5rem; cursor: pointer; font-size: 0.8rem; color: var(--text-dim);
+    }
+    .cal-nav button:hover { border-color: var(--accent); color: var(--accent); }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .cal-day-header { background: var(--accent-glow); padding: 0.3rem; text-align: center; font-size: 0.7rem; font-weight: 600; color: var(--text-dim); }
+    .cal-day {
+      background: var(--bg-card); padding: 0.25rem; min-height: 48px; font-size: 0.75rem;
+      position: relative; cursor: default;
+    }
+    .cal-day.other-month { opacity: 0.35; }
+    .cal-day.today { background: var(--accent-glow); }
+    .cal-day-num { font-weight: 600; margin-bottom: 2px; }
+    .cal-day-dot {
+      width: 5px; height: 5px; border-radius: 50%; display: inline-block; margin: 0 1px;
+    }
+    .cal-day-dot.article { background: var(--accent); }
+    .cal-day-dot.event { background: var(--gold); }
+    .cal-day-dot.document { background: var(--success); }
+    .cal-day-dot.resolution { background: var(--info); }
+    .cal-day-dot.assignment { background: var(--danger); }
+    .cal-legend { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.5rem; font-size: 0.72rem; color: var(--text-dim); }
+    .cal-legend-item { display: flex; align-items: center; gap: 0.25rem; }
+
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      z-index: 1000; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+      max-width: 640px; width: 100%; max-height: 80vh; overflow-y: auto; padding: 1.5rem;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .modal-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border);
+    }
+    .modal-header h3 { font-size: 1.15rem; font-weight: 700; margin: 0; }
+    .modal-close {
+      background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-dim);
+      padding: 0; line-height: 1; flex-shrink: 0;
+    }
+    .modal-close:hover { color: var(--text); }
+    .modal-body { font-size: 0.9rem; line-height: 1.6; }
+    .modal-body .field { margin-bottom: 0.75rem; }
+    .modal-body .field-label { font-size: 0.75rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.25rem; }
+
+    .comment-thread { margin-top: 1rem; }
+    .comment-item {
+      display: flex; gap: 0.75rem; padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .comment-item:last-child { border-bottom: none; }
+    .comment-avatar {
+      width: 32px; height: 32px; border-radius: 50%; background: var(--accent-glow);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.72rem; font-weight: 700; color: var(--accent); flex-shrink: 0;
+    }
+    .comment-content { flex: 1; }
+    .comment-meta { font-size: 0.78rem; color: var(--text-dim); margin-bottom: 0.25rem; }
+    .comment-meta strong { color: var(--text); }
+    .comment-body { font-size: 0.88rem; }
+    .comment-input {
+      display: flex; gap: 0.5rem; margin-top: 0.75rem; align-items: flex-start;
+    }
+    .comment-input textarea {
+      flex: 1; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);
+      font-family: inherit; font-size: 0.88rem; resize: vertical; min-height: 60px;
+      background: var(--bg); color: var(--text);
+    }
+
+    .create-form { max-width: 560px; }
+    .create-form .form-group { margin-bottom: 0.85rem; }
+
+    .wg-card {
+      padding: 1rem; margin-bottom: 0.75rem; background: var(--bg-card);
+      border: 1px solid var(--border); border-radius: var(--radius); transition: border-color 0.15s;
+    }
+    .wg-card:hover { border-color: var(--border-focus); }
+    .wg-card h4 { font-size: 0.95rem; margin-bottom: 0.25rem; }
+    .wg-card .wg-meta { font-size: 0.8rem; color: var(--text-dim); }
+    .wg-badge {
+      display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px;
+      font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
+      background: var(--accent-glow); color: var(--accent);
+    }
+    .wg-badge.committee { background: rgba(184,134,11,0.1); color: var(--gold); }
+    .wg-badge.task_force { background: rgba(45,106,79,0.1); color: var(--success); }
+
+    .budget-bar {
+      height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 0.35rem;
+    }
+    .budget-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+    .budget-bar-fill.income { background: var(--success); }
+    .budget-bar-fill.expense { background: var(--danger); }
+
+    .stat-trend { display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.72rem; font-weight: 600; margin-top: 0.25rem; }
+    .stat-trend.up { color: var(--success); }
+    .stat-trend.down { color: var(--danger); }
+    .stat-trend.neutral { color: var(--text-dim); }
+    .hero-meta { display: flex; gap: 1.5rem; margin-top: 0.5rem; flex-wrap: wrap; }
+    .hero-meta-item { font-size: 0.78rem; color: rgba(255,255,255,0.6); display: flex; align-items: center; gap: 0.3rem; }
+    .hero-meta-item strong { color: rgba(255,255,255,0.9); }
+
+    .upcoming-strip {
+      display: flex; gap: 1rem; overflow-x: auto; padding-bottom: 0.5rem;
+      scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+    }
+    .upcoming-strip::-webkit-scrollbar { height: 4px; }
+    .upcoming-strip::-webkit-scrollbar-track { background: var(--border); border-radius: 2px; }
+    .upcoming-strip::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 2px; }
+    .upcoming-event-card {
+      min-width: 260px; max-width: 320px; flex-shrink: 0; scroll-snap-align: start;
+      padding: 1rem; background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); transition: border-color 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+    }
+    .upcoming-event-card:hover { border-color: var(--accent); box-shadow: var(--shadow-md); }
+    .upcoming-event-date {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.72rem; font-weight: 600;
+      background: rgba(184,134,11,0.1); color: var(--gold); margin-bottom: 0.5rem;
+    }
+    .upcoming-event-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.25rem; color: var(--text); }
+    .upcoming-event-meta { font-size: 0.78rem; color: var(--text-dim); display: flex; flex-direction: column; gap: 0.15rem; }
+    .upcoming-event-rsvp { margin-top: 0.5rem; font-size: 0.75rem; color: var(--accent); font-weight: 600; }
+
+    .activity-feed { max-height: 400px; overflow-y: auto; }
+    .activity-item {
+      display: flex; gap: 0.75rem; padding: 0.65rem 0;
+      border-bottom: 1px solid var(--border); align-items: flex-start;
+    }
+    .activity-item:last-child { border-bottom: none; }
+    .activity-avatar {
+      width: 32px; height: 32px; border-radius: 50%; background: var(--accent-glow);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.68rem; font-weight: 700; color: var(--accent); flex-shrink: 0;
+    }
+    .activity-content { flex: 1; min-width: 0; }
+    .activity-text { font-size: 0.85rem; line-height: 1.4; }
+    .activity-text strong { font-weight: 600; }
+    .activity-time { font-size: 0.72rem; color: var(--text-faint); margin-top: 0.15rem; }
+    .activity-type-badge {
+      display: inline-block; padding: 0.1rem 0.35rem; border-radius: 3px;
+      font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em;
+    }
+    .activity-type-badge.create { background: rgba(45,106,79,0.1); color: var(--success); }
+    .activity-type-badge.update { background: rgba(27,73,101,0.1); color: var(--accent); }
+    .activity-type-badge.delete { background: rgba(185,28,28,0.1); color: var(--danger); }
+    .activity-type-badge.login { background: rgba(30,96,145,0.1); color: var(--info); }
+    .activity-type-badge.approve { background: rgba(45,106,79,0.1); color: var(--success); }
+    .activity-type-badge.submit { background: rgba(184,134,11,0.1); color: var(--gold); }
+
+    .empty-state {
+      text-align: center; padding: 2.5rem 1rem; color: var(--text-dim);
+    }
+    .empty-state .icon { font-size: 2rem; margin-bottom: 0.75rem; opacity: 0.4; }
+    .empty-state h4 { font-size: 1rem; font-weight: 600; margin-bottom: 0.35rem; color: var(--text); }
+    .empty-state p { font-size: 0.88rem; max-width: 320px; margin: 0 auto 1rem; }
+    .empty-state .btn { font-size: 0.82rem; }
   </style>
 </head>
 <body>
-  <nav class="nav">
-    <div class="container" style="display:flex;align-items:center;width:100%">
-      <a href="/" class="nav-brand">UAS</a>
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="container">
+      <a href="/" class="nav-brand"><img src="/img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
+      <button class="nav-burger" onclick="this.closest('.nav').classList.toggle('open')" aria-label="Menu">&#9776;</button>
       <div class="nav-links">
         <a href="/" class="nav-link">Home</a>
         <a href="/about" class="nav-link">About</a>
         <a href="/programmes" class="nav-link">Programmes</a>
         <a href="/events" class="nav-link">Events</a>
         <a href="/knowledge" class="nav-link">Knowledge</a>
-        <a href="/library" class="nav-link">Library</a>
-        <a href="/ecosystem" class="nav-link">Ecosystem</a>
-        <a href="/members" class="nav-link">Members</a>
         <a href="/contact" class="nav-link">Contact</a>
-        <a href="/search" class="nav-link">Search</a>
-        <a href="/dashboard" class="nav-link active">Dashboard</a>
-        <a href="/profile" class="nav-link">Profile</a>
-        </div>
-      <div class="nav-user" id="navUser"></div>
+      </div>
+      <div class="nav-right"><div class="nav-user" id="navUser"></div></div>
     </div>
   </nav>
 
-  <div class="container">
-    <div class="dash-header">
-      <h1 id="dashTitle">Dashboard</h1>
-      <p id="dashSubtitle"></p>
+  <div class="dash-hero">
+    <div class="container">
+      <div class="dash-avatar" id="dashAvatar"></div>
+      <div class="dash-hero-text">
+        <h1 id="dashTitle">Dashboard</h1>
+        <p id="dashSubtitle"></p>
+        <div class="hero-meta" id="heroMeta"></div>
+        <div class="dash-hero-roles" id="dashRoles"></div>
+      </div>
+      <div class="dash-hero-actions">
+        <a href="/profile" class="btn btn-sm">Profile</a>
+        <button class="btn btn-sm" onclick="api.logout();window.location.href=ua('/')">Logout</button>
+      </div>
     </div>
+  </div>
 
+  <div class="container">
     <div class="dash-tabs" id="dashTabs">
       <button class="dash-tab active" data-panel="overview">Overview</button>
-      <button class="dash-tab" data-panel="roles">My Roles</button>
       <button class="dash-tab" data-panel="pending">Pending Items</button>
       <button class="dash-tab" data-panel="resolutions">Resolutions</button>
-      <button class="dash-tab" data-panel="create">Create</button>
+      <button class="dash-tab" data-panel="finance">Finance</button>
+      <button class="dash-tab" data-panel="budget">Budget</button>
+      <button class="dash-tab" data-panel="groups">Groups</button>
+      <button class="dash-tab" data-panel="roles">My Roles</button>
+      <button class="dash-tab" data-panel="create">Submit Item</button>
     </div>
 
     <!-- Overview Panel -->
     <div class="dash-panel active" id="panel-overview">
-      <div class="health-grid" id="healthGrid"></div>
-      <h3 class="section-title">Upcoming Calendar</h3>
-      <div id="upcomingCal"></div>
-      <h3 class="section-title">Recent Pending Items</h3>
-      <div id="recentPending"></div>
-      <h3 class="section-title">My Assignments</h3>
-      <div id="myAssignments"></div>
-      <h3 class="section-title">My Submissions</h3>
-      <div id="mySubmissions"></div>
-    </div>
-
-    <!-- Roles Panel -->
-    <div class="dash-panel" id="panel-roles">
-      <h3 class="section-title">My Roles & Capabilities</h3>
-      <div id="myRoles"></div>
-      <h3 class="section-title mt-2">Authority Trace</h3>
-      <div id="authorityTrace"></div>
+      <div id="upcomingStrip" style="margin-bottom:2rem"></div>
+      <div class="stat-grid" id="statGrid"></div>
+      <div class="dash-grid">
+        <div class="dash-card">
+          <div class="dash-card-header">
+            <h4>Upcoming</h4>
+          </div>
+          <div id="upcomingCal"></div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-header">
+            <h4>Recent Pending</h4>
+            <button class="btn btn-outline btn-xs" onclick="switchTab('pending')">View all</button>
+          </div>
+          <div id="recentPending"></div>
+        </div>
+      </div>
+      <div class="dash-grid">
+        <div class="dash-card">
+          <div class="dash-card-header">
+            <h4>My Assignments</h4>
+          </div>
+          <div id="myAssignments"></div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-header">
+            <h4>My Submissions</h4>
+          </div>
+          <div id="mySubmissions"></div>
+        </div>
+      </div>
+      <div class="dash-card" style="margin-bottom:2rem">
+        <div class="dash-card-header">
+          <h4>Recent Activity</h4>
+        </div>
+        <div class="activity-feed" id="activityFeed"></div>
+      </div>
+      <div id="quickActions" style="display:none">
+        <div class="section-header">
+          <h3>Quick Actions</h3>
+        </div>
+        <div class="create-grid" id="quickActionsGrid"></div>
+      </div>
     </div>
 
     <!-- Pending Panel -->
     <div class="dash-panel" id="panel-pending">
-      <h3 class="section-title">All Pending Items</h3>
-      <div id="allPending"></div>
+      <div class="dash-tabs" id="pendingTabs" style="margin-bottom:1rem">
+        <button class="dash-tab active" data-scope="mine">My Items</button>
+        <button class="dash-tab" data-scope="org">Org Wide</button>
+      </div>
+      <div class="dash-grid" style="margin-bottom:1rem">
+        <div class="dash-card">
+          <div class="dash-card-header">
+            <h4>Calendar</h4>
+          </div>
+          <div id="pendingCalendar"></div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-header">
+            <h4>List</h4>
+            <div id="pendingCounts" class="text-sm text-dim"></div>
+          </div>
+          <div id="allPending"></div>
+          <div class="pagination" id="pendingPagination"></div>
+        </div>
+      </div>
     </div>
 
     <!-- Resolutions Panel -->
     <div class="dash-panel" id="panel-resolutions">
-      <div class="flex-between mb-2">
-        <h3 class="section-title" style="margin:0">Resolutions</h3>
+      <div class="section-header">
+        <h3>Resolutions & Polls</h3>
         <button class="btn btn-primary btn-sm" onclick="showCreateResolution()" id="createResBtn" style="display:none">New Resolution</button>
       </div>
       <div id="resolutionsList"></div>
     </div>
 
+    <!-- Finance Panel -->
+    <div class="dash-panel" id="panel-finance">
+      <div class="section-header">
+        <h3>Financial Summary</h3>
+        <button class="btn btn-primary btn-sm" onclick="showFinanceForm()" id="recordFinanceBtn" style="display:none">Record Transaction</button>
+      </div>
+      <div class="stat-grid" id="financeStatGrid"></div>
+      <div class="dash-grid">
+        <div class="dash-card">
+          <div class="dash-card-header">
+            <h4>By Category</h4>
+          </div>
+          <div id="financeCategoryBreakdown"></div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-header">
+            <h4>Recent Transactions</h4>
+          </div>
+          <div id="financeRecent"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Budget Panel -->
+    <div class="dash-panel" id="panel-budget">
+      <div class="section-header">
+        <h3>Budget Line Items</h3>
+        <button class="btn btn-primary btn-sm" onclick="showBudgetItemForm()" id="createBudgetBtn" style="display:none">Add Line Item</button>
+      </div>
+      <p class="text-dim text-sm" style="margin-bottom:1rem">Budget line items belong to a programme, event, or project. Record income and expenses against each item.</p>
+      <div id="budgetItemsList"></div>
+    </div>
+
+    <!-- Working Groups Panel -->
+    <div class="dash-panel" id="panel-groups">
+      <div class="section-header">
+        <h3>Working Groups & Committees</h3>
+        <button class="btn btn-primary btn-sm" onclick="showWorkingGroupForm()" id="createWgBtn" style="display:none">New Group</button>
+      </div>
+      <div id="workingGroupsList"></div>
+    </div>
+
+    <!-- Roles Panel -->
+    <div class="dash-panel" id="panel-roles">
+      <div class="dash-card mb-2">
+        <div class="dash-card-header">
+          <h4>My Roles</h4>
+        </div>
+        <div id="myRoles"></div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-header">
+          <h4>Authority Trace</h4>
+        </div>
+        <div id="authorityTrace"></div>
+      </div>
+    </div>
+
     <!-- Create Panel -->
     <div class="dash-panel" id="panel-create">
-      <h3 class="section-title">Create Content</h3>
-      <div class="grid-3">
-        <div class="card" style="cursor:pointer" onclick="showCreateForm('article')">
-          <h4 style="margin-bottom:0.25rem">📄 Article</h4>
-          <p class="text-sm text-dim">Submit an article, observing report, or educational piece</p>
+      <div class="section-header">
+        <h3>Create Content</h3>
+      </div>
+      <div class="create-grid">
+        <div class="create-card" onclick="showCreateForm('article')">
+          <div class="icon-circle"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span></div>
+          <h4>Article</h4>
+          <p>Submit an article, observing report, or educational piece</p>
         </div>
-        <div class="card" style="cursor:pointer" onclick="showCreateForm('event')">
-          <h4 style="margin-bottom:0.2rem">📅 Event</h4>
-          <p class="text-sm text-dim">Create an event (requires approval)</p>
+        <div class="create-card" onclick="showCreateForm('event')">
+          <div class="icon-circle"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span></div>
+          <h4>Event</h4>
+          <p>Create an event (requires approval)</p>
         </div>
-        <div class="card" style="cursor:pointer" onclick="showCreateForm('programme')">
-          <h4 style="margin-bottom:0.25rem">🎯 Programme</h4>
-          <p class="text-sm text-dim">Propose a new programme (requires programmes.create)</p>
+        <div class="create-card" onclick="showCreateForm('programme')">
+          <div class="icon-circle"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span></div>
+          <h4>Programme</h4>
+          <p>Propose a new programme</p>
         </div>
-        <div class="card" style="cursor:pointer" onclick="showCreateForm('project')">
-          <h4 style="margin-bottom:0.25rem">🚀 Project</h4>
-          <p class="text-sm text-dim">Create a project under a programme (requires projects.create)</p>
+        <div class="create-card" onclick="showCreateForm('project')">
+          <div class="icon-circle"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/></svg></span></div>
+          <h4>Project</h4>
+          <p>Create a project under a programme</p>
         </div>
       </div>
       <div id="createForm" class="mt-2"></div>
     </div>
   </div>
 
-  <script src="js/api.js"></script>
+  <!-- Detail Modal -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalTitle"></h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">Uganda Astronomical Society</div>
+          <p class="footer-desc">Advancing astronomy education, research, and outreach across Uganda since 2024.</p>
+        </div>
+        <div>
+          <div class="footer-heading">Explore</div>
+          <ul class="footer-links">
+            <li><a href="/about">About UAS</a></li>
+            <li><a href="/programmes">Programmes</a></li>
+            <li><a href="/events">Events</a></li>
+            <li><a href="/knowledge">Knowledge Base</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Community</div>
+          <ul class="footer-links">
+            <li><a href="/members">Members</a></li>
+            <li><a href="/ecosystem">Ecosystem</a></li>
+            <li><a href="/library">Library</a></li>
+            <li><a href="/contact">Contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Connect</div>
+          <ul class="footer-links">
+            <li><a href="mailto:contact@astronomy.ug">contact@astronomy.ug</a></li>
+            <li><a href="/login">Member Login</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2026 Uganda Astronomical Society. All rights reserved.</span>
+        <span>Kampala, Uganda</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/js/api.js"></script>
   <script>
     let health = {};
+    let allPendingData = [];
+    let pendPage = 1;
+    const PEND_PER = 8;
+    let pendingScope = 'mine';
+    let calMonth = new Date().getMonth();
+    let calYear = new Date().getFullYear();
 
     async function load() {
       try {
         const data = await api.me();
         const user = data.user;
-        document.getElementById('dashTitle').textContent = `Welcome, ${user.name}`;
+
+        // Avatar initials
+        const initials = user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+        document.getElementById('dashAvatar').textContent = initials;
+        document.getElementById('dashTitle').textContent = `Welcome back, ${user.name.split(' ')[0]}`;
         document.getElementById('dashSubtitle').textContent = user.email;
         updateNavUser();
 
-        // Show create resolution button if authorized
+        // Role badges in hero
+        const roles = data.roles || [];
+        const rolesEl = document.getElementById('dashRoles');
+        if (roles.length) {
+          rolesEl.innerHTML = roles.map(r => `<span class="dash-hero-role">${esc(r.title)}</span>`).join('');
+        }
+
         if (api.hasCap('resolutions.create')) {
           document.getElementById('createResBtn').style.display = '';
         }
 
-        // Load all data in parallel
-        const [healthData, pending, resolutions, roles, myAsg, mySubs, calItems] = await Promise.all([
+        const [healthData, pending, resolutions, myAsg, mySubs, calItems, finData, budgetData, wgData, activityData] = await Promise.all([
           api.getDashboard().catch(() => ({})),
-          api.getPending().catch(() => []),
+          api.getPending({ scope: pendingScope }).catch(() => []),
           api.getResolutions().catch(() => []),
-          api.getRoles().catch(() => []),
           api.getMyAssignments().catch(() => []),
           api.request('/submissions/mine').catch(() => []),
           api.getCalendar().catch(() => []),
+          api.getFinanceSummary().catch(() => null),
+          api.getBudgetItems().catch(() => []),
+          api.getWorkingGroups().catch(() => []),
+          api.getActivity(20).catch(() => []),
         ]);
 
         health = healthData;
         renderOverview(pending);
-        renderRoles(data.roles || []);
         renderPending(pending);
         renderResolutions(resolutions);
         renderMyAssignments(myAsg);
         renderMySubmissions(mySubs);
         renderUpcomingCal(calItems);
+        renderFinance(finData);
+        renderBudgetItems(budgetData);
+        renderWorkingGroups(wgData);
+        renderRoles(roles);
+        renderQuickActions();
+        renderHeroMeta(healthData);
+        renderUpcomingStrip(healthData.upcoming_events || []);
+        renderActivityFeed(activityData);
 
+        // Show action buttons based on capabilities
+        if (api.hasCap('finance.record')) {
+          document.getElementById('recordFinanceBtn').style.display = '';
+          document.getElementById('createBudgetBtn').style.display = '';
+        }
+        if (api.hasCap('roles.create')) {
+          document.getElementById('createWgBtn').style.display = '';
+        }
         setupTabs();
       } catch(e) {
         window.location.href = ua('/login');
@@ -185,40 +714,83 @@
     }
 
     function renderOverview(pending) {
-      const g = document.getElementById('healthGrid');
+      const g = document.getElementById('statGrid');
+      const newQ = health.new_members_quarter || 0;
+      const overdueCount = health.pending?.overdue || 0;
       g.innerHTML = `
-        <div class="card health-card"><div class="value">${health.members?.active || 0}</div><div class="label">Active Members</div></div>
-        <div class="card health-card"><div class="value">${health.programmes?.active || 0}</div><div class="label">Programmes</div></div>
-        <div class="card health-card"><div class="value">${health.projects?.active || 0}</div><div class="label">Projects</div></div>
-        <div class="card health-card"><div class="value">${health.events?.upcoming || 0}</div><div class="label">Upcoming Events</div></div>
-        <div class="card health-card"><div class="value" style="color:${health.pending?.overdue > 0 ? 'var(--danger)' : 'var(--accent)'}">${health.pending?.total || 0}</div><div class="label">Pending Items</div></div>
-        <div class="card health-card"><div class="value">${health.governance?.total || 0}</div><div class="label">Active Resolutions</div></div>
+        <div class="stat-card members">
+          <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span></div>
+          <div class="stat-value">${health.members?.active || 0}</div>
+          <div class="stat-label">Active Members</div>
+          ${newQ > 0 ? '<div class="stat-trend up">+' + newQ + ' this quarter</div>' : ''}
+        </div>
+        <div class="stat-card programmes">
+          <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span></div>
+          <div class="stat-value">${health.programmes?.active || 0}</div>
+          <div class="stat-label">Programmes</div>
+        </div>
+        <div class="stat-card projects">
+          <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/></svg></span></div>
+          <div class="stat-value">${health.projects?.active || 0}</div>
+          <div class="stat-label">Projects</div>
+        </div>
+        <div class="stat-card events">
+          <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span></div>
+          <div class="stat-value">${health.events?.upcoming || 0}</div>
+          <div class="stat-label">Upcoming Events</div>
+        </div>
+        <div class="stat-card pending">
+          <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span></div>
+          <div class="stat-value" style="color:${overdueCount > 0 ? 'var(--danger)' : ''}">${health.pending?.total || 0}</div>
+          <div class="stat-label">Pending Items</div>
+          ${overdueCount > 0 ? '<div class="stat-trend down">' + overdueCount + ' overdue</div>' : '<div class="stat-trend neutral">On track</div>'}
+        </div>
+        <div class="stat-card resolutions">
+          <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span></div>
+          <div class="stat-value">${health.governance?.total || 0}</div>
+          <div class="stat-label">Active Resolutions</div>
+        </div>
       `;
 
       const rp = document.getElementById('recentPending');
       if (pending.length) {
-        rp.innerHTML = pending.slice(0, 5).map(renderPendingItem).join('');
+        rp.innerHTML = pending.slice(0, 4).map(renderPendingItem).join('');
       } else {
-        rp.innerHTML = '<p class="text-dim text-sm">No pending items.</p>';
+        rp.innerHTML = '<div class="empty-state"><h4>All clear</h4><p>No pending items need your attention right now.</p></div>';
       }
+    }
+
+    function renderUpcomingCal(list) {
+      const div = document.getElementById('upcomingCal');
+      const upcoming = (list || []).filter(c => c.deadline && new Date(c.deadline) >= new Date()).sort((a, b) => new Date(a.deadline) - new Date(b.deadline)).slice(0, 6);
+      if (!upcoming.length) { div.innerHTML = '<div class="empty-state"><h4>Nothing scheduled</h4><p>No upcoming calendar items. Create one from the Pending tab.</p></div>'; return; }
+      div.innerHTML = upcoming.map(c => {
+        const dotClass = c.type === 'deadline' ? 'deadline' : (c.type === 'event' ? 'event' : 'other');
+        return `
+          <div class="cal-item">
+            <div class="cal-dot ${dotClass}"></div>
+            <div class="cal-item-text">${esc(c.title)}</div>
+            <div class="cal-item-date">${new Date(c.deadline).toLocaleDateString('en', {month:'short', day:'numeric'})}</div>
+          </div>
+        `;
+      }).join('');
     }
 
     function renderMyAssignments(list) {
       const div = document.getElementById('myAssignments');
-      if (!list.length) { div.innerHTML = '<p class="text-dim text-sm">No assignments for you yet.</p>'; return; }
-      div.innerHTML = list.map(a => `
-        <div class="card" style="padding:0.9rem 1rem;margin-bottom:0.5rem">
+      if (!list.length) { div.innerHTML = '<div class="empty-state"><h4>No assignments</h4><p>You have no active assignments. New tasks will appear here when assigned.</p></div>'; return; }
+      div.innerHTML = list.slice(0, 5).map(a => `
+        <div class="asg-card">
           <div class="flex-between">
             <div>
-              <strong>${esc(a.title)}</strong>
-              <div class="text-dim text-sm">${a.description ? esc(a.description).slice(0, 120) : ''}${a.due_date ? ` · due ${esc(a.due_date)}` : ''}</div>
-              ${a.completion_evidence ? `<div class="text-sm mt-1"><em>Evidence: ${esc(a.completion_evidence)}</em></div>` : ''}
+              <h4>${esc(a.title)}</h4>
+              <p>${a.description ? esc(a.description).slice(0, 100) : ''}${a.due_date ? ` &middot; due ${esc(a.due_date)}` : ''}</p>
             </div>
-            <div class="flex gap-2" style="align-items:center">
+            <div class="flex gap-1" style="align-items:center">
               <span class="badge badge-${a.status === 'completed' ? 'active' : (a.status === 'overdue' ? 'inactive' : 'pending')}">${esc(a.status)}</span>
               ${a.status === 'not_started' ? `<button class="btn btn-outline btn-xs" onclick="asgAction(${a.id}, 'start')">Start</button>` : ''}
               ${a.status === 'in_progress' ? `<button class="btn btn-primary btn-xs" onclick="asgSubmit(${a.id})">Submit</button>` : ''}
-              ${a.status === 'submitted' && api.hasCap('assignments.manage') ? `<button class="btn btn-success btn-xs" onclick="asgAction(${a.id}, 'complete')">Mark Complete</button>` : ''}
+              ${a.status === 'submitted' && api.hasCap('assignments.manage') ? `<button class="btn btn-success btn-xs" onclick="asgAction(${a.id}, 'complete')">Complete</button>` : ''}
             </div>
           </div>
         </div>
@@ -237,77 +809,518 @@
       catch(e) { alert(e.error || 'Failed'); }
     }
 
-    function renderUpcomingCal(list) {
-      const div = document.getElementById('upcomingCal');
-      const upcoming = (list || []).filter(c => c.deadline && new Date(c.deadline) >= new Date()).sort((a, b) => new Date(a.deadline) - new Date(b.deadline)).slice(0, 5);
-      if (!upcoming.length) { div.innerHTML = '<p class="text-dim text-sm">No upcoming calendar items.</p>'; return; }
-      div.innerHTML = upcoming.map(c => `
-        <div class="flex-between" style="padding:0.45rem 0;border-bottom:1px solid var(--border)">
-          <span class="text-sm">
-            <span class="badge badge-pending">${esc(c.type || 'other')}</span>
-            ${esc(c.title)}
-          </span>
-          <span class="text-dim text-sm">${new Date(c.deadline).toLocaleDateString('en', {month:'short', day:'numeric'})} ${new Date(c.deadline).toLocaleTimeString('en', {hour:'2-digit', minute:'2-digit'})}</span>
-        </div>
-      `).join('');
-    }
-
     function renderMySubmissions(list) {
       const div = document.getElementById('mySubmissions');
-      if (!list.length) { div.innerHTML = '<p class="text-dim text-sm">You have not submitted any content yet.</p>'; return; }
-      div.innerHTML = list.slice(0, 8).map(s => `
-        <div class="flex-between" style="padding:0.45rem 0;border-bottom:1px solid var(--border)">
-          <span class="text-sm">
-            <span class="badge badge-pending">${esc(s.kind)}</span>
-            ${esc(s.title)}
-            ${s.rejection_reason ? `<span class="text-danger text-sm"> — ${esc(s.rejection_reason)}</span>` : ''}
-          </span>
+      if (!list.length) { div.innerHTML = '<div class="empty-state"><h4>No submissions yet</h4><p>Articles, events, and documents you submit will appear here for tracking.</p></div>'; return; }
+      div.innerHTML = list.slice(0, 5).map(s => `
+        <div class="sub-item">
+          <span class="pending-type-badge ${esc(s.kind)}">${esc(s.kind)}</span>
+          <span style="flex:1;font-size:0.88rem">${esc(s.title)}</span>
           <span class="badge badge-${s.status === 'published' || s.status === 'approved' ? 'active' : (s.status === 'rejected' ? 'inactive' : 'pending')}">${esc(s.status)}</span>
         </div>
       `).join('');
     }
 
+    function renderQuickActions() {
+      const grid = document.getElementById('quickActionsGrid');
+      const actions = [];
+
+      if (api.hasCap('finance.record')) {
+        actions.push(`
+          <div class="create-card" onclick="showFinanceForm()">
+            <div class="icon-circle"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span></div>
+            <h4>Record Finance</h4>
+            <p>Log income or expense</p>
+          </div>
+        `);
+      }
+      if (api.hasCap('documents.upload')) {
+        actions.push(`
+          <div class="create-card" onclick="showUploadForm()">
+            <div class="icon-circle"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span></div>
+            <h4>Upload Document</h4>
+            <p>Upload files to the library</p>
+          </div>
+        `);
+      }
+      if (api.hasCap('members.approve')) {
+        actions.push(`
+          <div class="create-card" onclick="window.location.href=ua('/admin')">
+            <div class="icon-circle"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span></div>
+            <h4>Manage Members</h4>
+            <p>Review membership applications</p>
+          </div>
+        `);
+      }
+
+      if (actions.length) {
+        document.getElementById('quickActions').style.display = '';
+        grid.innerHTML = actions.join('');
+      }
+    }
+
+    function renderHeroMeta(health) {
+      const el = document.getElementById('heroMeta');
+      const parts = [];
+      if (health.member_since) {
+        parts.push('<span class="hero-meta-item">Member since <strong>' + new Date(health.member_since).toLocaleDateString('en', { year: 'numeric', month: 'short' }) + '</strong></span>');
+      }
+      if (health.last_login) {
+        const d = new Date(health.last_login.replace(' ', 'T'));
+        const ago = fmtTimeAgo(d);
+        parts.push('<span class="hero-meta-item">Last login <strong>' + ago + '</strong></span>');
+      }
+      if (health.members) {
+        parts.push('<span class="hero-meta-item"><strong>' + (health.members.active || 0) + '</strong> members</span>');
+      }
+      el.innerHTML = parts.join('');
+    }
+
+    function fmtTimeAgo(d) {
+      const s = (Date.now() - d.getTime()) / 1000;
+      if (s < 60) return 'just now';
+      if (s < 3600) return Math.floor(s / 60) + 'm ago';
+      if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+      if (s < 604800) return Math.floor(s / 86400) + 'd ago';
+      return d.toLocaleDateString('en', { month: 'short', day: 'numeric' });
+    }
+
+    function renderUpcomingStrip(events) {
+      const el = document.getElementById('upcomingStrip');
+      if (!events || !events.length) {
+        el.innerHTML = '';
+        return;
+      }
+      el.innerHTML = '<div class="section-header"><h3>Upcoming Events</h3><a href="' + ua('/events') + '" class="btn btn-outline btn-xs">View all</a></div>'
+        + '<div class="upcoming-strip">'
+        + events.map(e => {
+          const d = new Date(e.date);
+          const dateStr = d.toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric' });
+          const timeStr = d.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' });
+          const capacity = e.capacity ? e.rsvp_count + '/' + e.capacity + ' RSVPs' : e.rsvp_count + ' RSVPs';
+          return '<div class="upcoming-event-card" onclick="window.location.href=ua(\'/event/' + e.id + '\')">'
+            + '<div class="upcoming-event-date"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span> ' + dateStr + '</div>'
+            + '<div class="upcoming-event-title">' + esc(e.title) + '</div>'
+            + '<div class="upcoming-event-meta">'
+            + '<span>' + timeStr + (e.location ? ' &middot; ' + esc(e.location) : '') + '</span>'
+            + '</div>'
+            + '<div class="upcoming-event-rsvp">' + capacity + '</div>'
+            + '</div>';
+        }).join('')
+        + '</div>';
+    }
+
+    function renderActivityFeed(items) {
+      const el = document.getElementById('activityFeed');
+      if (!items || !items.length) {
+        el.innerHTML = '<div class="empty-state"><h4>No activity yet</h4><p>Actions like creating content, approving items, and voting will appear here.</p></div>';
+        return;
+      }
+      el.innerHTML = items.map(a => {
+        const name = a.user_name || 'System';
+        const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+        const actionText = formatAction(a);
+        const typeClass = getActionTypeClass(a.action_type);
+        const time = a.created_at ? fmtTimeAgo(new Date(a.created_at.replace(' ', 'T'))) : '';
+        return '<div class="activity-item">'
+          + '<div class="activity-avatar">' + esc(initials) + '</div>'
+          + '<div class="activity-content">'
+          + '<div class="activity-text"><strong>' + esc(name) + '</strong> ' + actionText + '</div>'
+          + '<div class="activity-time"><span class="activity-type-badge ' + typeClass + '">' + esc(a.action_type.replace(/_/g, ' ')) + '</span> &middot; ' + time + '</div>'
+          + '</div>'
+          + '</div>';
+      }).join('');
+    }
+
+    function formatAction(a) {
+      const type = a.target_type || '';
+      const id = a.target_id || '';
+      const detail = a.details || '';
+      const map = {
+        'article_create': 'submitted an article',
+        'article_approve': 'approved an article',
+        'article_publish': 'published an article',
+        'article_reject': 'rejected an article',
+        'event_create': 'created an event',
+        'event_approve': 'approved an event',
+        'event_cancel': 'cancelled an event',
+        'event_rsvp': 'RSVPed to an event',
+        'document_upload': 'uploaded a document',
+        'document_approve': 'approved a document',
+        'finance_record': 'recorded a financial transaction',
+        'budget_item_create': 'added a budget line item',
+        'member_approve': 'approved a membership',
+        'members_import': 'imported members',
+        'assignment_create': 'created an assignment',
+        'assignment_start': 'started an assignment',
+        'assignment_submit': 'submitted assignment evidence',
+        'assignment_complete': 'completed an assignment',
+        'resolution_create': 'proposed a resolution',
+        'calendar_create': 'added a calendar item',
+        'working_group_create': 'created a working group',
+        'admin_login_as': 'switched user session',
+        'password_change': 'changed their password',
+        'profile_update': 'updated their profile',
+      };
+      return map[a.action_type] || 'performed ' + esc(a.action_type.replace(/_/g, ' '));
+    }
+
+    function getActionTypeClass(actionType) {
+      if (actionType.includes('create') || actionType.includes('upload') || actionType.includes('import')) return 'create';
+      if (actionType.includes('approve') || actionType.includes('publish') || actionType.includes('complete')) return 'approve';
+      if (actionType.includes('reject') || actionType.includes('cancel') || actionType.includes('delete')) return 'delete';
+      if (actionType.includes('login') || actionType.includes('switch')) return 'login';
+      if (actionType.includes('submit') || actionType.includes('rsvp') || actionType.includes('vote')) return 'submit';
+      return 'update';
+    }
+
+    function showFinanceForm() {
+      openModal('Record Transaction', `
+        <div class="create-form" style="max-width:100%">
+          <div class="form-group"><label class="form-label">Type</label>
+            <select class="form-select" id="finType">
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+              <option value="payable">Payable (Bill to pay)</option>
+              <option value="receivable">Receivable (Expected income)</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Amount (UGX)</label><input type="number" class="form-input" id="finAmount"></div>
+          <div class="form-group"><label class="form-label">Category</label>
+            <select class="form-select" id="finCat">
+              <optgroup label="Income">
+                <option value="donation">Donation</option>
+                <option value="grant">Grant</option>
+                <option value="membership">Membership Dues</option>
+                <option value="sponsorship">Sponsorship</option>
+                <option value="event">Event Revenue</option>
+              </optgroup>
+              <optgroup label="Expense">
+                <option value="programme">Programme</option>
+                <option value="equipment">Equipment</option>
+                <option value="training">Training</option>
+                <option value="publication">Publication</option>
+                <option value="travel">Travel</option>
+                <option value="communications">Communications</option>
+                <option value="administration">Administration</option>
+                <option value="utilities">Utilities</option>
+                <option value="outreach">Outreach</option>
+              </optgroup>
+              <optgroup label="Other">
+                <option value="other">Other</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="finDesc"></div>
+          <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-input" id="finDate" value="${new Date().toISOString().split('T')[0]}"></div>
+          <div class="form-group"><label class="form-label">Due Date (payables/receivables)</label><input type="date" class="form-input" id="finDueDate"></div>
+          <div class="form-group"><label class="form-label">Status</label>
+            <select class="form-select" id="finStatus">
+              <option value="approved">Approved</option>
+              <option value="pending">Pending Approval</option>
+              <option value="paid">Paid</option>
+              <option value="draft">Draft</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="finNotes" rows="2"></textarea></div>
+          <button class="btn btn-primary" onclick="submitFinance()">Record</button>
+        </div>
+      `);
+    }
+
+    async function submitFinance() {
+      try {
+        await api.recordFinance({
+          type: document.getElementById('finType').value,
+          amount: parseFloat(document.getElementById('finAmount').value),
+          category: document.getElementById('finCat').value,
+          description: document.getElementById('finDesc').value,
+          record_date: document.getElementById('finDate').value,
+          due_date: document.getElementById('finDueDate').value || null,
+          status: document.getElementById('finStatus').value,
+          notes: document.getElementById('finNotes').value,
+        });
+        closeModal();
+        load();
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    function showUploadForm() {
+      openModal('Upload Document', `
+        <div class="create-form" style="max-width:100%">
+          <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="docTitle"></div>
+          <div class="form-group"><label class="form-label">Category</label>
+            <select class="form-select" id="docCat">
+              <option value="report">Report</option><option value="guide">Guide</option>
+              <option value="policy">Policy</option><option value="constitution">Constitution</option>
+              <option value="minutes">Minutes</option><option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Visibility</label>
+            <select class="form-select" id="docVis"><option value="public">Public</option><option value="internal">Internal</option></select>
+          </div>
+          <div class="form-group"><label class="form-label">File</label>
+            <input type="file" class="form-input" id="docFile" accept=".pdf,.doc,.docx,.txt,.csv,.jpg,.jpeg,.png,.gif,.webp">
+          </div>
+          <button class="btn btn-primary" onclick="submitUpload()">Upload</button>
+        </div>
+      `);
+    }
+
+    async function submitUpload() {
+      const fileInput = document.getElementById('docFile');
+      const file = fileInput.files[0];
+      if (!file) return alert('Please select a file');
+
+      try {
+        const uploadResult = await api.uploadFile(file);
+        await api.uploadDocument({
+          title: document.getElementById('docTitle').value,
+          category: document.getElementById('docCat').value,
+          visibility: document.getElementById('docVis').value,
+          file_path: uploadResult.url,
+        });
+        closeModal();
+        alert('Document uploaded!');
+        load();
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    function renderFinance(fin) {
+      if (!fin || (fin.income === 0 && fin.expense === 0)) {
+        document.getElementById('financeStatGrid').innerHTML = '<div class="empty-state"><h4>No financial records</h4><p>Record your first income or expense to start tracking finances.</p>' + (api.hasCap('finance.record') ? '<button class="btn btn-primary btn-sm" onclick="showFinanceForm()">Record Transaction</button>' : '') + '</div>';
+        document.getElementById('financeCategoryBreakdown').innerHTML = '';
+        document.getElementById('financeRecent').innerHTML = '';
+        return;
+      }
+
+      document.getElementById('financeStatGrid').innerHTML = `
+        <div class="stat-card programmes">
+          <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span></div>
+          <div class="stat-value" style="color:var(--success)">UGX ${fin.income.toLocaleString()}</div>
+          <div class="stat-label">Total Income</div>
+        </div>
+        <div class="stat-card pending">
+          <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span></div>
+          <div class="stat-value" style="color:var(--danger)">UGX ${fin.expense.toLocaleString()}</div>
+          <div class="stat-label">Total Expenses</div>
+        </div>
+        <div class="stat-card resolutions">
+          <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span></div>
+          <div class="stat-value">UGX ${fin.balance.toLocaleString()}</div>
+          <div class="stat-label">Balance</div>
+        </div>
+      `;
+
+      const catDiv = document.getElementById('financeCategoryBreakdown');
+      if (fin.by_category && fin.by_category.length) {
+        const cats = {};
+        fin.by_category.forEach(r => {
+          if (!cats[r.category]) cats[r.category] = { income: 0, expense: 0 };
+          cats[r.category][r.type] = parseFloat(r.total);
+        });
+        catDiv.innerHTML = Object.entries(cats).map(([cat, vals]) => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:0.65rem 0;border-bottom:1px solid var(--border)">
+            <span style="font-weight:500;font-size:0.9rem;text-transform:capitalize">${esc(cat)}</span>
+            <div style="text-align:right;font-size:0.85rem">
+              ${vals.income > 0 ? `<span style="color:var(--success)">+${vals.income.toLocaleString()}</span>` : ''}
+              ${vals.expense > 0 ? `<span style="color:var(--danger);margin-left:0.5rem">-${vals.expense.toLocaleString()}</span>` : ''}
+            </div>
+          </div>
+        `).join('');
+      } else {
+        catDiv.innerHTML = '<div class="empty-state"><p>No category data yet</p></div>';
+      }
+
+      const recentDiv = document.getElementById('financeRecent');
+      if (fin.recent && fin.recent.length) {
+        recentDiv.innerHTML = fin.recent.map(r => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:0.65rem 0;border-bottom:1px solid var(--border);font-size:0.88rem">
+            <div style="flex:1">
+              <div style="font-weight:500">${esc(r.description || r.category)}</div>
+              <div class="text-dim text-sm">${r.record_date}</div>
+            </div>
+            <span style="font-weight:600;color:${r.type === 'income' ? 'var(--success)' : 'var(--danger)'}">${r.type === 'income' ? '+' : '-'}UGX ${Number(r.amount).toLocaleString()}</span>
+          </div>
+        `).join('');
+      } else {
+        recentDiv.innerHTML = '<div class="empty-state"><p>No recent transactions</p></div>';
+      }
+    }
+
     function renderRoles(roles) {
       const div = document.getElementById('myRoles');
       if (roles.length) {
-        div.innerHTML = roles.map(r => `
-          <div class="role-badge">${esc(r.title)}</div>
-        `).join('');
+        div.innerHTML = roles.map(r => {
+          const scopeLabel = r.scope ? `<span class="cap-tag" style="background:var(--accent-glow);color:var(--accent)">${esc(r.scope)}</span>` : '';
+          const termLabel = r.effective_to ? `<span class="text-dim text-sm" style="margin-left:0.5rem">until ${r.effective_to}</span>` : '';
+          return `
+            <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:0.5rem;background:var(--bg-card)">
+              <span class="icon-inline icon-sm" style="color:var(--accent)"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+              <div style="flex:1">
+                <div style="font-weight:600;font-size:0.95rem">${esc(r.title)} ${scopeLabel}</div>
+                <div class="text-dim text-sm">${esc(r.description || 'No description')}${termLabel}</div>
+              </div>
+            </div>
+          `;
+        }).join('');
       } else {
-        div.innerHTML = '<p class="text-dim text-sm">No roles assigned yet.</p>';
+        div.innerHTML = '<div class="empty-state"><h4>No roles assigned</h4><p>You don\'t have any roles yet. Roles are assigned by administrators.</p></div>';
       }
 
       const caps = api._capabilities || [];
       const ct = document.getElementById('authorityTrace');
       if (caps.length) {
-        ct.innerHTML = `<div class="cap-list">${caps.map(c => `<span class="cap-tag">${esc(c)}</span>`).join('')}</div>`;
+        // Group capabilities by category
+        const grouped = {};
+        caps.forEach(c => {
+          const cat = c.split('.')[0] || 'other';
+          if (!grouped[cat]) grouped[cat] = [];
+          grouped[cat].push(c);
+        });
+        ct.innerHTML = Object.entries(grouped).map(([cat, items]) => `
+          <div style="margin-bottom:0.75rem">
+            <div style="font-size:0.78rem;font-weight:600;color:var(--text-dim);text-transform:uppercase;margin-bottom:0.35rem">${esc(cat)}</div>
+            <div class="cap-grid">${items.map(c => `<span class="cap-tag">${esc(c)}</span>`).join('')}</div>
+          </div>
+        `).join('');
       } else {
-        ct.innerHTML = '<p class="text-dim text-sm">No capabilities.</p>';
+        ct.innerHTML = '<div class="empty-state"><p>No capabilities assigned</p></div>';
       }
     }
 
     function renderPending(pending) {
-      const div = document.getElementById('allPending');
-      if (pending.length) {
-        div.innerHTML = pending.map(renderPendingItem).join('');
-      } else {
-        div.innerHTML = '<p class="text-dim">No pending items.</p>';
+      allPendingData = pending;
+      renderPendingCalendar();
+      renderPendingList();
+
+      // Update counts
+      const counts = {};
+      pending.forEach(i => { counts[i.item_type] = (counts[i.item_type] || 0) + 1; });
+      document.getElementById('pendingCounts').textContent = pending.length + ' items';
+    }
+
+    function renderPendingCalendar() {
+      const div = document.getElementById('pendingCalendar');
+      const today = new Date();
+      const firstDay = new Date(calYear, calMonth, 1);
+      const lastDay = new Date(calYear, calMonth + 1, 0);
+      const startPad = firstDay.getDay();
+      const daysInMonth = lastDay.getDate();
+      const monthName = firstDay.toLocaleString('default', { month: 'long' });
+
+      // Group items by date
+      const itemsByDate = {};
+      allPendingData.forEach(item => {
+        const d = (item.created_at || '').split(' ')[0];
+        if (d) {
+          if (!itemsByDate[d]) itemsByDate[d] = [];
+          itemsByDate[d].push(item);
+        }
+      });
+
+      let html = `
+        <div class="cal-header">
+          <button class="btn btn-outline btn-xs" onclick="changeCalMonth(-1)">&laquo;</button>
+          <h4>${monthName} ${calYear}</h4>
+          <button class="btn btn-outline btn-xs" onclick="changeCalMonth(1)">&raquo;</button>
+        </div>
+        <div class="cal-grid">
+          ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => `<div class="cal-day-header">${d}</div>`).join('')}
+      `;
+
+      // Previous month padding
+      const prevMonth = new Date(calYear, calMonth, 0);
+      for (let i = startPad - 1; i >= 0; i--) {
+        html += `<div class="cal-day other-month"><div class="cal-day-num">${prevMonth.getDate() - i}</div></div>`;
       }
+
+      // Current month days
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const isToday = today.getFullYear() === calYear && today.getMonth() === calMonth && today.getDate() === day;
+        const dayItems = itemsByDate[dateStr] || [];
+        const dots = dayItems.slice(0, 4).map(i => `<span class="cal-day-dot ${i.item_type}"></span>`).join('');
+
+        html += `<div class="cal-day${isToday ? ' today' : ''}" title="${dayItems.map(i => i.title || i.name).join(', ')}">
+          <div class="cal-day-num">${day}</div>
+          ${dots}
+        </div>`;
+      }
+
+      // Next month padding
+      const totalCells = startPad + daysInMonth;
+      const remaining = (7 - (totalCells % 7)) % 7;
+      for (let i = 1; i <= remaining; i++) {
+        html += `<div class="cal-day other-month"><div class="cal-day-num">${i}</div></div>`;
+      }
+
+      html += '</div>';
+      html += `<div class="cal-legend">
+        <span class="cal-legend-item"><span class="cal-day-dot article"></span> Article</span>
+        <span class="cal-legend-item"><span class="cal-day-dot event"></span> Event</span>
+        <span class="cal-legend-item"><span class="cal-day-dot document"></span> Document</span>
+        <span class="cal-legend-item"><span class="cal-day-dot resolution"></span> Resolution</span>
+        <span class="cal-legend-item"><span class="cal-day-dot assignment"></span> Assignment</span>
+      </div>`;
+
+      div.innerHTML = html;
+    }
+
+    function changeCalMonth(delta) {
+      calMonth += delta;
+      if (calMonth > 11) { calMonth = 0; calYear++; }
+      if (calMonth < 0) { calMonth = 11; calYear--; }
+      renderPendingCalendar();
+    }
+
+    function renderPendingList() {
+      const div = document.getElementById('allPending');
+      const pag = document.getElementById('pendingPagination');
+      if (!allPendingData.length) {
+        div.innerHTML = '<div class="empty-state"><h4>No pending items</h4><p>Nothing is waiting for review or action. New submissions will appear here.</p></div>';
+        pag.innerHTML = '';
+        return;
+      }
+      const totalPages = Math.ceil(allPendingData.length / PEND_PER);
+      if (pendPage > totalPages) pendPage = totalPages;
+      const start = (pendPage - 1) * PEND_PER;
+      const page = allPendingData.slice(start, start + PEND_PER);
+      div.innerHTML = page.map(renderPendingItem).join('');
+
+      if (totalPages <= 1) { pag.innerHTML = ''; return; }
+      let btns = '<button ' + (pendPage<=1?'disabled':'') + ' onclick="pendPage--;renderPendingList()">&#8249; Prev</button>';
+      for (let p=1; p<=totalPages; p++) {
+        btns += '<button class="' + (p===pendPage?'active':'') + '" onclick="pendPage=' + p + ';renderPendingList()">' + p + '</button>';
+      }
+      btns += '<button ' + (pendPage>=totalPages?'disabled':'') + ' onclick="pendPage++;renderPendingList()">Next &#8250;</button>';
+      pag.innerHTML = btns;
+    }
+
+    async function switchPendingScope(scope) {
+      pendingScope = scope;
+      pendPage = 1;
+      document.querySelectorAll('#pendingTabs .dash-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.scope === scope);
+      });
+      const pending = await api.getPending({ scope }).catch(() => []);
+      renderPending(pending);
     }
 
     function renderPendingItem(item) {
       const age = item.created_at ? Math.floor((Date.now() - new Date(item.created_at)) / 86400000) : 0;
       const overdue = age > 7;
       const actions = pendingActions(item);
+      const itemType = item.item_type || 'article';
       return `
-        <div class="pending-item">
-          <span class="pending-item-type">${esc(item.item_type)}</span>
-          <span class="pending-item-title">${esc(item.title || item.name)}</span>
-          <span class="pending-item-meta">
+        <div class="pending-item" style="cursor:pointer" onclick="showItemDetail('${esc(itemType)}', ${item.id})">
+          <span class="pending-type-badge ${esc(itemType)}">${esc(itemType)}</span>
+          <span class="pending-title">${esc(item.title || item.name)}</span>
+          <span class="pending-meta">
             by ${esc(item.author_name || 'Unknown')}
-            <span class="pending-item-age ${overdue ? 'overdue' : ''}">${age}d</span>
+            <span class="pending-age ${overdue ? 'overdue' : ''}">${age}d</span>
           </span>
-          ${actions ? `<span class="pending-item-actions">${actions}</span>` : ''}
+          ${actions ? `<span class="pending-actions" onclick="event.stopPropagation()">${actions}</span>` : ''}
         </div>
       `;
     }
@@ -315,21 +1328,21 @@
     function pendingActions(item) {
       const out = [];
       if (item.item_type === 'article' && (item.status === 'submitted' || item.status === 'under_review')) {
-        if (api.hasCap('articles.approve')) out.push(`<button class="btn btn-primary btn-sm" onclick="actOnItem('article', 'approve', ${item.id})">Approve</button>`);
-        if (api.hasCap('articles.publish') && item.status !== 'approved') out.push(`<button class="btn btn-outline btn-sm" onclick="actOnItem('article', 'publish', ${item.id})">Publish</button>`);
-        if (api.hasCap('articles.approve')) out.push(`<button class="btn btn-outline btn-sm" onclick="rejectArticle(${item.id})">Reject</button>`);
+        if (api.hasCap('articles.approve')) out.push(`<button class="btn btn-primary btn-xs" onclick="actOnItem('article', 'approve', ${item.id})">Approve</button>`);
+        if (api.hasCap('articles.publish') && item.status !== 'approved') out.push(`<button class="btn btn-outline btn-xs" onclick="actOnItem('article', 'publish', ${item.id})">Publish</button>`);
+        if (api.hasCap('articles.approve')) out.push(`<button class="btn btn-outline btn-xs" onclick="rejectArticle(${item.id})">Reject</button>`);
       }
       if (item.item_type === 'event' && item.status === 'submitted') {
-        if (api.hasCap('events.approve')) out.push(`<button class="btn btn-primary btn-sm" onclick="actOnItem('event', 'approve', ${item.id})">Approve</button>`);
-        if (api.hasCap('events.publish')) out.push(`<button class="btn btn-outline btn-sm" onclick="actOnItem('event', 'publish', ${item.id})">Publish</button>`);
+        if (api.hasCap('events.approve')) out.push(`<button class="btn btn-primary btn-xs" onclick="actOnItem('event', 'approve', ${item.id})">Approve</button>`);
+        if (api.hasCap('events.publish')) out.push(`<button class="btn btn-outline btn-xs" onclick="actOnItem('event', 'publish', ${item.id})">Publish</button>`);
       }
       if (item.item_type === 'document' && (item.status === 'submitted' || item.status === 'draft')) {
-        if (api.hasCap('documents.approve')) out.push(`<button class="btn btn-primary btn-sm" onclick="actOnItem('document', 'approve', ${item.id})">Approve</button>`);
-        if (api.hasCap('documents.publish')) out.push(`<button class="btn btn-outline btn-sm" onclick="actOnItem('document', 'publish', ${item.id})">Publish</button>`);
+        if (api.hasCap('documents.approve')) out.push(`<button class="btn btn-primary btn-xs" onclick="actOnItem('document', 'approve', ${item.id})">Approve</button>`);
+        if (api.hasCap('documents.publish')) out.push(`<button class="btn btn-outline btn-xs" onclick="actOnItem('document', 'publish', ${item.id})">Publish</button>`);
       }
       if (item.item_type === 'resolution' && item.status === 'voting' && api.hasCap('resolutions.vote')) {
-        out.push(`<button class="btn btn-success btn-sm" onclick="actOnItem('resolution', 'for', ${item.id})">For</button>`);
-        out.push(`<button class="btn btn-outline btn-sm" onclick="actOnItem('resolution', 'against', ${item.id})">Against</button>`);
+        out.push(`<button class="btn btn-success btn-xs" onclick="actOnItem('resolution', 'for', ${item.id})">For</button>`);
+        out.push(`<button class="btn btn-outline btn-xs" onclick="actOnItem('resolution', 'against', ${item.id})">Against</button>`);
       }
       return out.join('');
     }
@@ -385,15 +1398,21 @@
             <div class="resolution-card">
               <div class="flex-between">
                 <div>
-                  <h4>${esc(r.title)}</h4>
+                  <h4 style="cursor:pointer" onclick="showResolutionDetail(${r.id})">${esc(r.title)}</h4>
                   <span class="badge badge-${esc(r.status)}">${esc(r.status)}</span>
                   <span class="text-sm text-dim" style="margin-left:0.5rem">${esc(r.code)}</span>
+                  ${r.type ? `<span class="cap-tag" style="margin-left:0.5rem">${esc(r.type)}</span>` : ''}
                 </div>
                 <span class="text-sm text-dim">by ${esc(r.proposer_name || 'Unknown')}</span>
               </div>
+              ${r.description ? `<p class="text-dim" style="margin:0.5rem 0;font-size:0.88rem">${esc(r.description).slice(0, 200)}${r.description.length > 200 ? '...' : ''}</p>` : ''}
               ${r.status === 'voting' ? `
                 <div class="vote-bar">
-                  <span class="counts">👍 ${r.votes_for} 👎 ${r.votes_against} ⏸ ${r.votes_abstain}</span>
+                  <span class="counts">
+                    <span style="color:var(--success)">&#10003; ${r.votes_for}</span>
+                    <span style="color:var(--danger)">&#10007; ${r.votes_against}</span>
+                    <span style="color:var(--text-faint)">— ${r.votes_abstain}</span>
+                  </span>
                   <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>
                   ${canVote ? `
                     <button class="btn btn-success btn-vote" onclick="vote(${r.id},'for')">For</button>
@@ -402,12 +1421,53 @@
                   ` : ''}
                 </div>
               ` : ''}
+              <div class="comment-thread" id="comments-${r.id}">
+                <button class="btn btn-outline btn-xs" onclick="loadComments(${r.id})" style="margin-top:0.5rem">Discussion</button>
+              </div>
             </div>
           `;
         }).join('');
       } else {
-        div.innerHTML = '<p class="text-dim">No resolutions yet.</p>';
+        div.innerHTML = '<div class="empty-state"><h4>No resolutions yet</h4><p>Propose a governance resolution to get started with formal decision-making.</p>' + (api.hasCap('resolutions.create') ? '<button class="btn btn-primary btn-sm" onclick="showCreateResolution()">New Resolution</button>' : '') + '</div>';
       }
+    }
+
+    async function loadComments(resId) {
+      const container = document.getElementById('comments-' + resId);
+      if (!container) return;
+      const existing = container.querySelector('.comment-list');
+      if (existing) { existing.remove(); return; }
+
+      const comments = await api.getResolutionComments(resId).catch(() => []);
+      const list = document.createElement('div');
+      list.className = 'comment-list';
+      list.innerHTML = `
+        ${comments.length ? comments.map(c => `
+          <div class="comment-item">
+            <div class="comment-avatar">${(c.user_name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase()}</div>
+            <div class="comment-content">
+              <div class="comment-meta"><strong>${esc(c.user_name)}</strong> &middot; ${new Date(c.created_at).toLocaleDateString()}</div>
+              <div class="comment-body">${esc(c.body)}</div>
+            </div>
+          </div>
+        `).join('') : '<p class="text-dim text-sm" style="padding:0.5rem 0">No comments yet. Start the discussion!</p>'}
+        <div class="comment-input">
+          <textarea id="commentInput-${resId}" placeholder="Add a comment..."></textarea>
+          <button class="btn btn-primary btn-sm" onclick="postComment(${resId})">Post</button>
+        </div>
+      `;
+      container.appendChild(list);
+    }
+
+    async function postComment(resId) {
+      const textarea = document.getElementById('commentInput-' + resId);
+      const body = textarea.value.trim();
+      if (!body) return;
+      try {
+        await api.addResolutionComment(resId, body);
+        textarea.value = '';
+        loadComments(resId);
+      } catch(e) { alert(e.error || 'Failed to post comment'); }
     }
 
     async function vote(id, value) {
@@ -520,8 +1580,8 @@
     }
 
     function showCreateResolution() {
-      const div = document.getElementById('createForm');
       switchTab('create');
+      const div = document.getElementById('createForm');
       div.innerHTML = `
         <div class="card create-form">
           <h4 class="mb-1">Propose Governance Resolution</h4>
@@ -570,6 +1630,11 @@
         if (!tab) return;
         switchTab(tab.dataset.panel);
       });
+      document.getElementById('pendingTabs').addEventListener('click', e => {
+        const tab = e.target.closest('.dash-tab');
+        if (!tab) return;
+        switchPendingScope(tab.dataset.scope);
+      });
     }
 
     function switchTab(panel) {
@@ -577,12 +1642,437 @@
       document.querySelectorAll('.dash-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + panel));
     }
 
-    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
-    function updateNavUser() {
-      const el = document.getElementById('navUser');
-      el.innerHTML = api._user
-        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a> <button class="btn btn-outline btn-sm" onclick="api.logout();window.location.href=ua('/')">Logout</button>`
-        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
+    function renderBudgetItems(items) {
+      const div = document.getElementById('budgetItemsList');
+      if (!items.length) { div.innerHTML = '<div class="empty-state"><h4>No budget items yet</h4><p>Add budget line items to programmes, events, or projects to track income and expenses.</p>' + (api.hasCap('finance.record') ? '<button class="btn btn-primary btn-sm" onclick="showBudgetItemForm()">Add Line Item</button>' : '') + '</div>'; return; }
+
+      // Group by parent
+      const grouped = {};
+      items.forEach(b => {
+        const parent = b.programme_name || b.event_name || b.project_name || 'Unlinked';
+        const parentType = b.programme_name ? 'programme' : (b.event_name ? 'event' : (b.project_name ? 'project' : ''));
+        if (!grouped[parent]) grouped[parent] = { type: parentType, items: [] };
+        grouped[parent].items.push(b);
+      });
+
+      div.innerHTML = Object.entries(grouped).map(([parent, data]) => {
+        const totalBudget = data.items.reduce((s, b) => s + parseFloat(b.amount), 0);
+        const totalSpent = data.items.reduce((s, b) => s + parseFloat(b.type === 'income' ? b.spent_income : b.spent_expense), 0);
+        return `
+          <div style="margin-bottom:1.5rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+              <h4 style="font-size:1rem;margin:0">${esc(parent)}</h4>
+              <span class="text-sm text-dim">Total: UGX ${totalBudget.toLocaleString()}</span>
+            </div>
+            ${data.items.map(b => {
+              const pct = b.amount > 0 ? Math.min(((b.type === 'income' ? b.spent_income : b.spent_expense) / b.amount) * 100, 100) : 0;
+              const spent = b.type === 'income' ? b.spent_income : b.spent_expense;
+              return `
+                <div class="wg-card" style="margin-left:0.5rem;cursor:pointer" onclick="showItemDetail('budget_item',${b.id})">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                    <div>
+                      <h4 style="font-size:0.9rem;margin-bottom:0.15rem">${esc(b.title)}</h4>
+                      <div class="wg-meta">
+                        <span class="wg-badge" style="${b.type === 'income' ? 'background:rgba(45,106,79,0.1);color:var(--success)' : 'background:rgba(185,28,28,0.1);color:var(--danger)'}">${esc(b.type)}</span>
+                        <span style="margin-left:0.4rem">${esc(b.category)}</span>
+                      </div>
+                    </div>
+                    <div style="text-align:right">
+                      <div style="font-weight:600;font-size:0.9rem">UGX ${Number(b.amount).toLocaleString()}</div>
+                      <div class="text-sm text-dim">spent: UGX ${Number(spent).toLocaleString()}</div>
+                    </div>
+                  </div>
+                  <div class="budget-bar"><div class="budget-bar-fill ${b.type}" style="width:${pct}%"></div></div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderWorkingGroups(groups) {
+      const div = document.getElementById('workingGroupsList');
+      if (!groups.length) { div.innerHTML = '<div class="empty-state"><h4>No working groups</h4><p>Working groups and committees will appear here once created.</p>' + (api.hasCap('roles.create') ? '<button class="btn btn-primary btn-sm" onclick="showWorkingGroupForm()">New Group</button>' : '') + '</div>'; return; }
+      div.innerHTML = groups.map(g => {
+        const typeClass = g.type === 'committee' ? 'committee' : (g.type === 'task_force' ? 'task_force' : '');
+        return `
+          <div class="wg-card" style="cursor:pointer" onclick="showItemDetail('working_group',${g.id})">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div>
+                <h4>${esc(g.name)}</h4>
+                <div class="wg-meta">
+                  <span class="wg-badge ${typeClass}">${esc(g.type.replace('_', ' '))}</span>
+                  ${g.chair_name ? `<span style="margin-left:0.5rem">Chair: ${esc(g.chair_name)}</span>` : ''}
+                  ${g.programme_name ? `<span style="margin-left:0.5rem">&middot; ${esc(g.programme_name)}</span>` : ''}
+                </div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-weight:600;font-size:1.1rem">${g.member_count}</div>
+                <div class="text-sm text-dim">members</div>
+              </div>
+            </div>
+            ${g.description ? `<p class="text-dim text-sm" style="margin-top:0.5rem">${esc(g.description).slice(0, 150)}</p>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function showBudgetItemForm() {
+      openModal('Add Budget Line Item', `
+        <div class="create-form" style="max-width:100%">
+          <p class="text-dim text-sm" style="margin-bottom:1rem">This is a budget line item within a programme, event, or project.</p>
+          <div class="form-group"><label class="form-label">Attached To *</label>
+            <select class="form-select" id="biParent">
+              <option value="">— Select parent —</option>
+              <optgroup label="Programme" id="biProgOpts"></optgroup>
+              <optgroup label="Event" id="biEvtOpts"></optgroup>
+              <optgroup label="Project" id="biProjOpts"></optgroup>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Line Item Title *</label><input class="form-input" id="biTitle" placeholder="e.g. Telescope purchase, Venue hire, Printing"></div>
+          <div class="form-group"><label class="form-label">Type *</label>
+            <select class="form-select" id="biType"><option value="expense">Expense</option><option value="income">Income</option></select>
+          </div>
+          <div class="form-group"><label class="form-label">Amount (UGX) *</label><input type="number" class="form-input" id="biAmount"></div>
+          <div class="form-group"><label class="form-label">Category</label>
+            <select class="form-select" id="biCat">
+              <option value="equipment">Equipment</option>
+              <option value="training">Training</option>
+              <option value="event">Event</option>
+              <option value="travel">Travel</option>
+              <option value="publication">Publication</option>
+              <option value="communications">Communications</option>
+              <option value="administration">Administration</option>
+              <option value="programme">Programme</option>
+              <option value="outreach">Outreach</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="biDesc"></div>
+          <div class="form-group"><label class="form-label">Fiscal Year</label><input type="number" class="form-input" id="biYear" value="${new Date().getFullYear()}"></div>
+          <button class="btn btn-primary" onclick="submitBudgetItem()">Add Line Item</button>
+        </div>
+      `);
+      loadBudgetParentOptions();
+    }
+
+    async function loadBudgetParentOptions() {
+      try {
+        const [progs, evts, projs] = await Promise.all([
+          api.getProgrammes().catch(() => []),
+          api.getEvents().catch(() => []),
+          api.getProjects().catch(() => []),
+        ]);
+        const progOpts = document.getElementById('biProgOpts');
+        const evtOpts = document.getElementById('biEvtOpts');
+        const projOpts = document.getElementById('biProjOpts');
+        if (progOpts) progOpts.innerHTML = progs.map(p => `<option value="programme:${p.id}">${esc(p.title)}</option>`).join('') || '<option disabled>No programmes</option>';
+        if (evtOpts) evtOpts.innerHTML = evts.map(e => `<option value="event:${e.id}">${esc(e.title)}</option>`).join('') || '<option disabled>No events</option>';
+        if (projOpts) projOpts.innerHTML = projs.map(p => `<option value="project:${p.id}">${esc(p.title)}</option>`).join('') || '<option disabled>No projects</option>';
+      } catch(e) {}
+    }
+
+    async function submitBudgetItem() {
+      const parentVal = document.getElementById('biParent').value;
+      if (!parentVal) return alert('Please select a programme, event, or project');
+      const [parentType, parentId] = parentVal.split(':');
+      try {
+        await api.createBudgetItem({
+          title: document.getElementById('biTitle').value,
+          type: document.getElementById('biType').value,
+          amount: parseFloat(document.getElementById('biAmount').value),
+          category: document.getElementById('biCat').value,
+          description: document.getElementById('biDesc').value,
+          fiscal_year: document.getElementById('biYear').value,
+          programme_id: parentType === 'programme' ? parseInt(parentId) : null,
+          event_id: parentType === 'event' ? parseInt(parentId) : null,
+          project_id: parentType === 'project' ? parseInt(parentId) : null,
+        });
+        closeModal();
+        load();
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    function showWorkingGroupForm() {
+      const userOpts = '';
+      openModal('Create Working Group / Committee', `
+        <div class="create-form" style="max-width:100%">
+          <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="wgName"></div>
+          <div class="form-group"><label class="form-label">Type</label>
+            <select class="form-select" id="wgType">
+              <option value="working_group">Working Group</option>
+              <option value="committee">Committee</option>
+              <option value="task_force">Task Force</option>
+              <option value="sub_committee">Sub-Committee</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="wgDesc" rows="3"></textarea></div>
+          <div class="form-group"><label class="form-label">Term Start</label><input type="date" class="form-input" id="wgStart"></div>
+          <div class="form-group"><label class="form-label">Term End</label><input type="date" class="form-input" id="wgEnd"></div>
+          <button class="btn btn-primary" onclick="submitWorkingGroup()">Create</button>
+        </div>
+      `);
+    }
+
+    async function submitWorkingGroup() {
+      try {
+        await api.createWorkingGroup({
+          name: document.getElementById('wgName').value,
+          type: document.getElementById('wgType').value,
+          description: document.getElementById('wgDesc').value,
+          term_start: document.getElementById('wgStart').value || null,
+          term_end: document.getElementById('wgEnd').value || null,
+        });
+        closeModal();
+        load();
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    // Modal functions
+    function openModal(title, html) {
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalBody').innerHTML = html;
+      document.getElementById('detailModal').classList.add('open');
+    }
+    function closeModal() {
+      document.getElementById('detailModal').classList.remove('open');
+    }
+    document.getElementById('detailModal').addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeModal();
+    });
+
+    async function showItemDetail(type, id) {
+      try {
+        let data, html = '';
+        if (type === 'article') {
+          data = await api.request('/articles/' + id);
+          const actions = [];
+          if (data.status === 'submitted' || data.status === 'under_review') {
+            if (api.hasCap('articles.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('article','approve',${id})">Approve</button>`);
+            if (api.hasCap('articles.approve')) actions.push(`<button class="btn btn-danger btn-sm" onclick="modalRejectArticle(${id})">Reject</button>`);
+          }
+          if (data.status === 'approved' && api.hasCap('articles.publish')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('article','publish',${id})">Publish</button>`);
+          if (data.status === 'rejected' && api.hasCap('articles.edit') && data.author_name === api._user?.name) actions.push(`<button class="btn btn-outline btn-sm" onclick="modalAction('article','resubmit',${id})">Resubmit</button>`);
+
+          html = `
+            <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
+            <div class="field"><div class="field-label">Category</div>${esc(data.category)}</div>
+            <div class="field"><div class="field-label">Author</div>${esc(data.author_name || 'Unknown')}</div>
+            <div class="field"><div class="field-label">Created</div>${new Date(data.created_at).toLocaleDateString('en', {year:'numeric',month:'long',day:'numeric'})}</div>
+            ${data.published_at ? `<div class="field"><div class="field-label">Published</div>${new Date(data.published_at).toLocaleDateString('en', {year:'numeric',month:'long',day:'numeric'})}</div>` : ''}
+            ${data.tags ? `<div class="field"><div class="field-label">Tags</div>${JSON.parse(data.tags).map(t => `<span class="cap-tag">${esc(t)}</span>`).join(' ')}</div>` : ''}
+            ${data.body ? `<div class="field"><div class="field-label">Body</div><div style="max-height:300px;overflow-y:auto;padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border);line-height:1.6">${data.body}</div></div>` : ''}
+            ${data.rejection_reason ? `<div class="field"><div class="field-label">Rejection Reason</div><div style="color:var(--danger);padding:0.5rem;background:rgba(185,28,28,0.05);border-radius:var(--radius)">${esc(data.rejection_reason)}</div></div>` : ''}
+            ${actions.length ? `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);display:flex;gap:0.5rem">${actions.join('')}</div>` : ''}
+          `;
+
+        } else if (type === 'event') {
+          data = await api.request('/events/' + id);
+          const rsvps = await api.getEventRsvps(id).catch(() => []);
+          const actions = [];
+          if (data.status === 'submitted') {
+            if (api.hasCap('events.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('event','approve',${id})">Approve</button>`);
+            if (api.hasCap('events.publish')) actions.push(`<button class="btn btn-outline btn-sm" onclick="modalAction('event','publish',${id})">Publish</button>`);
+          }
+          if (data.status === 'published' && api.hasCap('events.rsvp')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('event','rsvp',${id})">RSVP</button>`);
+
+          html = `
+            <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
+            <div class="field"><div class="field-label">Date</div>${new Date(data.date).toLocaleDateString('en', {weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
+            ${data.end_date ? `<div class="field"><div class="field-label">End</div>${new Date(data.end_date).toLocaleDateString('en', {hour:'2-digit',minute:'2-digit'})}</div>` : ''}
+            <div class="field"><div class="field-label">Location</div>${esc(data.location || 'TBA')}</div>
+            <div class="field"><div class="field-label">Organizer</div>${esc(data.organizer_name || 'Unknown')}</div>
+            <div class="field"><div class="field-label">Capacity</div>${data.capacity ? data.capacity + ' attendees' : 'Unlimited'}</div>
+            ${data.description ? `<div class="field"><div class="field-label">Description</div><div style="max-height:200px;overflow-y:auto;padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${data.description}</div></div>` : ''}
+            ${rsvps.length ? `<div class="field"><div class="field-label">RSVPs (${rsvps.length})</div><div style="max-height:120px;overflow-y:auto">${rsvps.map(r => `<div style="padding:0.25rem 0;font-size:0.85rem">• ${esc(r.user_name)} <span class="text-dim">${esc(r.status)}</span></div>`).join('')}</div></div>` : ''}
+            ${actions.length ? `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);display:flex;gap:0.5rem">${actions.join('')}</div>` : ''}
+          `;
+
+        } else if (type === 'document') {
+          data = await api.request('/documents/' + id);
+          const actions = [];
+          if (data.status === 'submitted' || data.status === 'draft') {
+            if (api.hasCap('documents.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('document','approve',${id})">Approve</button>`);
+            if (api.hasCap('documents.publish')) actions.push(`<button class="btn btn-outline btn-sm" onclick="modalAction('document','publish',${id})">Publish</button>`);
+          }
+
+          html = `
+            <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
+            <div class="field"><div class="field-label">Category</div>${esc(data.category)}</div>
+            <div class="field"><div class="field-label">Owner</div>${esc(data.owner_name || 'Unknown')}</div>
+            <div class="field"><div class="field-label">Visibility</div><span class="cap-tag">${esc(data.visibility)}</span></div>
+            <div class="field"><div class="field-label">Version</div>${data.version || 1}</div>
+            <div class="field"><div class="field-label">File</div><a href="${esc(data.file_path)}" target="_blank" style="color:var(--accent)">${esc(data.file_path)}</a></div>
+            ${actions.length ? `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);display:flex;gap:0.5rem">${actions.join('')}</div>` : ''}
+          `;
+
+        } else if (type === 'resolution') {
+          data = await api.request('/resolutions/' + id);
+          const comments = await api.getResolutionComments(id).catch(() => []);
+          const total = data.votes_for + data.votes_against + data.votes_abstain;
+          const pct = total > 0 ? (data.votes_for / total * 100) : 0;
+          const actions = [];
+          if (data.status === 'draft' && api.hasCap('resolutions.manage')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('resolution','submit',${id})">Submit for Voting</button>`);
+          if (data.status === 'submitted' && api.hasCap('resolutions.manage')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('resolution','begin_voting',${id})">Begin Voting</button>`);
+          if (data.status === 'voting' && api.hasCap('resolutions.vote')) {
+            actions.push(`<button class="btn btn-success btn-sm" onclick="modalVote(${id},'for')">Vote For</button>`);
+            actions.push(`<button class="btn btn-danger btn-sm" onclick="modalVote(${id},'against')">Vote Against</button>`);
+            actions.push(`<button class="btn btn-outline btn-sm" onclick="modalVote(${id},'abstain')">Abstain</button>`);
+          }
+
+          html = `
+            <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
+            <div class="field"><div class="field-label">Code</div><span class="cap-tag">${esc(data.code)}</span></div>
+            <div class="field"><div class="field-label">Type</div>${esc(data.type)}</div>
+            <div class="field"><div class="field-label">Proposed by</div>${esc(data.proposer_name || 'Unknown')}</div>
+            <div class="field"><div class="field-label">Majority</div>${esc(data.majority)}</div>
+            ${data.quorum ? `<div class="field"><div class="field-label">Quorum</div>${data.quorum} votes</div>` : ''}
+            ${data.voting_deadline ? `<div class="field"><div class="field-label">Voting Deadline</div>${new Date(data.voting_deadline).toLocaleDateString('en', {year:'numeric',month:'long',day:'numeric'})}</div>` : ''}
+            <div class="field"><div class="field-label">Votes</div>
+              <div style="display:flex;gap:1rem;margin-top:0.25rem">
+                <span style="color:var(--success);font-weight:600">&#10003; ${data.votes_for} For</span>
+                <span style="color:var(--danger);font-weight:600">&#10007; ${data.votes_against} Against</span>
+                <span style="color:var(--text-dim)">— ${data.votes_abstain} Abstain</span>
+              </div>
+              ${total > 0 ? `<div class="budget-bar" style="margin-top:0.35rem"><div class="budget-bar-fill income" style="width:${pct}%"></div></div>` : ''}
+            </div>
+            ${data.description ? `<div class="field"><div class="field-label">Description</div><div style="max-height:200px;overflow-y:auto;padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${data.description}</div></div>` : ''}
+            ${actions.length ? `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);display:flex;gap:0.5rem">${actions.join('')}</div>` : ''}
+            <div class="comment-thread" style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border)">
+              <div style="font-weight:600;font-size:0.9rem;margin-bottom:0.5rem">Discussion (${comments.length})</div>
+              ${comments.length ? comments.map(c => `
+                <div class="comment-item">
+                  <div class="comment-avatar">${(c.user_name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase()}</div>
+                  <div class="comment-content">
+                    <div class="comment-meta"><strong>${esc(c.user_name)}</strong> &middot; ${new Date(c.created_at).toLocaleDateString()}</div>
+                    <div class="comment-body">${esc(c.body)}</div>
+                  </div>
+                </div>
+              `).join('') : '<p class="text-dim text-sm">No comments yet.</p>'}
+              <div class="comment-input">
+                <textarea id="modalCommentInput" placeholder="Add a comment..."></textarea>
+                <button class="btn btn-primary btn-sm" onclick="modalPostComment(${id})">Post</button>
+              </div>
+            </div>
+          `;
+
+        } else if (type === 'assignment') {
+          data = await api.request('/assignments/' + id);
+          const actions = [];
+          if (data.status === 'not_started' && api.hasCap('assignments.manage')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('assignment','start',${id})">Start</button>`);
+          if (data.status === 'in_progress' && api.hasCap('assignments.manage')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAssignmentSubmit(${id})">Submit Evidence</button>`);
+          if (data.status === 'submitted' && api.hasCap('assignments.manage')) actions.push(`<button class="btn btn-success btn-sm" onclick="modalAction('assignment','complete',${id})">Mark Complete</button>`);
+
+          html = `
+            <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
+            <div class="field"><div class="field-label">Assigned to</div>${esc(data.assignee_name || 'Unassigned')}</div>
+            <div class="field"><div class="field-label">Assigned by</div>${esc(data.assigner_name || 'Unknown')}</div>
+            ${data.role_title ? `<div class="field"><div class="field-label">Role</div><span class="cap-tag">${esc(data.role_title)}</span></div>` : ''}
+            ${data.due_date ? `<div class="field"><div class="field-label">Due Date</div>${new Date(data.due_date).toLocaleDateString('en', {year:'numeric',month:'long',day:'numeric'})}</div>` : ''}
+            <div class="field"><div class="field-label">Priority</div><span class="cap-tag" style="${data.priority === 'urgent' ? 'background:rgba(185,28,28,0.1);color:var(--danger)' : data.priority === 'high' ? 'background:rgba(184,134,11,0.1);color:var(--gold)' : ''}">${esc(data.priority)}</span></div>
+            ${data.description ? `<div class="field"><div class="field-label">Description</div><div style="padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${esc(data.description)}</div></div>` : ''}
+            ${data.completion_evidence ? `<div class="field"><div class="field-label">Completion Evidence</div><div style="padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${esc(data.completion_evidence)}</div></div>` : ''}
+            ${actions.length ? `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);display:flex;gap:0.5rem">${actions.join('')}</div>` : ''}
+          `;
+
+        } else if (type === 'budget_item') {
+          data = await api.getBudgetItem(id);
+          const linked = data.programme_name || data.event_name || data.project_name || 'Unlinked';
+          html = `
+            <div class="field"><div class="field-label">Parent</div>${esc(linked)}</div>
+            <div class="field"><div class="field-label">Type</div><span class="cap-tag" style="${data.type === 'income' ? 'background:rgba(45,106,79,0.1);color:var(--success)' : 'background:rgba(185,28,28,0.1);color:var(--danger)'}">${esc(data.type)}</span></div>
+            <div class="field"><div class="field-label">Amount</div><span style="font-weight:600;font-size:1.1rem">UGX ${Number(data.amount).toLocaleString()}</span></div>
+            <div class="field"><div class="field-label">Category</div>${esc(data.category)}</div>
+            <div class="field"><div class="field-label">Fiscal Year</div>${data.fiscal_year}</div>
+            <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
+            ${data.description ? `<div class="field"><div class="field-label">Description</div><div style="padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${esc(data.description)}</div></div>` : ''}
+          `;
+
+        } else if (type === 'working_group') {
+          const members = await api.getWorkingGroupMembers(id).catch(() => []);
+          html = `
+            <div class="field"><div class="field-label">Type</div><span class="wg-badge ${data.type === 'committee' ? 'committee' : (data.type === 'task_force' ? 'task_force' : '')}">${esc(data.type?.replace('_', ' '))}</span></div>
+            <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
+            ${data.chair_name ? `<div class="field"><div class="field-label">Chair</div>${esc(data.chair_name)}</div>` : ''}
+            ${data.programme_name ? `<div class="field"><div class="field-label">Programme</div>${esc(data.programme_name)}</div>` : ''}
+            ${data.term_start ? `<div class="field"><div class="field-label">Term</div>${data.term_start} — ${data.term_end || 'Ongoing'}</div>` : ''}
+            ${data.description ? `<div class="field"><div class="field-label">Description</div><div style="padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${esc(data.description)}</div></div>` : ''}
+            <div class="field"><div class="field-label">Members (${members.length})</div>
+              ${members.length ? `<div style="max-height:150px;overflow-y:auto">${members.map(m => `<div style="padding:0.35rem 0;font-size:0.88rem;display:flex;justify-content:space-between;border-bottom:1px solid var(--border)"><span>${esc(m.user_name)}</span><span class="cap-tag">${esc(m.role)}</span></div>`).join('')}</div>` : '<p class="text-dim text-sm">No members yet</p>'}
+            </div>
+          `;
+        }
+
+        openModal(data.title || data.name || type.charAt(0).toUpperCase() + type.slice(1), html);
+      } catch(e) { alert('Could not load details'); }
+    }
+
+    async function modalAction(type, action, id) {
+      try {
+        if (type === 'article') {
+          if (action === 'approve') await api.approveArticle(id);
+          if (action === 'publish') await api.publishArticle(id);
+        } else if (type === 'event') {
+          if (action === 'approve') await api.approveEvent(id);
+          if (action === 'publish') await api.publishEvent(id);
+          if (action === 'rsvp') await api.rsvpEvent(id);
+        } else if (type === 'document') {
+          if (action === 'approve') await api.request('/documents/' + id + '/approve', { method: 'POST' });
+          if (action === 'publish') await api.request('/documents/' + id + '/publish', { method: 'POST' });
+        } else if (type === 'resolution') {
+          if (action === 'submit') await api.submitResolution(id);
+          if (action === 'begin_voting') await api.beginVoting(id);
+        } else if (type === 'assignment') {
+          if (action === 'start') await api.startAssignment(id);
+          if (action === 'complete') await api.completeAssignment(id);
+        }
+        closeModal();
+        load();
+      } catch(e) { alert(e.error || 'Action failed'); }
+    }
+
+    async function modalVote(id, value) {
+      try {
+        await api.castVote(id, value);
+        closeModal();
+        load();
+      } catch(e) { alert(e.error || 'Vote failed'); }
+    }
+
+    async function modalRejectArticle(id) {
+      const reason = prompt('Rejection reason (shown to the author):');
+      if (reason === null || !reason.trim()) return;
+      try {
+        await api.request('/articles/' + id + '/reject', { method: 'POST', body: { reason: reason.trim() } });
+        closeModal();
+        load();
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function modalAssignmentSubmit(id) {
+      const evidence = prompt('Describe what was done / link evidence:');
+      if (evidence === null) return;
+      try {
+        await api.submitAssignment(id, evidence);
+        closeModal();
+        load();
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function modalPostComment(resId) {
+      const textarea = document.getElementById('modalCommentInput');
+      const body = textarea.value.trim();
+      if (!body) return;
+      try {
+        await api.addResolutionComment(resId, body);
+        // Refresh modal with updated comments
+        showItemDetail('resolution', resId);
+      } catch(e) { alert(e.error || 'Failed to post comment'); }
+    }
+
+    async function showResolutionDetail(id) {
+      showItemDetail('resolution', id);
     }
 
     load();

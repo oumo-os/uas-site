@@ -3,79 +3,185 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="img/uas-emblem.png">
+  <link rel="icon" type="image/png" href="/img/uas-emblem.png">
   <title>Members — Uganda Astronomical Society</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/base.css">
+  <meta name="description" content="Meet the astronomers, educators, and space enthusiasts behind UAS.">
+  <meta property="og:title" content="Members — Uganda Astronomical Society">
+  <meta property="og:description" content="Meet the astronomers, educators, and space enthusiasts behind UAS.">
+  <meta property="og:image" content="/img/uas-emblem.png">
+  <meta property="og:type" content="website">
+  <link rel="stylesheet" href="/css/base.css">
   <style>
-    .page-header { padding: 3rem 0 2rem; text-align: center; }
-    .page-header h1 { font-size: 2.2rem; font-weight: 800; }
-    .page-header p { color: var(--text-dim); max-width: 600px; margin: 0.5rem auto 0; }
-    .member-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+    .page-hero {
+      position:relative; min-height:45vh; display:flex; flex-direction:column;
+      justify-content:center; align-items:flex-start; padding:6rem 1.5rem 4rem; background:url('/img/header-members.jpg') center/cover no-repeat; color:#fff;
+    }
+    .page-hero::before { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(15,23,42,0.6) 0%,rgba(15,23,42,0.85) 100%); }
+    .page-hero > * { position:relative; z-index:1; }
+    .page-hero h1 { font-size:2.8rem; font-weight:700; color:#fff; margin-bottom:0.75rem; }
+    .page-hero p { font-size:1.1rem; color:rgba(255,255,255,0.85); max-width:600px; }
+
+    .section { padding:4rem 0; }
+    .section-alt { background:var(--bg-card); border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+
+    .stat-row { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; max-width:800px; margin:0 auto 2.5rem; }
+    .stat-item { text-align:center; padding:1.25rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); }
+    .stat-item .stat-val { font-size:1.8rem; font-weight:700; color:var(--accent); }
+    .stat-item .stat-lbl { font-size:0.8rem; color:var(--text-dim); margin-top:0.25rem; }
+
+    .filter-bar { display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1.5rem; justify-content:center; }
+    .filter-chip {
+      padding:0.45rem 1rem; border-radius:999px; border:1px solid var(--border);
+      background:transparent; color:var(--text-dim); font-size:0.85rem; cursor:pointer;
+      font-family:inherit; transition:all 0.2s;
+    }
+    .filter-chip:hover, .filter-chip.active { border-color:var(--accent); color:var(--accent); background:var(--accent-glow); }
+
+    .search-box { max-width:500px; margin:0 auto 2rem; position:relative; }
+    .search-box input {
+      width:100%; padding:0.75rem 1rem 0.75rem 2.75rem; border:1px solid var(--border); border-radius:var(--radius);
+      background:var(--bg-card); color:var(--text); font-size:0.95rem; font-family:inherit; transition:border-color 0.2s;
+    }
+    .search-box input:focus { outline:none; border-color:var(--accent); }
+    .search-box .search-icon { position:absolute; left:0.85rem; top:50%; transform:translateY(-50%); color:var(--text-dim); }
+
+    .member-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1.25rem; }
     .member-card {
-      padding: 1.25rem;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      background: var(--bg-card);
-      text-align: center;
+      padding:1.5rem; background:var(--bg-card); border:1px solid var(--border);
+      border-radius:var(--radius-lg); transition:all 0.3s; cursor:pointer;
     }
+    .member-card:hover { border-color:var(--border-focus); box-shadow:var(--shadow-md); transform:translateY(-2px); }
+    .member-header { display:flex; align-items:center; gap:0.85rem; margin-bottom:0.75rem; }
     .member-avatar {
-      width: 56px; height: 56px; border-radius: 50%;
-      background: var(--accent-glow); color: var(--accent);
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: 1.1rem; margin: 0 auto 0.75rem;
+      width:52px; height:52px; border-radius:50%; background:var(--accent-glow);
+      color:var(--accent); display:flex; align-items:center; justify-content:center;
+      font-weight:700; font-size:1rem; flex-shrink:0;
     }
-    .member-card h3 { font-size: 0.95rem; margin-bottom: 0.25rem; }
-    .member-card .institution { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.5rem; }
-    .member-card .meta { font-size: 0.72rem; color: var(--text-faint); }
-    .search-row { max-width: 420px; margin: 0 auto 2rem; }
+    .member-name { font-size:1rem; font-weight:600; margin-bottom:0.15rem; }
+    .member-inst { font-size:0.82rem; color:var(--text-dim); }
+    .member-bio { font-size:0.85rem; color:var(--text-dim); margin-bottom:0.75rem; line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .member-tags { display:flex; flex-wrap:wrap; gap:0.3rem; }
+    .member-tag { font-size:0.7rem; padding:0.15rem 0.5rem; border-radius:999px; background:var(--accent-glow); color:var(--accent); }
+    .member-meta { display:flex; justify-content:space-between; align-items:center; margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--border); font-size:0.75rem; color:var(--text-dim); }
+
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; padding:1rem; }
+    .modal-overlay.open { display:flex; }
+    .modal { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); max-width:560px; width:100%; max-height:80vh; overflow-y:auto; padding:1.5rem; box-shadow:0 20px 60px rgba(0,0,0,0.3); }
+    .modal-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1rem; padding-bottom:0.75rem; border-bottom:1px solid var(--border); }
+    .modal-header h3 { font-size:1.15rem; font-weight:700; margin:0; }
+    .modal-close { background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-dim); padding:0; line-height:1; }
+    .modal-close:hover { color:var(--text); }
+    .modal-body { font-size:0.9rem; line-height:1.6; }
+    .modal-body .field { margin-bottom:0.75rem; }
+    .modal-body .field-label { font-size:0.75rem; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.03em; margin-bottom:0.25rem; }
+
+    .empty-state { text-align:center; padding:3rem 0; }
+    .empty-state p { color:var(--text-dim); font-size:0.95rem; }
+
+    @media (max-width:768px) {
+      .page-hero { min-height:35vh; padding:4rem 1rem 3rem; }
+      .page-hero h1 { font-size:1.8rem; }
+      .member-grid { grid-template-columns:1fr; }
+      .stat-row { grid-template-columns:repeat(2,1fr); }
+    }
   </style>
 </head>
 <body>
-  <nav class="nav">
-    <div class="container" style="display:flex;align-items:center;width:100%">
-      <a href="/" class="nav-brand">UAS</a>
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="container">
+      <a href="/" class="nav-brand"><img src="/img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
+      <button class="nav-burger" aria-label="Toggle navigation menu" onclick="this.closest('.nav').classList.toggle('open')" aria-label="Menu">&#9776;</button>
       <div class="nav-links">
         <a href="/" class="nav-link">Home</a>
         <a href="/about" class="nav-link">About</a>
         <a href="/programmes" class="nav-link">Programmes</a>
         <a href="/events" class="nav-link">Events</a>
         <a href="/knowledge" class="nav-link">Knowledge</a>
-        <a href="/library" class="nav-link">Library</a>
-        <a href="/ecosystem" class="nav-link">Ecosystem</a>
         <a href="/members" class="nav-link active">Members</a>
         <a href="/contact" class="nav-link">Contact</a>
-        <a href="/search" class="nav-link">Search</a>
-        <a href="/dashboard" class="nav-link">Dashboard</a>
-        <a href="/profile" class="nav-link">Profile</a>
-        </div>
-      <div class="nav-user" id="navUser"></div>
+      </div>
+      <div class="nav-right"><div class="nav-user" id="navUser"></div></div>
     </div>
   </nav>
 
-  <div class="container">
-    <div class="page-header">
-      <h1>Member Directory</h1>
+  <section class="page-hero">
+    <div class="container">
+      <h1>Members</h1>
       <p>The community behind Uganda's astronomy movement</p>
     </div>
+  </section>
 
-    <div class="search-row">
-      <input class="form-input" id="memberSearch" placeholder="Search by name, institution, or category..." oninput="filterMembers()">
-    </div>
-
-    <div class="member-grid" id="membersGrid"></div>
-    <p class="text-center text-dim" id="emptyMsg" style="display:none;padding:2rem 0">No members found.</p>
-  </div>
-
-  <footer>
+  <section class="section">
     <div class="container">
-      <p>&copy; 2026 Uganda Astronomical Society. All rights reserved.</p>
+      <div class="stat-row" id="memberStats"></div>
+
+      <div class="search-box">
+        <span class="search-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span></span>
+        <input type="text" id="memberSearch" placeholder="Search by name, institution, interests, location...">
+      </div>
+
+      <div class="filter-bar" id="catFilter"></div>
+
+      <div class="member-grid" id="membersGrid"></div>
+      <div class="empty-state" id="emptyMsg" style="display:none"><p>No members found.</p></div>
+      <div class="pagination" id="membersPagination"></div>
+    </div>
+  </section>
+
+  <section class="section section-alt">
+    <div class="container" style="text-align:center">
+      <h2 class="section-title">Join Our Community</h2>
+      <p class="section-subtitle">Become part of Uganda's growing astronomy network.</p>
+      <a href="/login" class="btn btn-primary btn-lg">Become a Member</a>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">Uganda Astronomical Society</div>
+          <p class="footer-desc">A public scientific society advancing astronomy, space science and scientific discovery in Uganda since 2024.</p>
+        </div>
+        <div>
+          <div class="footer-heading">Explore</div>
+          <ul class="footer-links">
+            <li><a href="/about">About UAS</a></li>
+            <li><a href="/programmes">Programmes</a></li>
+            <li><a href="/events">Events</a></li>
+            <li><a href="/knowledge">Knowledge Base</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Community</div>
+          <ul class="footer-links">
+            <li><a href="/members">Members</a></li>
+            <li><a href="/ecosystem">Ecosystem</a></li>
+            <li><a href="/library">Library</a></li>
+            <li><a href="/contact">Contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Connect</div>
+          <ul class="footer-links">
+            <li><a href="mailto:contact@astronomy.ug">contact@astronomy.ug</a></li>
+            <li><a href="/login">Member Login</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2026 Uganda Astronomical Society. All rights reserved.</span>
+        <span>Kampala, Uganda</span>
+      </div>
     </div>
   </footer>
 
-  <script src="js/api.js"></script>
+  <script src="/js/api.js"></script>
   <script>
     let allMembers = [];
+    let activeCat = '';
+    let memPage = 1;
+    const MEM_PER = 8;
 
     async function load() {
       try { await api.me(); } catch(e) {}
@@ -84,51 +190,156 @@
       if (api._user) {
         allMembers = await api.getMembers().catch(() => []);
       } else {
-        const pub = await api.request('/members?public=1').catch(() => []);
-        if (!pub.length) {
-          document.getElementById('emptyMsg').innerHTML = 'No public member profiles yet. Sign in as a member to see the full directory.';
-          document.getElementById('emptyMsg').style.display = 'block';
-          return;
-        }
-        allMembers = pub;
+        allMembers = await api.request('/members?public=1').catch(() => []);
       }
+
+      renderStats();
+      renderCatFilter();
       renderMembers(allMembers);
+
+      document.getElementById('memberSearch').addEventListener('input', filterMembers);
+    }
+
+    function renderStats() {
+      const total = allMembers.length;
+      const institutions = [...new Set(allMembers.map(m => m.institution).filter(Boolean))].length;
+      const locations = [...new Set(allMembers.map(m => m.location).filter(Boolean))].length;
+      const recent = allMembers.filter(m => {
+        if (!m.joined_date) return false;
+        const d = new Date(m.joined_date);
+        const now = new Date();
+        return (now - d) < 90 * 24 * 60 * 60 * 1000;
+      }).length;
+
+      document.getElementById('memberStats').innerHTML = `
+        <div class="stat-item"><div class="stat-val">${total}</div><div class="stat-lbl">Members</div></div>
+        <div class="stat-item"><div class="stat-val">${institutions}</div><div class="stat-lbl">Institutions</div></div>
+        <div class="stat-item"><div class="stat-val">${locations}</div><div class="stat-lbl">Locations</div></div>
+        <div class="stat-item"><div class="stat-val">${recent}</div><div class="stat-lbl">Recent (90d)</div></div>
+      `;
+    }
+
+    function renderCatFilter() {
+      const cats = [...new Set(allMembers.map(m => m.category).filter(Boolean))];
+      document.getElementById('catFilter').innerHTML = `
+        <button class="filter-chip ${!activeCat ? 'active' : ''}" onclick="filterCat('')">All</button>
+        ${cats.map(c => `<button class="filter-chip ${activeCat === c ? 'active' : ''}" onclick="filterCat('${esc(c)}')">${esc(c)}</button>`).join('')}
+      `;
+    }
+
+    function filterCat(cat) {
+      activeCat = cat;
+      renderCatFilter();
+      filterMembers();
     }
 
     function renderMembers(list) {
       const grid = document.getElementById('membersGrid');
+      const pag = document.getElementById('membersPagination');
       document.getElementById('emptyMsg').style.display = list.length ? 'none' : 'block';
-      grid.innerHTML = list.map(m => {
+
+      if (!list.length) { grid.innerHTML = ''; pag.innerHTML = ''; return; }
+
+      const totalPages = Math.ceil(list.length / MEM_PER);
+      if (memPage > totalPages) memPage = totalPages;
+      const start = (memPage - 1) * MEM_PER;
+      const page = list.slice(start, start + MEM_PER);
+
+      grid.innerHTML = page.map(m => {
         const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        const interests = m.interests ? m.interests.split(',').slice(0, 3) : [];
+        const joined = m.joined_date ? new Date(m.joined_date).toLocaleDateString('en', { month: 'short', year: 'numeric' }) : '';
         return `
-          <div class="member-card">
-            <div class="member-avatar">${initials}</div>
-            <h3>${esc(m.name)}</h3>
-            <div class="institution">${esc(m.institution || 'Independent')}</div>
-            <div class="meta">${esc(m.category || 'member')} · ${esc(m.membership_number || '')}</div>
+          <div class="member-card" onclick="showMemberDetail(${m.user_id || m.id})">
+            <div class="member-header">
+              <div class="member-avatar">${initials}</div>
+              <div>
+                <div class="member-name">${esc(m.name)}</div>
+                <div class="member-inst">${esc(m.institution || 'Independent')}${m.location ? ' &middot; ' + esc(m.location) : ''}</div>
+              </div>
+            </div>
+            ${m.bio ? `<div class="member-bio">${esc(m.bio)}</div>` : ''}
+            ${interests.length ? `<div class="member-tags">${interests.map(i => `<span class="member-tag">${esc(i.trim())}</span>`).join('')}</div>` : ''}
+            <div class="member-meta">
+              <span>${esc(m.category || 'member')}${m.membership_number ? ' &middot; #' + esc(m.membership_number) : ''}</span>
+              <span>${joined}</span>
+            </div>
           </div>
         `;
       }).join('');
+
+      // Pagination
+      if (totalPages <= 1) { pag.innerHTML = ''; return; }
+      let btns = '<button ' + (memPage<=1?'disabled':'') + ' onclick="memPage--;renderMembers(getFilteredList())">&#8249; Prev</button>';
+      for (let p=1; p<=totalPages; p++) {
+        btns += '<button class="' + (p===memPage?'active':'') + '" onclick="memPage=' + p + ';renderMembers(getFilteredList())">' + p + '</button>';
+      }
+      btns += '<button ' + (memPage>=totalPages?'disabled':'') + ' onclick="memPage++;renderMembers(getFilteredList())">Next &#8250;</button>';
+      pag.innerHTML = btns;
+    }
+
+    function getFilteredList() {
+      const q = document.getElementById('memberSearch').value.toLowerCase();
+      let filtered = allMembers;
+      if (activeCat) filtered = filtered.filter(m => m.category === activeCat);
+      if (q) filtered = filtered.filter(m =>
+        (m.name || '').toLowerCase().includes(q) ||
+        (m.institution || '').toLowerCase().includes(q) ||
+        (m.bio || '').toLowerCase().includes(q) ||
+        (m.interests || '').toLowerCase().includes(q) ||
+        (m.location || '').toLowerCase().includes(q)
+      );
+      return filtered;
     }
 
     function filterMembers() {
-      const q = document.getElementById('memberSearch').value.toLowerCase();
-      if (!q) { renderMembers(allMembers); return; }
-      const filtered = allMembers.filter(m =>
-        (m.name || '').toLowerCase().includes(q) ||
-        (m.institution || '').toLowerCase().includes(q) ||
-        (m.category || '').toLowerCase().includes(q)
-      );
-      renderMembers(filtered);
+      memPage = 1;
+      renderMembers(getFilteredList());
     }
 
-    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
-    function updateNavUser() {
-      const el = document.getElementById('navUser');
-      el.innerHTML = api._user
-        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
-        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
+    async function showMemberDetail(userId) {
+      try {
+        const m = await api.getMember(userId);
+        const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        const interests = m.interests ? m.interests.split(',') : [];
+        const html = `
+          <div style="display:flex;gap:1rem;align-items:center;margin-bottom:1rem">
+            <div class="member-avatar" style="width:60px;height:60px;font-size:1.3rem">${initials}</div>
+            <div>
+              <h3 style="margin:0">${esc(m.name)}</h3>
+              <div class="text-dim">${esc(m.institution || 'Independent')}${m.location ? ' &middot; ' + esc(m.location) : ''}</div>
+            </div>
+          </div>
+          ${m.bio ? `<div class="field"><div class="field-label">Bio</div><div style="line-height:1.7">${esc(m.bio)}</div></div>` : ''}
+          ${interests.length ? `<div class="field"><div class="field-label">Interests</div><div class="member-tags">${interests.map(i => `<span class="member-tag">${esc(i.trim())}</span>`).join('')}</div></div>` : ''}
+          ${m.contributions ? `<div class="field"><div class="field-label">Contributions</div><div style="line-height:1.6">${esc(m.contributions)}</div></div>` : ''}
+          <div style="display:flex;gap:1.5rem;margin-top:0.75rem;font-size:0.82rem;color:var(--text-dim);flex-wrap:wrap">
+            <span>Member since ${m.joined_date ? new Date(m.joined_date).toLocaleDateString('en', { month: 'long', year: 'numeric' }) : 'N/A'}</span>
+            <span>${esc(m.category || 'regular')}</span>
+            ${m.membership_number ? `<span>#${esc(m.membership_number)}</span>` : ''}
+          </div>
+        `;
+        openModal(m.name, html);
+      } catch(e) { alert('Could not load profile'); }
     }
+
+    function openModal(title, html) {
+      let overlay = document.getElementById('detailModal');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'detailModal';
+        overlay.className = 'modal-overlay';
+        overlay.innerHTML = '<div class="modal"><div class="modal-header"><h3 id="modalTitle"></h3><button class="modal-close" onclick="closeModal()">&times;</button></div><div class="modal-body" id="modalBody"></div></div>';
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+      }
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalBody').innerHTML = html;
+      overlay.classList.add('open');
+    }
+    function closeModal() { const m = document.getElementById('detailModal'); if (m) m.classList.remove('open'); }
+
+
     load();
   </script>
 </body>

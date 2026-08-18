@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/img/uas-emblem.png">
+  <title>Page Not Found — Uganda Astronomical Society</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="/css/base.css">
+  <style>
+    .error-page {
+      min-height: 80vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; text-align: center;
+      padding: 2rem 1.5rem;
+    }
+    .error-code {
+      font-size: 8rem; font-weight: 900; color: var(--accent);
+      line-height: 1; margin-bottom: 0.5rem; opacity: 0.15;
+    }
+    .error-title {
+      font-size: 1.8rem; font-weight: 700; margin-bottom: 0.75rem;
+    }
+    .error-desc {
+      color: var(--text-dim); max-width: 420px; margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+    .error-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center; }
+  </style>
+</head>
+<body>
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="container">
+      <a href="/" class="nav-brand"><img src="/img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
+      <button class="nav-burger" onclick="this.closest('.nav').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+      <div class="nav-links">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/about" class="nav-link">About</a>
+        <a href="/programmes" class="nav-link">Programmes</a>
+        <a href="/events" class="nav-link">Events</a>
+        <a href="/knowledge" class="nav-link">Knowledge</a>
+        <a href="/contact" class="nav-link">Contact</a>
+      </div>
+      <div class="nav-right"><div class="nav-user" id="navUser"></div></div>
+    </div>
+  </nav>
+
+  <main class="error-page">
+    <div class="error-code">404</div>
+    <h1 class="error-title">Page Not Found</h1>
+    <p class="error-desc">The page you are looking for does not exist or has been moved. Let us help you find your way back.</p>
+    <div class="error-actions">
+      <a href="/" class="btn btn-primary">Back to Home</a>
+      <a href="/events" class="btn btn-outline">Upcoming Events</a>
+      <a href="/contact" class="btn btn-outline">Contact Us</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-bottom"><span>&copy; 2026 Uganda Astronomical Society.</span><span>Kampala, Uganda</span></div>
+    </div>
+  </footer>
+
+  <script src="/js/api.js"></script>
+  <script>
+    async function init() {
+      try { await api.me(); } catch(e) {}
+      updateNavUser();
+    }
+
+    init();
+  </script>
+</body>
+</html>

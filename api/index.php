@@ -15,6 +15,8 @@ $method = $_SERVER['REQUEST_METHOD'];
 $route = $_GET['route'] ?? '';
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $path = rtrim(str_replace('/uas/api', '', $path), '/');
+$path = str_replace('/api', '', $path);
+if ($path === '') $path = '/';
 
 // CORS for dev
 if (ENV === 'development') {
@@ -57,6 +59,23 @@ try {
     db()->prepare('UPDATE users SET password = ? WHERE id = ?')->execute([password_hash($new, PASSWORD_DEFAULT), $user['id']]);
     audit_log('password_change', 'user', $user['id']);
     json_response(['ok' => true]);
+  }
+  // --- ADMIN LOGIN-AS ---
+  elseif ($path === '/admin/login-as' && $method === 'POST') {
+    $admin = require_cap('admin.system');
+    $data = input_json();
+    $targetId = (int) ($data['user_id'] ?? 0);
+    if (!$targetId) json_error('user_id is required', 400);
+    $stmt = db()->prepare('SELECT id, name, email, status FROM users WHERE id = ?');
+    $stmt->execute([$targetId]);
+    $target = $stmt->fetch();
+    if (!$target || $target['status'] !== 'active') json_error('User not found or inactive', 404);
+    // Log in as target user
+    $_SESSION['user_id'] = $target['id'];
+    $caps = user_capabilities($target['id']);
+    $roles = user_roles($target['id']);
+    audit_log('admin_login_as', 'user', $target['id'], ['admin_id' => $admin['id']]);
+    json_response(['user' => public_user($target), 'capabilities' => $caps, 'roles' => $roles]);
   }
   // --- NOTIFICATIONS ---
   elseif ($path === '/notifications' && $method === 'GET') {
@@ -325,6 +344,35 @@ try {
     json_response(['ok' => true]);
   }
 
+  // --- RESOLUTION COMMENTS ---
+  elseif (preg_match('#^/resolutions/(\d+)/comments$#', $path, $m) && $method === 'GET') {
+    require_login();
+    $resId = (int) $m[1];
+    $stmt = db()->prepare('
+      SELECT c.*, u.name AS user_name
+      FROM resolution_comments c
+      JOIN users u ON u.id = c.user_id
+      WHERE c.resolution_id = ?
+      ORDER BY c.created_at ASC
+    ');
+    $stmt->execute([$resId]);
+    json_response($stmt->fetchAll());
+  }
+  elseif (preg_match('#^/resolutions/(\d+)/comments$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('resolutions.vote');
+    $resId = (int) $m[1];
+    $data = input_json();
+    $body = trim($data['body'] ?? '');
+    if (!$body) json_error('Comment body is required', 400);
+    $parentId = $data['parent_id'] ? (int) $data['parent_id'] : null;
+    db()->prepare('INSERT INTO resolution_comments (resolution_id, user_id, parent_id, body) VALUES (?, ?, ?, ?)')
+      ->execute([$resId, $user['id'], $parentId, $body]);
+    $commentId = (int) db()->lastInsertId();
+    $stmt = db()->prepare('SELECT c.*, u.name AS user_name FROM resolution_comments c JOIN users u ON u.id = c.user_id WHERE c.id = ?');
+    $stmt->execute([$commentId]);
+    json_response($stmt->fetch(), 201);
+  }
+
   // --- PROGRAMMES ---
   elseif ($path === '/programmes' && $method === 'GET') {
     require_login();
@@ -416,7 +464,7 @@ try {
   // --- PUBLIC EVENT DETAIL ---
   elseif (preg_match('#^/events/(\d+)$#', $path, $m) && $method === 'GET') {
     $eventId = (int) $m[1];
-    $stmt = db()->prepare('SELECT e.*, u.name AS organiser_name FROM events e JOIN users u ON u.id = e.organizer_id WHERE e.id = ? AND e.status IN ("published", "cancelled", "completed")');
+    $stmt = db()->prepare('SELECT e.*, u.name AS organiser_name, pr.title AS programme_title FROM events e JOIN users u ON u.id = e.organizer_id LEFT JOIN programmes pr ON pr.id = e.programme_id WHERE e.id = ? AND e.status IN ("published", "cancelled", "completed")');
     $stmt->execute([$eventId]);
     $event = $stmt->fetch();
     if (!$event) json_error('Event not found', 404);
@@ -691,21 +739,190 @@ try {
     json_response(['ok' => true]);
   }
 
+  // --- FILE UPLOAD ---
+  elseif ($path === '/upload' && $method === 'POST') {
+    $user = require_login();
+    if (!isset($_FILES['file'])) json_error('No file uploaded', 400);
+    $file = $_FILES['file'];
+    if ($file['error'] !== UPLOAD_ERR_OK) json_error('Upload error: ' . $file['error'], 400);
+
+    $maxSize = 10 * 1024 * 1024; // 10MB
+    if ($file['size'] > $maxSize) json_error('File too large (max 10MB)', 400);
+
+    $allowedTypes = [
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+      'application/pdf',
+      'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain', 'text/csv',
+    ];
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mimeType = finfo_file($finfo, $file['tmp_name']);
+    finfo_close($finfo);
+
+    if (!in_array($mimeType, $allowedTypes)) {
+      json_error('File type not allowed: ' . $mimeType, 400);
+    }
+
+    $uploadDir = UPLOAD_DIR;
+    if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+
+    $ext = pathinfo($file['name'], PATHINFO_EXTENSION) ?: 'bin';
+    $filename = date('Ymd-His') . '-' . bin2hex(random_bytes(8)) . '.' . $ext;
+    $filepath = $uploadDir . $filename;
+
+    if (!move_uploaded_file($file['tmp_name'], $filepath)) {
+      json_error('Failed to save file', 500);
+    }
+
+    $relativePath = '/img/uploads/' . $filename;
+    audit_log('file_upload', 'file', 0, ['filename' => $file['name'], 'path' => $relativePath]);
+    json_response(['url' => $relativePath, 'filename' => $file['name'], 'mime' => $mimeType], 201);
+  }
+
   // --- FINANCE ---
   elseif ($path === '/finance' && $method === 'GET') {
     require_cap('finance.view');
-    $stmt = db()->prepare('SELECT f.*, u.name AS recorded_by_name, a.name AS approved_by_name FROM financial_records f JOIN users u ON u.id = f.recorded_by LEFT JOIN users a ON a.id = f.approved_by ORDER BY f.record_date DESC');
+    $stmt = db()->prepare('SELECT f.*, u.name AS recorded_by_name, a.name AS approved_by_name,
+      p.title AS programme_name, e.title AS event_name, pr.title AS project_name,
+      bi.title AS budget_item_title
+      FROM financial_records f
+      JOIN users u ON u.id = f.recorded_by
+      LEFT JOIN users a ON a.id = f.approved_by
+      LEFT JOIN programmes p ON p.id = f.programme_id
+      LEFT JOIN events e ON e.id = f.event_id
+      LEFT JOIN projects pr ON pr.id = f.project_id
+      LEFT JOIN budget_items bi ON bi.id = f.budget_item_id
+      ORDER BY f.record_date DESC');
     $stmt->execute();
     json_response($stmt->fetchAll());
   }
   elseif ($path === '/finance' && $method === 'POST') {
     $user = require_cap('finance.record');
     $data = input_json();
-    db()->prepare('INSERT INTO financial_records (type, amount, category, programme_id, project_id, description, recorded_by, record_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      ->execute([$data['type'], $data['amount'], $data['category'] ?? 'other', $data['programme_id'] ?? null, $data['project_id'] ?? null, $data['description'] ?? null, $user['id'], $data['record_date']]);
+    db()->prepare('INSERT INTO financial_records (type, amount, category, programme_id, project_id, event_id, budget_item_id, description, recorded_by, record_date, due_date, status, attachment_url, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      ->execute([
+        $data['type'], $data['amount'], $data['category'] ?? 'other',
+        $data['programme_id'] ?? null, $data['project_id'] ?? null,
+        $data['event_id'] ?? null, $data['budget_item_id'] ?? null,
+        $data['description'] ?? null, $user['id'], $data['record_date'],
+        $data['due_date'] ?? null, $data['status'] ?? 'approved',
+        $data['attachment_url'] ?? null, $data['notes'] ?? null
+      ]);
     $id = (int) db()->lastInsertId();
     audit_log('finance_record', 'financial_record', $id);
     json_response(['id' => $id], 201);
+  }
+
+  // --- FINANCE SUMMARY (authenticated) ---
+  elseif ($path === '/finance/summary' && $method === 'GET') {
+    require_cap('finance.view');
+
+    $stmt = db()->prepare('SELECT type, SUM(amount) as total FROM financial_records GROUP BY type');
+    $stmt->execute();
+    $byType = [];
+    foreach ($stmt->fetchAll() as $row) $byType[$row['type']] = (float) $row['total'];
+
+    $stmt = db()->prepare('SELECT category, type, SUM(amount) as total FROM financial_records GROUP BY category, type ORDER BY category');
+    $stmt->execute();
+    $byCategory = $stmt->fetchAll();
+
+    $stmt = db()->prepare('SELECT id, type, amount, category, description, record_date FROM financial_records ORDER BY record_date DESC, id DESC LIMIT 10');
+    $stmt->execute();
+    $recent = $stmt->fetchAll();
+
+    json_response([
+      'income' => $byType['income'] ?? 0,
+      'expense' => $byType['expense'] ?? 0,
+      'balance' => ($byType['income'] ?? 0) - ($byType['expense'] ?? 0),
+      'by_category' => $byCategory,
+      'recent' => $recent,
+    ]);
+  }
+
+  // --- BUDGET ITEMS ---
+  elseif ($path === '/budget-items' && $method === 'GET') {
+    require_login();
+    $stmt = db()->prepare('SELECT bi.*, p.title AS programme_name, e.title AS event_name, pr.title AS project_name,
+      u.name AS created_by_name,
+      (SELECT COALESCE(SUM(f.amount), 0) FROM financial_records f WHERE f.budget_item_id = bi.id AND f.type = "income" AND f.status != "cancelled") AS spent_income,
+      (SELECT COALESCE(SUM(f.amount), 0) FROM financial_records f WHERE f.budget_item_id = bi.id AND f.type = "expense" AND f.status != "cancelled") AS spent_expense
+      FROM budget_items bi
+      LEFT JOIN programmes p ON p.id = bi.programme_id
+      LEFT JOIN events e ON e.id = bi.event_id
+      LEFT JOIN projects pr ON pr.id = bi.project_id
+      LEFT JOIN users u ON u.id = bi.created_by
+      ORDER BY bi.created_at DESC');
+    $stmt->execute();
+    json_response($stmt->fetchAll());
+  }
+  elseif ($path === '/budget-items' && $method === 'POST') {
+    $user = require_cap('finance.record');
+    $data = input_json();
+    db()->prepare('INSERT INTO budget_items (title, description, type, amount, category, programme_id, project_id, event_id, fiscal_year, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      ->execute([
+        $data['title'], $data['description'] ?? null, $data['type'],
+        $data['amount'], $data['category'] ?? 'other',
+        $data['programme_id'] ?? null, $data['project_id'] ?? null,
+        $data['event_id'] ?? null, $data['fiscal_year'] ?? date('Y'),
+        $data['status'] ?? 'draft', $user['id']
+      ]);
+    $id = (int) db()->lastInsertId();
+    audit_log('budget_item_create', 'budget_item', $id);
+    json_response(['id' => $id], 201);
+  }
+  elseif (preg_match('#^/budget-items/(\d+)$#', $path, $m) && $method === 'GET') {
+    require_login();
+    $stmt = db()->prepare('SELECT bi.*, p.title AS programme_name, e.title AS event_name, pr.title AS project_name FROM budget_items bi LEFT JOIN programmes p ON p.id = bi.programme_id LEFT JOIN events e ON e.id = bi.event_id LEFT JOIN projects pr ON pr.id = bi.project_id WHERE bi.id = ?');
+    $stmt->execute([(int) $m[1]]);
+    $item = $stmt->fetch();
+    if (!$item) json_error('Not found', 404);
+    json_response($item);
+  }
+
+  // --- WORKING GROUPS ---
+  elseif ($path === '/working-groups' && $method === 'GET') {
+    require_login();
+    $stmt = db()->prepare('SELECT wg.*, u.name AS chair_name, p.title AS programme_name,
+      (SELECT COUNT(*) FROM working_group_members wgm WHERE wgm.group_id = wg.id AND wgm.status = "active") AS member_count
+      FROM working_groups wg
+      LEFT JOIN users u ON u.id = wg.chair_id
+      LEFT JOIN programmes p ON p.id = wg.programme_id
+      WHERE wg.status = "active"
+      ORDER BY wg.name');
+    $stmt->execute();
+    json_response($stmt->fetchAll());
+  }
+  elseif ($path === '/working-groups' && $method === 'POST') {
+    $user = require_cap('roles.create');
+    $data = input_json();
+    db()->prepare('INSERT INTO working_groups (name, description, type, chair_id, programme_id, created_by, resolution_id, term_start, term_end) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      ->execute([
+        $data['name'], $data['description'] ?? null, $data['type'] ?? 'working_group',
+        $data['chair_id'] ?? null, $data['programme_id'] ?? null,
+        $user['id'], $data['resolution_id'] ?? null,
+        $data['term_start'] ?? null, $data['term_end'] ?? null
+      ]);
+    $id = (int) db()->lastInsertId();
+    audit_log('working_group_create', 'working_group', $id);
+    json_response(['id' => $id], 201);
+  }
+  elseif (preg_match('#^/working-groups/(\d+)/members$#', $path, $m) && $method === 'GET') {
+    require_login();
+    $groupId = (int) $m[1];
+    $stmt = db()->prepare('SELECT wgm.*, u.name AS user_name, u.email FROM working_group_members wgm JOIN users u ON u.id = wgm.user_id WHERE wgm.group_id = ? AND wgm.status = "active" ORDER BY wgm.role, u.name');
+    $stmt->execute([$groupId]);
+    json_response($stmt->fetchAll());
+  }
+  elseif (preg_match('#^/working-groups/(\d+)/members$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('roles.manage');
+    $groupId = (int) $m[1];
+    $data = input_json();
+    $userId = (int) $data['user_id'];
+    $role = $data['role'] ?? 'member';
+    db()->prepare('INSERT INTO working_group_members (group_id, user_id, role, joined_date) VALUES (?, ?, ?, CURDATE()) ON DUPLICATE KEY UPDATE role = VALUES(role), status = "active"')
+      ->execute([$groupId, $userId, $role]);
+    audit_log('working_group_member_add', 'working_group', $groupId, ['user_id' => $userId]);
+    json_response(['ok' => true], 201);
   }
 
   // --- ASSIGNMENTS ---
@@ -726,6 +943,14 @@ try {
       notify_user((int) $data['assignee_id'], 'assignment_assigned', 'New assignment: ' . $data['title'], 'An assignment has been given to you' . (!empty($data['due_date']) ? ' (due ' . $data['due_date'] . ')' : '') . '.', '/dashboard');
     }
     json_response(['id' => $id], 201);
+  }
+  elseif (preg_match('#^/assignments/(\d+)$#', $path, $m) && $method === 'GET') {
+    require_login();
+    $stmt = db()->prepare('SELECT a.*, u.name AS assignee_name, cr.name AS assigner_name, r.title AS role_title FROM assignments a LEFT JOIN users u ON u.id = a.assignee_id LEFT JOIN users cr ON cr.id = a.assigner_id LEFT JOIN roles r ON r.id = a.role_id WHERE a.id = ?');
+    $stmt->execute([(int) $m[1]]);
+    $item = $stmt->fetch();
+    if (!$item) json_error('Not found', 404);
+    json_response($item);
   }
   elseif ($path === '/assignments/mine' && $method === 'GET') {
     $user = require_login();
@@ -799,13 +1024,41 @@ try {
   // --- PENDING ITEMS ---
   elseif ($path === '/pending' && $method === 'GET') {
     require_login();
-    json_response(get_pending_items());
+    $scope = $_GET['scope'] ?? 'org';
+    $userId = $scope === 'mine' ? $_SESSION['user_id'] : null;
+    json_response(get_pending_items($userId));
   }
 
   // --- DASHBOARD / HEALTH ---
   elseif ($path === '/dashboard' && $method === 'GET') {
     require_login();
-    json_response(institutional_health());
+    $health = institutional_health();
+    // Enrich with current user's member-since and last login
+    $user = current_user();
+    if ($user) {
+      $stmt = db()->prepare('SELECT joined_date FROM members WHERE user_id = ?');
+      $stmt->execute([$user['id']]);
+      $health['member_since'] = $stmt->fetchColumn() ?: null;
+      $stmt = db()->prepare('SELECT last_login FROM users WHERE id = ?');
+      $stmt->execute([$user['id']]);
+      $health['last_login'] = $stmt->fetchColumn() ?: null;
+      // Upcoming events (next 3)
+      $stmt = db()->prepare("SELECT e.id, e.title, e.date, e.location, e.capacity,
+        (SELECT COUNT(*) FROM event_registrations r WHERE r.event_id = e.id AND r.status = 'registered') AS rsvp_count
+        FROM events e WHERE e.date >= NOW() AND e.status IN ('approved','published') ORDER BY e.date ASC LIMIT 3");
+      $stmt->execute();
+      $health['upcoming_events'] = $stmt->fetchAll();
+    }
+    json_response($health);
+  }
+
+  // --- ACTIVITY FEED ---
+  elseif ($path === '/activity' && $method === 'GET') {
+    require_login();
+    $limit = min((int)($_GET['limit'] ?? 20), 50);
+    $stmt = db()->prepare("SELECT al.*, u.avatar_url FROM audit_log al LEFT JOIN users u ON u.id = al.user_id ORDER BY al.created_at DESC LIMIT ?");
+    $stmt->execute([$limit]);
+    json_response($stmt->fetchAll());
   }
 
   // --- PARTNERS ---
@@ -979,10 +1232,17 @@ try {
     json_response($stmt->fetchAll());
   }
   elseif (preg_match('#^/public/articles/(\d+)$#', $path, $m) && $method === 'GET') {
-    $stmt = db()->prepare('SELECT a.id, a.title, a.body, a.category, a.tags, a.image_url, a.published_at, a.approved_by, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.id = ? AND a.status = "published"');
+    $stmt = db()->prepare('SELECT a.id, a.title, a.body, a.category, a.tags, a.image_url, a.published_at, a.created_at, a.author_id, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.id = ? AND a.status = "published"');
     $stmt->execute([(int) $m[1]]);
     $article = $stmt->fetch();
     if (!$article) json_error('Article not found', 404);
+
+    $stmt = db()->prepare('SELECT id, title, category, tags, image_url, published_at, author_id FROM articles WHERE id != ? AND status = "published" AND (category = ? OR tags LIKE ?) ORDER BY published_at DESC LIMIT 3');
+    $cat = $article['category'];
+    $tag = '%' . ($article['tags'] !== null ? substr($article['tags'], 0, 20) : '') . '%';
+    $stmt->execute([(int) $m[1], $cat, $tag]);
+    $article['related'] = $stmt->fetchAll();
+
     json_response($article);
   }
   elseif ($path === '/public/events' && $method === 'GET') {
@@ -998,17 +1258,73 @@ try {
     json_response($stmt->fetchAll());
   }
   elseif (preg_match('#^/public/programmes/(\d+)$#', $path, $m) && $method === 'GET') {
+    $pid = (int) $m[1];
     $stmt = db()->prepare('SELECT p.*, u.name AS lead_name, u.email AS lead_email FROM programmes p LEFT JOIN users u ON u.id = p.lead_id WHERE p.id = ?');
-    $stmt->execute([(int) $m[1]]);
+    $stmt->execute([$pid]);
     $programme = $stmt->fetch();
     if (!$programme) json_error('Programme not found', 404);
-    $stmt = db()->prepare('SELECT id, title, description, status, deadline, budget, spent FROM projects WHERE programme_id = ? ORDER BY title');
-    $stmt->execute([(int) $m[1]]);
+
+    $requester = current_user();
+
+    // Projects — budget/spent only for members
+    if ($requester) {
+      $stmt = db()->prepare('SELECT id, title, description, status, deadline, budget, spent FROM projects WHERE programme_id = ? ORDER BY title');
+    } else {
+      $stmt = db()->prepare('SELECT id, title, description, status, deadline FROM projects WHERE programme_id = ? ORDER BY title');
+    }
+    $stmt->execute([$pid]);
     $programme['projects'] = $stmt->fetchAll();
+
+    $stmt = db()->prepare('SELECT id, title, date, end_date, location, status FROM events WHERE programme_id = ? ORDER BY date ASC');
+    $stmt->execute([$pid]);
+    $programme['events'] = $stmt->fetchAll();
+
+    // Finance and programme budget are member-only
+    if ($requester) {
+      $stmt = db()->prepare('SELECT type, SUM(amount) AS total FROM financial_records WHERE programme_id = ? GROUP BY type');
+      $stmt->execute([$pid]);
+      $fin = [];
+      foreach ($stmt->fetchAll() as $r) $fin[$r['type']] = (float) $r['total'];
+      $programme['finance'] = [
+        'income' => $fin['income'] ?? 0,
+        'expense' => $fin['expense'] ?? 0,
+        'balance' => ($fin['income'] ?? 0) - ($fin['expense'] ?? 0),
+      ];
+    } else {
+      $programme['finance'] = null;
+      unset($programme['budget'], $programme['spent']);
+    }
+
     json_response($programme);
   }
   elseif ($path === '/public/documents' && $method === 'GET') {
     $stmt = db()->prepare('SELECT d.id, d.title, d.category, d.file_path, d.visibility, d.updated_at AS published_at, u.name AS owner_name FROM documents d JOIN users u ON u.id = d.owner_id WHERE d.status = "published" AND d.visibility = "public" ORDER BY d.updated_at DESC');
+    $stmt->execute();
+    json_response($stmt->fetchAll());
+  }
+  // --- PUBLIC FINANCE SUMMARY --- REMOVED: finance is members-only
+  // Use GET /finance (requires finance.view capability) instead
+  elseif ($path === '/public/finance/summary' && $method === 'GET') {
+    json_error('Finance data is restricted to members', 403);
+  }
+  // --- MEMBER DOCUMENTS (internal + public for logged-in users) ---
+  elseif ($path === '/member/documents' && $method === 'GET') {
+    require_login();
+    $stmt = db()->prepare('SELECT d.id, d.title, d.category, d.file_path, d.visibility, d.status, d.updated_at AS published_at, u.name AS owner_name FROM documents d JOIN users u ON u.id = d.owner_id WHERE d.status IN ("published", "approved") ORDER BY d.updated_at DESC');
+    $stmt->execute();
+    json_response($stmt->fetchAll());
+  }
+  // --- MEMBER ASSIGNMENTS ---
+  elseif ($path === '/member/assignments' && $method === 'GET') {
+    require_login();
+    $stmt = db()->prepare('SELECT a.*, u.name AS assignee_name, u2.name AS assigner_name FROM assignments a LEFT JOIN users u ON u.id = a.assignee_id LEFT JOIN users u2 ON u2.id = a.assigner_id WHERE a.assignee_id = ? ORDER BY a.due_date ASC, a.created_at DESC');
+    $stmt->execute([current_user_id()]);
+    json_response($stmt->fetchAll());
+  }
+  // --- MEMBER CALENDAR ---
+  elseif ($path === '/member/calendar' && $method === 'GET') {
+    require_login();
+    $stmt = db()->prepare('SELECT c.*, u.name AS owner_name FROM calendar_items c LEFT JOIN users u ON u.id = c.owner_id ORDER BY c.deadline ASC');
     $stmt->execute();
     json_response($stmt->fetchAll());
   }

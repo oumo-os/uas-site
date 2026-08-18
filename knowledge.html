@@ -3,155 +3,272 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="img/uas-emblem.png">
+  <link rel="icon" type="image/png" href="/img/uas-emblem.png">
   <title>Knowledge — Uganda Astronomical Society</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="/css/base.css">
   <style>
-    .page-header { padding: 3rem 0 2rem; text-align: center; }
-    .page-header h1 { font-size: 2.2rem; font-weight: 800; }
-    .page-header p { color: var(--text-dim); max-width: 600px; margin: 0.5rem auto 0; }
-    .filter-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; justify-content: center; }
-    .filter-chip {
-      padding: 0.35rem 0.75rem;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--text-dim);
-      font-size: 0.85rem;
-      cursor: pointer;
-      font-family: inherit;
-      transition: all 0.15s;
+    .page-hero {
+      position:relative; min-height:45vh; display:flex; flex-direction:column;
+      justify-content:center; align-items:flex-start; padding:6rem 1.5rem 4rem; background:url('/img/header-knowledge.jpg') center/cover no-repeat; color:#fff;
     }
-    .filter-chip:hover, .filter-chip.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
-    .article-card { padding: 1.25rem; margin-bottom: 1rem; }
-    .article-card h3 { font-size: 1.05rem; margin-bottom: 0.35rem; }
-    .article-card h3 a { color: var(--text); text-decoration: none; }
-    .article-card h3 a:hover { color: var(--accent); }
-    .article-card p { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 0.5rem; }
-    .article-meta { display: flex; gap: 0.75rem; font-size: 0.8rem; color: var(--text-faint); flex-wrap: wrap; }
-    .article-tags { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.5rem; }
-    .tag { font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: 4px; background: var(--bg-card); color: var(--text-dim); }
+    .page-hero::before { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(15,23,42,0.6) 0%,rgba(15,23,42,0.85) 100%); }
+    .page-hero > * { position:relative; z-index:1; }
+    .page-hero h1 { font-size:2.8rem; font-weight:700; color:#fff; margin-bottom:0.75rem; }
+    .page-hero p { font-size:1.1rem; color:rgba(255,255,255,0.85); max-width:600px; }
+
+    .section { padding:4rem 0; }
+    .section-alt { background:var(--bg-card); border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+
+    .filter-bar { display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1.5rem; justify-content:center; }
+    .filter-chip {
+      padding:0.45rem 1rem; border-radius:999px; border:1px solid var(--border);
+      background:transparent; color:var(--text-dim); font-size:0.85rem; cursor:pointer;
+      font-family:inherit; transition:all 0.2s;
+    }
+    .filter-chip:hover, .filter-chip.active { border-color:var(--accent); color:var(--accent); background:var(--accent-glow); }
+
+    .article-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:1.5rem; }
+    .article-card {
+      background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg);
+      overflow:hidden; transition:all 0.3s; cursor:pointer;
+    }
+    .article-card:hover { border-color:var(--border-focus); box-shadow:var(--shadow-md); transform:translateY(-2px); }
+    .article-card img { width:100%; height:180px; object-fit:cover; }
+    .article-card .card-body { padding:1.25rem; }
+    .article-card h3 { font-size:1.05rem; margin-bottom:0.35rem; line-height:1.3; }
+    .article-card .article-meta { display:flex; gap:0.5rem; font-size:0.8rem; color:var(--text-dim); flex-wrap:wrap; margin-top:0.5rem; }
+    .article-card .article-meta span { display:flex; align-items:center; gap:0.2rem; }
+    .article-card .excerpt { font-size:0.88rem; color:var(--text-dim); line-height:1.5; margin-top:0.5rem; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .article-tags { display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.5rem; }
+    .tag { font-size:0.68rem; padding:0.15rem 0.45rem; border-radius:4px; background:var(--accent-glow); color:var(--accent); font-weight:500; }
+
+    .search-box {
+      max-width:500px; margin:0 auto 2rem; position:relative;
+    }
+    .search-box input {
+      width:100%; padding:0.75rem 1rem 0.75rem 2.75rem; border:1px solid var(--border); border-radius:var(--radius);
+      background:var(--bg-card); color:var(--text); font-size:0.95rem; font-family:inherit; transition:border-color 0.2s;
+    }
+    .search-box input:focus { outline:none; border-color:var(--accent); }
+    .search-box .search-icon { position:absolute; left:0.85rem; top:50%; transform:translateY(-50%); color:var(--text-dim); }
+
+    .stat-row { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; max-width:800px; margin:0 auto 2.5rem; }
+    .stat-item { text-align:center; padding:1rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); }
+    .stat-item .stat-val { font-size:1.5rem; font-weight:700; color:var(--accent); }
+    .stat-item .stat-lbl { font-size:0.75rem; color:var(--text-dim); margin-top:0.2rem; }
+
+    .empty-state { text-align:center; padding:4rem 0; }
+    .empty-state p { color:var(--text-dim); font-size:1rem; }
+
+    @media (max-width:768px) {
+      .page-hero { min-height:35vh; padding:4rem 1rem 3rem; }
+      .page-hero h1 { font-size:1.8rem; }
+      .article-grid { grid-template-columns:1fr; }
+      .stat-row { grid-template-columns:repeat(2,1fr); }
+    }
   </style>
 </head>
 <body>
-  <nav class="nav">
-    <div class="container" style="display:flex;align-items:center;width:100%">
-      <a href="/" class="nav-brand">UAS</a>
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="container">
+      <a href="/" class="nav-brand"><img src="/img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
+      <button class="nav-burger" aria-label="Toggle navigation menu" onclick="this.closest('.nav').classList.toggle('open')" aria-label="Menu">&#9776;</button>
       <div class="nav-links">
         <a href="/" class="nav-link">Home</a>
         <a href="/about" class="nav-link">About</a>
         <a href="/programmes" class="nav-link">Programmes</a>
         <a href="/events" class="nav-link">Events</a>
         <a href="/knowledge" class="nav-link active">Knowledge</a>
-        <a href="/library" class="nav-link">Library</a>
-        <a href="/ecosystem" class="nav-link">Ecosystem</a>
-        <a href="/members" class="nav-link">Members</a>
         <a href="/contact" class="nav-link">Contact</a>
-        <a href="/search" class="nav-link">Search</a>
-        <a href="/dashboard" class="nav-link">Dashboard</a>
-        <a href="/profile" class="nav-link">Profile</a>
-        </div>
-      <div class="nav-user" id="navUser"></div>
+      </div>
+      <div class="nav-right"><div class="nav-user" id="navUser"></div></div>
     </div>
   </nav>
 
-  <div class="container">
-    <div class="page-header">
+  <section class="page-hero">
+    <div class="container">
       <h1>Knowledge Base</h1>
       <p>Articles, publications, observing reports, and educational resources</p>
     </div>
+  </section>
 
-    <div class="filter-bar" id="filterBar">
-      <button class="filter-chip active" data-cat="all">All</button>
-      <button class="filter-chip" data-cat="article">Articles</button>
-      <button class="filter-chip" data-cat="observing_report">Observing Reports</button>
-      <button class="filter-chip" data-cat="educational">Educational</button>
-      <button class="filter-chip" data-cat="project_report">Project Reports</button>
-      <button class="filter-chip" data-cat="announcement">Announcements</button>
-      <button class="filter-chip" data-cat="paper">Papers</button>
-    </div>
-
-    <div id="articlesList"></div>
-  </div>
-
-  <footer>
+  <section class="section">
     <div class="container">
-      <p>&copy; 2026 Uganda Astronomical Society. All rights reserved.</p>
+      <div class="search-box">
+        <span class="search-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span></span>
+        <input type="text" id="searchInput" placeholder="Search articles by title, content, or tags...">
+      </div>
+
+      <div class="stat-row" id="statsRow">
+        <div class="stat-item"><div class="stat-val" id="statTotal">&mdash;</div><div class="stat-lbl">Total</div></div>
+        <div class="stat-item"><div class="stat-val" id="statArticles">&mdash;</div><div class="stat-lbl">Articles</div></div>
+        <div class="stat-item"><div class="stat-val" id="statReports">&mdash;</div><div class="stat-lbl">Reports</div></div>
+        <div class="stat-item"><div class="stat-val" id="statEdu">&mdash;</div><div class="stat-lbl">Educational</div></div>
+      </div>
+
+      <div class="filter-bar" id="filterBar">
+        <button class="filter-chip active" data-cat="all">All</button>
+        <button class="filter-chip" data-cat="article">Articles</button>
+        <button class="filter-chip" data-cat="observing_report">Observing Reports</button>
+        <button class="filter-chip" data-cat="educational">Educational</button>
+        <button class="filter-chip" data-cat="project_report">Project Reports</button>
+        <button class="filter-chip" data-cat="announcement">Announcements</button>
+        <button class="filter-chip" data-cat="paper">Papers</button>
+      </div>
+
+      <div class="article-grid" id="articlesList"></div>
+      <div class="pagination" id="articlesPagination"></div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">Uganda Astronomical Society</div>
+          <p class="footer-desc">A public scientific society advancing astronomy, space science and scientific discovery in Uganda since 2024.</p>
+        </div>
+        <div>
+          <div class="footer-heading">Explore</div>
+          <ul class="footer-links">
+            <li><a href="/about">About UAS</a></li>
+            <li><a href="/programmes">Programmes</a></li>
+            <li><a href="/events">Events</a></li>
+            <li><a href="/knowledge">Knowledge Base</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Community</div>
+          <ul class="footer-links">
+            <li><a href="/members">Members</a></li>
+            <li><a href="/ecosystem">Ecosystem</a></li>
+            <li><a href="/library">Library</a></li>
+            <li><a href="/contact">Contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Connect</div>
+          <ul class="footer-links">
+            <li><a href="mailto:contact@astronomy.ug">contact@astronomy.ug</a></li>
+            <li><a href="/login">Member Login</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2026 Uganda Astronomical Society. All rights reserved.</span>
+        <span>Kampala, Uganda</span>
+      </div>
     </div>
   </footer>
 
-  <script src="js/api.js"></script>
+  <script src="/js/api.js"></script>
   <script>
+    const articleImgs = ['/img/article-moon.jpg','/img/article-galaxy.jpg','/img/article-solar.jpg','/img/article-deepsky.jpg'];
     let allArticles = [];
     let currentCat = 'all';
+    let searchTerm = '';
+    let artPage = 1;
+    const ART_PER = 6;
 
     async function load() {
       try { await api.me(); } catch(e) {}
       updateNavUser();
 
       allArticles = await api.getPublicArticles().catch(() => []);
-      render();
-      setupFilters();
-    }
 
-    function render() {
-      const filtered = currentCat === 'all' ? allArticles : allArticles.filter(a => a.category === currentCat);
-      const div = document.getElementById('articlesList');
+      // Stats
+      document.getElementById('statTotal').textContent = allArticles.length;
+      document.getElementById('statArticles').textContent = allArticles.filter(a => a.category === 'article').length;
+      document.getElementById('statReports').textContent = allArticles.filter(a => a.category === 'observing_report' || a.category === 'project_report').length;
+      document.getElementById('statEdu').textContent = allArticles.filter(a => a.category === 'educational').length;
 
-      if (filtered.length) {
-        div.innerHTML = filtered.map(a => {
-          const d = a.published_at ? new Date(a.published_at) : null;
-          const tags = parseTags(a.tags);
-          return `
-            <div class="card article-card">
-              <h3><a href="/article/${a.id}" style="color:inherit">${esc(a.title)}</a></h3>
-              <p>${esc(a.category || 'article').replace(/_/g, ' ')}</p>
-              <div class="article-meta">
-                ${a.author_name ? `<span>👤 ${esc(a.author_name)}</span>` : ''}
-                ${d ? `<span>📅 ${d.toLocaleDateString('en', {year:'numeric',month:'short',day:'numeric'})}</span>` : ''}
-              </div>
-              ${tags.length ? `<div class="article-tags">${tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
-            </div>
-          `;
-        }).join('');
-      } else {
-        div.innerHTML = '<p class="text-center text-dim" style="padding:3rem 0">No articles found.</p>';
-      }
-    }
+      // Search
+      document.getElementById('searchInput').addEventListener('input', e => {
+        searchTerm = e.target.value.toLowerCase();
+        artPage = 1;
+        render();
+      });
 
-    function setupFilters() {
+      // Filters
       document.getElementById('filterBar').addEventListener('click', e => {
         const chip = e.target.closest('.filter-chip');
         if (!chip) return;
         document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
         currentCat = chip.dataset.cat;
+        artPage = 1;
         render();
       });
+
+      render();
+    }
+
+    function render() {
+      let filtered = currentCat === 'all' ? allArticles : allArticles.filter(a => a.category === currentCat);
+
+      if (searchTerm) {
+        filtered = filtered.filter(a => {
+          const search = (a.title + ' ' + (a.content || '') + ' ' + (a.tags || '')).toLowerCase();
+          return search.includes(searchTerm);
+        });
+      }
+
+      const div = document.getElementById('articlesList');
+      const pag = document.getElementById('articlesPagination');
+
+      if (!filtered.length) {
+        div.innerHTML = '<div class="empty-state"><p>No articles match your search.</p></div>';
+        pag.innerHTML = '';
+        return;
+      }
+
+      const totalPages = Math.ceil(filtered.length / ART_PER);
+      if (artPage > totalPages) artPage = totalPages;
+      const start = (artPage - 1) * ART_PER;
+      const page = filtered.slice(start, start + ART_PER);
+
+      div.innerHTML = page.map((a, i) => {
+        const idx = start + i;
+        const d = a.published_at ? new Date(a.published_at) : null;
+        const tags = parseTags(a.tags);
+        const catLabel = (a.category || 'article').replace(/_/g, ' ');
+        return `
+          <div class="article-card" onclick="location.href=ua('/article/${a.id}')">
+            <img src="${articleImgs[idx % articleImgs.length]}" alt="" loading="lazy">
+            <div class="card-body">
+              <span class="tag" style="margin-bottom:0.5rem;display:inline-flex">${esc(catLabel)}</span>
+              <h3>${esc(a.title)}</h3>
+              <div class="article-meta">
+                ${a.author_name ? `<span><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>${esc(a.author_name)}</span>` : ''}
+                ${d ? `<span><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>${d.toLocaleDateString('en',{year:'numeric',month:'short',day:'numeric'})}</span>` : ''}
+              </div>
+              ${tags.length ? `<div class="article-tags">${tags.slice(0,3).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
+            </div>
+          </div>
+          `;
+        }).join('');
+
+      // Pagination
+      if (totalPages <= 1) { pag.innerHTML = ''; return; }
+      let btns = '<button ' + (artPage<=1?'disabled':'') + ' onclick="artPage--;render()">&#8249; Prev</button>';
+      for (let p=1; p<=totalPages; p++) {
+        btns += '<button class="' + (p===artPage?'active':'') + '" onclick="artPage=' + p + ';render()">' + p + '</button>';
+      }
+      btns += '<button ' + (artPage>=totalPages?'disabled':'') + ' onclick="artPage++;render()">Next &#8250;</button>';
+      pag.innerHTML = btns;
     }
 
     function parseTags(t) {
       if (!t) return [];
       if (Array.isArray(t)) return t;
       if (typeof t === 'string') {
-        try {
-          const v = JSON.parse(t);
-          return Array.isArray(v) ? v : parseTags(v);
-        } catch(e) {
-          return t.split(',').map(s => s.trim()).filter(Boolean);
-        }
+        try { const v = JSON.parse(t); return Array.isArray(v) ? v : []; }
+        catch(e) { return t.split(',').map(s => s.trim()).filter(Boolean); }
       }
       return [];
     }
 
-    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
-    function updateNavUser() {
-      const el = document.getElementById('navUser');
-      el.innerHTML = api._user
-        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
-        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
-    }
+
     load();
   </script>
 </body>

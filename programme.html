@@ -3,122 +3,281 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="../img/uas-emblem.png">
+  <link rel="icon" type="image/png" href="/img/uas-emblem.png">
   <title>Programme — Uganda Astronomical Society</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../css/base.css">
+  <meta name="description" content="Programme details — Uganda Astronomical Society.">
+  <meta property="og:title" content="Programme — Uganda Astronomical Society">
+  <meta property="og:description" content="Programme details — Uganda Astronomical Society.">
+  <meta property="og:image" content="/img/uas-emblem.png">
+  <meta property="og:type" content="website">
+  <link rel="stylesheet" href="/css/base.css">
   <style>
-    .prog-hero {
-      padding: 3rem 0 2rem;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 2rem;
+    .page-hero {
+      position:relative; min-height:40vh; display:flex; flex-direction:column;
+      justify-content:flex-end; padding:6rem 1.5rem 3rem; background:url('/img/header-programmes.jpg') center/cover no-repeat; color:#fff;
     }
-    .prog-hero h1 { font-size: 2rem; font-weight: 800; margin: 0 0 0.5rem; }
-    .prog-hero .lead { color: var(--text-dim); max-width: 640px; }
-    .prog-stats { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1.25rem; }
+    .page-hero::before { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(15,23,42,0.4) 0%,rgba(15,23,42,0.85) 100%); }
+    .page-hero > * { position:relative; z-index:1; }
+    .page-hero .breadcrumb { font-size:0.85rem; margin-bottom:0.75rem; }
+    .page-hero .breadcrumb a { color:rgba(255,255,255,0.7); text-decoration:none; }
+    .page-hero .breadcrumb a:hover { color:#fff; }
+    .page-hero h1 { font-size:2.2rem; font-weight:700; color:#fff; margin-bottom:0.5rem; }
+    .page-hero p { font-size:1rem; color:rgba(255,255,255,0.8); max-width:640px; line-height:1.6; }
+    .hero-meta { display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; margin-top:0.75rem; }
+
+    .section { padding:3rem 0; }
+    .content-grid { display:grid; grid-template-columns:2fr 1fr; gap:2rem; align-items:start; }
+    .sidebar { position:sticky; top:100px; }
+
+    .stat-row { display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom:2rem; }
     .stat-chip {
-      border: 1px solid var(--border); border-radius: var(--radius-lg);
-      padding: 0.5rem 1rem; font-size: 0.8rem; background: var(--bg-card);
+      display:inline-flex; align-items:center; gap:0.5rem; padding:0.6rem 1rem;
+      background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg);
+      font-size:0.85rem; transition:all 0.2s;
     }
-    .stat-chip b { display: block; font-size: 1.1rem; }
-    .obj-list { list-style: none; padding: 0; margin: 0; }
+    .stat-chip:hover { border-color:var(--border-focus); box-shadow:var(--shadow); }
+    .stat-chip .label { font-size:0.7rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em; }
+    .stat-chip .value { font-weight:600; }
+
+    .card-section { padding:1.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); margin-bottom:1.5rem; }
+    .card-section h3 { font-size:1.1rem; font-weight:700; margin-bottom:1rem; padding-bottom:0.75rem; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:0.5rem; }
+
+    .timeline-bar { display:flex; align-items:center; gap:0.75rem; padding:1rem; background:var(--accent-glow); border-radius:var(--radius); margin-bottom:1rem; }
+    .timeline-bar .track { flex:1; height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
+    .timeline-bar .fill { height:100%; background:var(--accent); border-radius:3px; transition:width 0.5s; }
+    .timeline-bar .date { font-size:0.8rem; color:var(--text-dim); white-space:nowrap; }
+
+    .obj-list { list-style:none; padding:0; margin:0; }
     .obj-list li {
-      padding: 0.6rem 0.9rem; margin-bottom: 0.5rem;
-      border-left: 3px solid var(--accent); background: var(--bg-card);
-      border-radius: 0 var(--radius) var(--radius) 0;
-      font-size: 0.9rem;
+      padding:0.6rem 0.85rem; margin-bottom:0.5rem; border-left:3px solid var(--accent);
+      background:var(--accent-glow); border-radius:0 var(--radius) var(--radius) 0;
+      font-size:0.9rem; line-height:1.5;
+    }
+
+    .project-card { padding:1.25rem; border:1px solid var(--border); border-radius:var(--radius-lg); margin-bottom:0.75rem; transition:all 0.2s; }
+    .project-card:hover { border-color:var(--border-focus); box-shadow:var(--shadow); }
+    .project-card h4 { font-size:0.95rem; margin-bottom:0.3rem; }
+    .project-card p { font-size:0.85rem; color:var(--text-dim); line-height:1.5; margin-bottom:0.5rem; }
+    .project-meta { display:flex; gap:0.75rem; font-size:0.8rem; color:var(--text-dim); flex-wrap:wrap; align-items:center; }
+    .budget-bar { height:6px; background:var(--border); border-radius:3px; overflow:hidden; margin-top:0.5rem; }
+    .budget-fill { height:100%; border-radius:3px; transition:width 0.3s; }
+
+    .event-row { display:flex; gap:1rem; padding:0.75rem 0; border-bottom:1px solid var(--border); align-items:center; }
+    .event-row:last-child { border-bottom:none; }
+    .event-row .ev-date { min-width:50px; text-align:center; padding:0.4rem; background:var(--accent-glow); border-radius:var(--radius); flex-shrink:0; }
+    .event-row .ev-date .day { font-size:1.2rem; font-weight:700; color:var(--accent); line-height:1; }
+    .event-row .ev-date .month { font-size:0.65rem; color:var(--text-dim); text-transform:uppercase; }
+    .event-row .ev-info h4 { font-size:0.9rem; margin-bottom:0.15rem; }
+    .event-row .ev-info p { font-size:0.8rem; color:var(--text-dim); }
+
+    .finance-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:0.75rem; }
+    .finance-box { padding:1rem; text-align:center; border-radius:var(--radius); border:1px solid var(--border); }
+    .finance-box .f-label { font-size:0.7rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-dim); margin-bottom:0.25rem; }
+    .finance-box .f-value { font-size:1.2rem; font-weight:700; }
+    .finance-box.income .f-value { color:var(--success); }
+    .finance-box.expense .f-value { color:var(--danger); }
+    .finance-box.balance .f-value { color:var(--accent); }
+
+    @media (max-width:768px) {
+      .page-hero { min-height:30vh; padding:4rem 1rem 2rem; }
+      .page-hero h1 { font-size:1.5rem; }
+      .content-grid { grid-template-columns:1fr; }
+      .sidebar { position:static; }
+      .finance-grid { grid-template-columns:1fr; }
+      .stat-row { gap:0.5rem; }
     }
   </style>
 </head>
 <body>
-  <nav class="nav">
-    <div class="container" style="display:flex;align-items:center;width:100%">
-      <a href="/" class="nav-brand">UAS</a>
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="container">
+      <a href="/" class="nav-brand"><img src="/img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
+      <button class="nav-burger" onclick="this.closest('.nav').classList.toggle('open')" aria-label="Menu">&#9776;</button>
       <div class="nav-links">
         <a href="/" class="nav-link">Home</a>
         <a href="/about" class="nav-link">About</a>
         <a href="/programmes" class="nav-link active">Programmes</a>
         <a href="/events" class="nav-link">Events</a>
         <a href="/knowledge" class="nav-link">Knowledge</a>
-        <a href="/library" class="nav-link">Library</a>
-        <a href="/ecosystem" class="nav-link">Ecosystem</a>
-        <a href="/members" class="nav-link">Members</a>
         <a href="/contact" class="nav-link">Contact</a>
-        <a href="/search" class="nav-link">Search</a>
-        <a href="/dashboard" class="nav-link">Dashboard</a>
       </div>
-      <div class="nav-user" id="navUser"></div>
+      <div class="nav-right"><div class="nav-user" id="navUser"></div></div>
     </div>
   </nav>
 
-  <div class="container" id="progRoot">
-    <div class="prog-hero">
-      <a href="/programmes" class="text-dim" style="font-size:0.85rem;text-decoration:none">← All programmes</a>
-      <h1 id="pTitle"></h1>
-      <p class="lead" id="pDesc"></p>
-      <div class="prog-stats" id="pStats"></div>
-    </div>
-    <div class="grid-2 gap-3" style="align-items:start">
-      <div class="card" style="padding:1.25rem">
-        <h3 class="section-title" style="margin-top:0">Objectives</h3>
-        <ul class="obj-list" id="pObjectives"></ul>
-      </div>
-      <div class="card" style="padding:1.25rem">
-        <h3 class="section-title" style="margin-top:0">Projects</h3>
-        <div id="pProjects"></div>
-      </div>
-    </div>
-  </div>
-
-  <footer>
+  <section class="page-hero">
     <div class="container">
-      <p>&copy; 2026 Uganda Astronomical Society. All rights reserved.</p>
+      <div class="breadcrumb"><a href="/programmes">Programmes</a> &rsaquo; <span id="pBreadcrumb"></span></div>
+      <h1 id="pTitle"></h1>
+      <p id="pDesc"></p>
+      <div class="hero-meta" id="pHeroMeta"></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="stat-row" id="pStats"></div>
+      <div class="content-grid">
+        <div class="content-main">
+          <div id="pTimeline"></div>
+          <div class="card-section">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg></span> Objectives</h3>
+            <ul class="obj-list" id="pObjectives"></ul>
+          </div>
+          <div class="card-section">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span> Projects</h3>
+            <div id="pProjects"></div>
+          </div>
+          <div class="card-section" id="pEventsSection" style="display:none">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span> Related Events</h3>
+            <div id="pEvents"></div>
+          </div>
+        </div>
+        <div class="sidebar">
+          <div class="card-section" id="pLeadCard" style="display:none">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span> Programme Lead</h3>
+            <div id="pLead"></div>
+          </div>
+          <div class="card-section" id="pFinanceCard" style="display:none">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span> Financial Summary</h3>
+            <div class="finance-grid" id="pFinance"></div>
+          </div>
+          <div class="card-section">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span> Quick Facts</h3>
+            <div id="pFacts"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div><div class="footer-brand">Uganda Astronomical Society</div><p class="footer-desc">Advancing astronomy education, research, and outreach across Uganda since 2024.</p></div>
+        <div><div class="footer-heading">Explore</div><ul class="footer-links"><li><a href="/about">About UAS</a></li><li><a href="/programmes">Programmes</a></li><li><a href="/events">Events</a></li><li><a href="/knowledge">Knowledge Base</a></li></ul></div>
+        <div><div class="footer-heading">Community</div><ul class="footer-links"><li><a href="/members">Members</a></li><li><a href="/ecosystem">Ecosystem</a></li><li><a href="/library">Library</a></li><li><a href="/contact">Contact</a></li></ul></div>
+        <div><div class="footer-heading">Connect</div><ul class="footer-links"><li><a href="mailto:contact@astronomy.ug">contact@astronomy.ug</a></li><li><a href="/login">Member Login</a></li></ul></div>
+      </div>
+      <div class="footer-bottom"><span>&copy; 2026 Uganda Astronomical Society. All rights reserved.</span><span>Kampala, Uganda</span></div>
     </div>
   </footer>
 
-  <script src="../js/api.js"></script>
+  <script src="/js/api.js"></script>
   <script>
     async function load() {
       try { await api.me(); } catch(e) {}
       updateNavUser();
-
-      const id = new URLSearchParams(location.search).get('id');
+      var id = new URLSearchParams(location.search).get('id') || (location.pathname.match(/\/(\d+)$/) || [])[1];
       if (!id) { document.getElementById('pTitle').textContent = 'Programme not found'; return; }
-      const p = await api.getPublicProgramme(id).catch(() => null);
+      var p = await api.getPublicProgramme(id).catch(function(){ return null; });
       if (!p) { document.getElementById('pTitle').textContent = 'Programme not found'; return; }
-
+      document.title = p.title + ' — Uganda Astronomical Society';
+      document.getElementById('pBreadcrumb').textContent = p.title;
       document.getElementById('pTitle').textContent = p.title;
       document.getElementById('pDesc').textContent = p.description || '';
-      document.getElementById('pStats').innerHTML = `
-        ${p.lead_name ? `<span class="stat-chip">Lead<b>${esc(p.lead_name)}</b></span>` : ''}
-        <span class="stat-chip">Projects<b>${p.projects.length}</b></span>
-        ${p.budget ? `<span class="stat-chip">Budget<b>UGX ${Number(p.budget).toLocaleString()}</b></span>` : ''}
-        ${p.spent ? `<span class="stat-chip">Spent<b>UGX ${Number(p.spent).toLocaleString()}</b></span>` : ''}
-      `;
-      const objs = document.getElementById('pObjectives');
+
+      var statusClass = p.status === 'active' ? 'active' : p.status === 'completed' ? 'dim' : 'pending';
+      document.getElementById('pHeroMeta').innerHTML =
+        '<span class="badge badge-' + statusClass + '">' + esc(p.status) + '</span>' +
+        (p.start_date ? '<span style="color:rgba(255,255,255,0.8)"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span> ' + fmtDate(p.start_date) + (p.end_date ? ' — ' + fmtDate(p.end_date) : '') + '</span>' : '');
+
+      document.getElementById('pStats').innerHTML =
+        (p.lead_name ? '<div class="stat-chip"><div><div class="label">Lead</div><div class="value">' + esc(p.lead_name) + '</div></div></div>' : '') +
+        '<div class="stat-chip"><div><div class="label">Projects</div><div class="value">' + p.projects.length + '</div></div></div>' +
+        (p.events && p.events.length ? '<div class="stat-chip"><div><div class="label">Events</div><div class="value">' + p.events.length + '</div></div></div>' : '') +
+        (Number(p.budget) > 0 ? '<div class="stat-chip"><div><div class="label">Budget</div><div class="value">UGX ' + Number(p.budget).toLocaleString() + '</div></div></div>' : '');
+
+      if (p.start_date || p.end_date) {
+        var now = new Date();
+        var start = p.start_date ? new Date(p.start_date) : null;
+        var end = p.end_date ? new Date(p.end_date) : null;
+        var pct = 0;
+        if (start && end) { pct = Math.min(100, Math.max(0, (now - start) / (end - start) * 100)); }
+        else if (start && !end && p.status === 'active') { pct = 50; }
+        else if (p.status === 'completed') { pct = 100; }
+        document.getElementById('pTimeline').innerHTML =
+          '<div class="card-section"><h3><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span> Timeline</h3>' +
+          '<div class="timeline-bar">' +
+          '<span class="date">' + (start ? fmtDate(start) : 'TBD') + '</span>' +
+          '<div class="track"><div class="fill" style="width:' + pct + '%"></div></div>' +
+          '<span class="date">' + (end ? fmtDate(end) : 'TBD') + '</span>' +
+          '</div></div>';
+      }
+
+      var objs = document.getElementById('pObjectives');
       objs.innerHTML = p.objectives
-        ? p.objectives.split(/\r?\n/).filter(Boolean).map(o => `<li>${esc(o)}</li>`).join('')
-        : '<p class="text-dim">No objectives listed.</p>';
+        ? p.objectives.split(/\r?\n/).filter(Boolean).map(function(o){ return '<li>' + esc(o.trim()) + '</li>'; }).join('')
+        : '<p class="text-dim" style="font-size:0.9rem">No objectives listed.</p>';
 
-      const projDiv = document.getElementById('pProjects');
-      if (!p.projects.length) { projDiv.innerHTML = '<p class="text-dim">No projects under this programme yet.</p>'; return; }
-      projDiv.innerHTML = p.projects.map(pr => `
-        <div style="padding:0.75rem 0;border-bottom:1px solid var(--border)">
-          <h4 style="margin:0 0 0.25rem">${esc(pr.title)}</h4>
-          <p style="margin:0;font-size:0.85rem;color:var(--text-dim)">${esc(pr.description || '')}</p>
-          <span class="badge badge-active">${esc(pr.status)}</span>
-          ${pr.deadline ? `<span class="text-dim" style="font-size:0.8rem"> · due ${esc(pr.deadline)}</span>` : ''}
-        </div>
-      `).join('');
+      var projDiv = document.getElementById('pProjects');
+      if (!p.projects.length) {
+        projDiv.innerHTML = '<p class="text-dim" style="font-size:0.9rem">No projects yet.</p>';
+      } else {
+        projDiv.innerHTML = p.projects.map(function(pr) {
+          var pct = pr.budget && Number(pr.budget) > 0 ? Math.min(100, (Number(pr.spent || 0) / Number(pr.budget) * 100)) : 0;
+          var color = pct > 80 ? 'var(--danger)' : pct > 50 ? 'var(--warning)' : 'var(--success)';
+          return '<div class="project-card">' +
+            '<div style="display:flex;justify-content:space-between;align-items:start">' +
+            '<h4>' + esc(pr.title) + '</h4>' +
+            '<span class="badge badge-' + (pr.status === 'active' ? 'active' : pr.status === 'completed' ? 'dim' : 'pending') + '">' + esc(pr.status) + '</span></div>' +
+            '<p>' + esc(pr.description || '') + '</p>' +
+            '<div class="project-meta">' +
+            (pr.deadline ? '<span>Due ' + esc(pr.deadline) + '</span>' : '') +
+            (pr.budget && Number(pr.budget) > 0 ? '<span>Budget: UGX ' + Number(pr.budget).toLocaleString() + '</span>' : '') +
+            (pr.spent && Number(pr.spent) > 0 ? '<span>Spent: UGX ' + Number(pr.spent).toLocaleString() + '</span>' : '') +
+            '</div>' +
+            (pr.budget && Number(pr.budget) > 0 ? '<div class="budget-bar"><div class="budget-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' : '') +
+            '</div>';
+        }).join('');
+      }
+
+      if (p.events && p.events.length) {
+        document.getElementById('pEventsSection').style.display = 'block';
+        document.getElementById('pEvents').innerHTML = p.events.map(function(ev) {
+          var d = new Date(ev.date);
+          return '<div class="event-row" onclick="location.href=ua(\'/event/' + ev.id + '\')" style="cursor:pointer">' +
+            '<div class="ev-date"><div class="day">' + d.getDate() + '</div><div class="month">' + d.toLocaleString('en',{month:'short'}) + '</div></div>' +
+            '<div class="ev-info"><h4>' + esc(ev.title) + '</h4><p>' + esc(ev.location || 'TBD') + ' &middot; ' + esc(ev.status) + '</p></div></div>';
+        }).join('');
+      }
+
+      if (p.lead_name) {
+        document.getElementById('pLeadCard').style.display = 'block';
+        var initials = p.lead_name.split(' ').map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
+        document.getElementById('pLead').innerHTML =
+          '<div style="display:flex;align-items:center;gap:0.75rem">' +
+          '<div style="width:44px;height:44px;border-radius:50%;background:var(--accent-glow);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;flex-shrink:0">' + initials + '</div>' +
+          '<div><div style="font-weight:600">' + esc(p.lead_name) + '</div>' +
+          (p.lead_email ? '<div style="font-size:0.82rem;color:var(--text-dim)">' + esc(p.lead_email) + '</div>' : '') +
+          '</div></div>';
+      }
+
+      if (p.finance && (p.finance.income > 0 || p.finance.expense > 0)) {
+        document.getElementById('pFinanceCard').style.display = 'block';
+        document.getElementById('pFinance').innerHTML =
+          '<div class="finance-box income"><div class="f-label">Income</div><div class="f-value">UGX ' + Number(p.finance.income).toLocaleString() + '</div></div>' +
+          '<div class="finance-box expense"><div class="f-label">Expenses</div><div class="f-value">UGX ' + Number(p.finance.expense).toLocaleString() + '</div></div>' +
+          '<div class="finance-box balance"><div class="f-label">Balance</div><div class="f-value">UGX ' + Number(p.finance.balance).toLocaleString() + '</div></div>';
+      } else if (p.finance === null) {
+        document.getElementById('pFinanceCard').style.display = 'block';
+        document.getElementById('pFinance').innerHTML =
+          '<div style="grid-column:1/-1;text-align:center;padding:1.5rem;color:var(--text-dim);font-size:0.9rem">' +
+          '<span class="icon-inline icon-sm" style="margin-right:0.3rem"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></span>' +
+          'Financial data is available to members. <a href="/login" style="color:var(--accent)">Login</a> to view.</div>';
+      }
+
+      document.getElementById('pFacts').innerHTML =
+        '<div style="font-size:0.88rem;line-height:2">' +
+        '<div><span class="text-dim">Status:</span> <strong>' + esc(p.status) + '</strong></div>' +
+        (p.start_date ? '<div><span class="text-dim">Started:</span> ' + fmtDate(p.start_date) + '</div>' : '') +
+        (p.end_date ? '<div><span class="text-dim">Ends:</span> ' + fmtDate(p.end_date) + '</div>' : '') +
+        '<div><span class="text-dim">Projects:</span> ' + p.projects.length + '</div>' +
+        (p.events ? '<div><span class="text-dim">Events:</span> ' + p.events.length + '</div>' : '') +
+        '</div>';
     }
 
-    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
-    function updateNavUser() {
-      const el = document.getElementById('navUser');
-      el.innerHTML = api._user
-        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
-        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
-    }
+    function fmtDate(d) { if (!d) return ''; var dt = new Date(d); return dt.toLocaleDateString('en',{year:'numeric',month:'short',day:'numeric'}); }
     load();
   </script>
 </body>

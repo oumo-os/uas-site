@@ -3,55 +3,124 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="img/uas-emblem.png">
+  <link rel="icon" type="image/png" href="/img/uas-emblem.png">
   <title>Admin — UAS</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="/css/base.css">
   <style>
-    .dash-header { padding: 1.5rem 0; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
-    .dash-header h1 { font-size: 1.5rem; font-weight: 700; }
-    .dash-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; overflow-x: auto; }
-    .dash-tab {
-      padding: 0.6rem 1rem; border-bottom: 2px solid transparent; color: var(--text-dim);
-      cursor: pointer; font-size: 0.85rem; white-space: nowrap; background: none;
-      border-top: none; border-left: none; border-right: none; font-family: inherit;
+    .admin-hero {
+      background: var(--accent); color: #fff; padding: 1.5rem 0; margin-bottom: 1.5rem;
     }
-    .dash-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .admin-hero h1 { font-size: 1.5rem; font-weight: 700; color: #fff; }
+    .admin-hero p { color: rgba(255,255,255,0.7); font-size: 0.9rem; }
+    .quick-switch {
+      display: flex; gap: 0.5rem; align-items: center; margin-top: 0.75rem; flex-wrap: wrap;
+    }
+    .quick-switch label { font-size: 0.8rem; color: rgba(255,255,255,0.7); }
+    .quick-switch select {
+      padding: 0.35rem 0.6rem; border-radius: var(--radius); border: 1px solid rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.1); color: #fff; font-size: 0.85rem; font-family: inherit;
+    }
+    .quick-switch select option { color: #1a2332; background: #fff; }
+    .dash-tabs {
+      display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem;
+      overflow-x: auto; background: var(--bg-card); border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      border: 1px solid var(--border); border-bottom: none;
+    }
+    .dash-tab {
+      padding: 0.75rem 1.25rem; border-bottom: 2px solid transparent; color: var(--text-dim);
+      cursor: pointer; font-size: 0.88rem; white-space: nowrap; background: none;
+      border-top: none; border-left: none; border-right: none; font-family: inherit;
+      font-weight: 500; transition: all 0.15s;
+    }
+    .dash-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--bg-card); }
+    .dash-tab:hover:not(.active) { color: var(--text); background: var(--accent-glow); }
     .dash-panel { display: none; }
     .dash-panel.active { display: block; }
-    .audit-row { display: flex; gap: 0.75rem; padding: 0.6rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+    .member-row {
+      display: flex; gap: 1rem; align-items: center; padding: 0.85rem 1rem;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+      margin-bottom: 0.5rem; transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .member-row:hover { border-color: var(--border-focus); box-shadow: var(--shadow-md); }
+    .member-avatar {
+      width: 42px; height: 42px; border-radius: 50%; background: var(--accent-glow);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600; color: var(--accent); font-size: 0.85rem; flex-shrink: 0;
+    }
+    .member-info { flex: 1; }
+    .member-info h4 { font-size: 0.92rem; margin-bottom: 0.1rem; }
+    .member-info p { font-size: 0.8rem; color: var(--text-dim); margin: 0; }
+    .member-actions { display: flex; gap: 0.35rem; align-items: center; flex-shrink: 0; }
+    .role-card {
+      padding: 1.1rem; margin-bottom: 0.75rem; background: var(--bg-card);
+      border: 1px solid var(--border); border-radius: var(--radius-lg);
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .role-card:hover { border-color: var(--border-focus); box-shadow: var(--shadow-md); }
+    .role-card h4 { font-size: 1rem; margin-bottom: 0.25rem; }
+    .role-caps { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.5rem; }
+    .role-cap {
+      font-size: 0.68rem; padding: 0.15rem 0.4rem; border-radius: 4px;
+      background: var(--accent-glow); color: var(--accent); font-family: monospace;
+    }
+    .resolution-card {
+      padding: 1.1rem; margin-bottom: 0.75rem; background: var(--bg-card);
+      border: 1px solid var(--border); border-radius: var(--radius-lg);
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .resolution-card:hover { border-color: var(--border-focus); box-shadow: var(--shadow-md); }
+    .audit-row {
+      display: flex; gap: 0.75rem; padding: 0.65rem 0; border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
     .audit-row .time { color: var(--text-faint); min-width: 140px; }
     .audit-row .action { color: var(--accent); min-width: 120px; font-weight: 500; }
     .audit-row .detail { color: var(--text-dim); flex: 1; }
-    .member-row { display: flex; gap: 1rem; align-items: center; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 0.5rem; }
-    .member-avatar {
-      width: 40px; height: 40px; border-radius: 50%; background: var(--accent-glow);
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 600; color: var(--accent); font-size: 0.85rem;
+    .inbox-item {
+      padding: 1rem; margin-bottom: 0.5rem; background: var(--bg-card);
+      border: 1px solid var(--border); border-radius: var(--radius); transition: border-color 0.15s;
     }
-    .member-info { flex: 1; }
-    .member-info h4 { font-size: 0.9rem; }
-    .member-info p { font-size: 0.8rem; color: var(--text-dim); }
+    .inbox-item:hover { border-color: var(--border-focus); }
+    .inbox-item.unread { border-left: 3px solid var(--gold); }
+    .ops-section {
+      padding: 1.25rem; background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .ops-section:hover { border-color: var(--border-focus); box-shadow: var(--shadow-md); }
+    .ops-section h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; }
+    .finance-item { padding: 0.4rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+    .finance-item:last-child { border-bottom: none; }
+    .empty-state { text-align: center; padding: 2rem 1rem; color: var(--text-dim); }
+    .empty-state p { font-size: 0.9rem; }
   </style>
 </head>
 <body>
-  <nav class="nav">
-    <div class="container" style="display:flex;align-items:center;width:100%">
-      <a href="/" class="nav-brand">UAS</a>
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="container">
+      <a href="/" class="nav-brand"><img src="/img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
+      <button class="nav-burger" onclick="this.closest('.nav').classList.toggle('open')" aria-label="Menu">&#9776;</button>
       <div class="nav-links">
         <a href="/" class="nav-link">Home</a>
-        <a href="/dashboard" class="nav-link">Dashboard</a>
-        <a href="/profile" class="nav-link">Profile</a>
         <a href="/admin" class="nav-link active">Admin</a>
       </div>
-      <div class="nav-user" id="navUser"></div>
+      <div class="nav-right"><div class="nav-user" id="navUser"></div></div>
     </div>
   </nav>
 
-  <div class="container">
-    <div class="dash-header">
+  <div class="admin-hero">
+    <div class="container">
       <h1>Administration</h1>
+      <p>Manage members, roles, governance, and operations</p>
+      <div class="quick-switch" id="quickSwitch">
+        <label>Switch user:</label>
+        <select id="userSwitcher" onchange="switchUser(this.value)">
+          <option value="">-- Select a user --</option>
+        </select>
+      </div>
     </div>
+  </div>
+
+  <div class="container">
 
     <div class="dash-tabs" id="adminTabs">
       <button class="dash-tab active" data-panel="members">Members</button>
@@ -111,8 +180,8 @@
         </div>
       </div>
       <div class="grid-2 gap-3" style="align-items:start">
-        <div class="card" style="padding:1rem">
-          <h3 class="section-title" style="margin:0 0 0.75rem">Finance</h3>
+        <div class="ops-section">
+          <h3>Finance</h3>
           <div class="flex gap-2" style="flex-wrap:wrap">
             <input class="form-input" id="finAmount" type="number" step="0.01" placeholder="Amount" style="width:110px">
             <select class="form-select" id="finType" style="width:110px"><option value="income">Income</option><option value="expense">Expense</option></select>
@@ -122,8 +191,8 @@
           </div>
           <div id="financeList" class="mt-2 small"></div>
         </div>
-        <div class="card" style="padding:1rem">
-          <h3 class="section-title" style="margin:0 0 0.75rem">Documents</h3>
+        <div class="ops-section">
+          <h3>Documents</h3>
           <div class="flex gap-2" style="flex-wrap:wrap">
             <input class="form-input" id="docTitle" placeholder="Title" style="flex:1.5">
             <input class="form-input" id="docPath" placeholder="File path" style="flex:1.5">
@@ -134,8 +203,8 @@
         </div>
       </div>
       <div class="grid-2 gap-3 mt-2" style="align-items:start">
-        <div class="card" style="padding:1rem">
-          <h3 class="section-title" style="margin:0 0 0.75rem">Assignments</h3>
+        <div class="ops-section">
+          <h3>Assignments</h3>
           <div class="flex gap-2" style="flex-wrap:wrap">
             <input class="form-input" id="asgTitle" placeholder="Task title" style="flex:2">
             <input class="form-input" id="asgDue" type="date" style="width:150px">
@@ -143,8 +212,8 @@
           </div>
           <div id="asgList" class="mt-2 small"></div>
         </div>
-        <div class="card" style="padding:1rem">
-          <h3 class="section-title" style="margin:0 0 0.75rem">Calendar</h3>
+        <div class="ops-section">
+          <h3>Calendar</h3>
           <div class="flex gap-2" style="flex-wrap:wrap">
             <input class="form-input" id="calTitle" placeholder="Item title" style="flex:2">
             <input class="form-input" id="calDeadline" type="datetime-local" style="width:170px">
@@ -155,8 +224,8 @@
         </div>
       </div>
       <div class="grid-2 gap-3 mt-2" style="align-items:start">
-        <div class="card" style="padding:1rem">
-          <h3 class="section-title" style="margin:0 0 0.75rem">Partners</h3>
+        <div class="ops-section">
+          <h3>Partners</h3>
           <div class="flex gap-2" style="flex-wrap:wrap">
             <input class="form-input" id="pOrg" placeholder="Organization" style="flex:2">
             <input class="form-input" id="pWebsite" placeholder="Website" style="flex:2">
@@ -165,8 +234,8 @@
           </div>
           <div id="partnerList" class="mt-2 small"></div>
         </div>
-        <div class="card" style="padding:1rem">
-          <h3 class="section-title" style="margin:0 0 0.75rem">Useful Links</h3>
+        <div class="ops-section">
+          <h3>Useful Links</h3>
           <div class="flex gap-2" style="flex-wrap:wrap">
             <input class="form-input" id="lTitle" placeholder="Title" style="flex:2">
             <input class="form-input" id="lUrl" placeholder="URL" style="flex:2">
@@ -193,7 +262,7 @@
     </div>
   </div>
 
-  <script src="js/api.js"></script>
+  <script src="/js/api.js"></script>
   <script>
     async function load() {
       try {
@@ -225,29 +294,60 @@
 
     function renderMembers(members) {
       const div = document.getElementById('membersList');
-      if (!members.length) { div.innerHTML = '<p class="text-dim">No members.</p>'; return; }
+      const switcher = document.getElementById('userSwitcher');
+      if (!members.length) { div.innerHTML = '<div class="empty-state"><p>No members.</p></div>'; return; }
+
+      // Populate user switcher
+      if (api.hasCap('admin.system') && switcher.options.length <= 1) {
+        members.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.user_id;
+          opt.textContent = `${m.name} (${m.email})`;
+          switcher.appendChild(opt);
+        });
+      }
+
       div.innerHTML = members.map(m => {
         const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
         const accountStatus = m.user_status || 'active';
         const canApprove = api.hasCap('members.approve') && accountStatus === 'pending';
+        const roles = (m.roles || []).map(r => r.title || r).join(', ');
         return `
           <div class="member-row">
             <div class="member-avatar">${initials}</div>
             <div class="member-info">
-              <h4>${esc(m.name)}</h4>
+              <h4>${esc(m.name)} ${roles ? `<span style="font-size:0.75rem;color:var(--text-dim);font-weight:400">&middot; ${esc(roles)}</span>` : ''}</h4>
               <p>${esc(m.email)} &middot; ${esc(m.membership_number || '—')} &middot; ${esc(m.category)}</p>
             </div>
             <span class="badge badge-${accountStatus === 'active' ? 'active' : 'inactive'}">${esc(accountStatus)}</span>
-            ${canApprove ? `
-              <button class="btn btn-primary btn-sm" onclick="setMemberStatus(${m.user_id}, 'active')">Approve</button>
-              <button class="btn btn-outline btn-sm" onclick="setMemberStatus(${m.user_id}, 'pending')">Reject</button>
-            ` : ''}
-            ${api.hasCap('members.manage') ? `
-              <button class="btn btn-outline btn-sm" onclick="resetPassword(${m.user_id}, '${esc(m.name)}')">Reset Password</button>
-            ` : ''}
+            <div class="member-actions">
+              ${canApprove ? `
+                <button class="btn btn-primary btn-xs" onclick="setMemberStatus(${m.user_id}, 'active')">Approve</button>
+                <button class="btn btn-outline btn-xs" onclick="setMemberStatus(${m.user_id}, 'pending')">Reject</button>
+              ` : ''}
+              ${api.hasCap('admin.system') && accountStatus === 'active' ? `
+                <button class="btn btn-outline btn-xs" onclick="loginAsUser(${m.user_id})" title="Login as this user">Login as</button>
+              ` : ''}
+              ${api.hasCap('members.manage') ? `
+                <button class="btn btn-outline btn-xs" onclick="resetPassword(${m.user_id}, '${esc(m.name)}')">Reset PW</button>
+              ` : ''}
+            </div>
           </div>
         `;
       }).join('');
+    }
+
+    async function loginAsUser(userId) {
+      if (!confirm('Switch to this user? You will be logged in as them.')) return;
+      try {
+        await api.loginAs(userId);
+        window.location.href = ua('/dashboard');
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function switchUser(userId) {
+      if (!userId) return;
+      await loginAsUser(parseInt(userId));
     }
 
     async function setMemberStatus(userId, status) {
@@ -286,19 +386,32 @@
 
     function renderRoles(roles) {
       const div = document.getElementById('rolesList');
-      if (!roles.length) { div.innerHTML = '<p class="text-dim">No roles defined.</p>'; return; }
+      if (!roles.length) { div.innerHTML = '<div class="empty-state"><p>No roles defined.</p></div>'; return; }
       div.innerHTML = roles.map(r => `
-        <div class="card" style="margin-bottom:0.5rem;padding:1rem">
+        <div class="role-card">
           <div class="flex-between">
             <div>
-              <strong>${esc(r.title)}</strong>
-              <span class="badge badge-${esc(r.status)}" style="margin-left:0.5rem">${esc(r.status)}</span>
+              <h4>${esc(r.title)}</h4>
+              <span class="badge badge-${esc(r.status)}">${esc(r.status)}</span>
+              <span class="text-sm text-dim" style="margin-left:0.5rem">${esc(r.scope || 'institutional')}</span>
             </div>
-            <span class="text-sm text-dim">${esc(r.scope || 'institutional')}</span>
+            ${r.member_count ? `<span class="text-sm text-dim">${r.member_count} member${r.member_count > 1 ? 's' : ''}</span>` : ''}
           </div>
           ${r.description ? `<p class="text-sm text-dim mt-1">${esc(r.description)}</p>` : ''}
+          <div class="role-caps" id="caps-${r.id}"><span class="text-sm text-dim">Loading capabilities...</span></div>
         </div>
       `).join('');
+      // Load capabilities for each role
+      roles.forEach(r => {
+        api.request('/roles/' + r.id + '/capabilities').then(caps => {
+          const el = document.getElementById('caps-' + r.id);
+          if (el && caps.length) {
+            el.innerHTML = caps.map(c => `<span class="role-cap">${esc(c.slug)}</span>`).join('');
+          } else if (el) {
+            el.innerHTML = '<span class="text-sm text-dim">No capabilities</span>';
+          }
+        }).catch(() => {});
+      });
     }
 
     function renderResolutions(resolutions) {
@@ -346,13 +459,13 @@
 
     function renderInbox(list) {
       const div = document.getElementById('inboxList');
-      if (!list.length) { div.innerHTML = '<p class="text-dim">No messages yet.</p>'; return; }
+      if (!list.length) { div.innerHTML = '<div class="empty-state"><p>No messages yet.</p></div>'; return; }
       div.innerHTML = list.map(m => `
-        <div class="card" style="padding:0.9rem 1rem;margin-bottom:0.5rem">
+        <div class="inbox-item ${m.status === 'new' ? 'unread' : ''}">
           <div class="flex-between">
             <div>
               <strong>${esc(m.subject || '(no subject)')}</strong>
-              <div class="text-dim text-sm">${esc(m.name)} &lt;${esc(m.email)}&gt; · ${esc(m.created_at)}</div>
+              <div class="text-dim text-sm">${esc(m.name)} &lt;${esc(m.email)}&gt; &middot; ${esc(m.created_at)}</div>
               <div class="text-sm mt-1">${esc(m.message)}</div>
             </div>
             <span class="badge ${m.status === 'new' ? 'badge-active' : 'badge-inactive'}">${esc(m.status)}</span>
@@ -563,14 +676,6 @@
         document.querySelectorAll('.dash-tab').forEach(t => t.classList.toggle('active', t.dataset.panel === tab.dataset.panel));
         document.querySelectorAll('.dash-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab.dataset.panel));
       });
-    }
-
-    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
-    function updateNavUser() {
-      const el = document.getElementById('navUser');
-      el.innerHTML = api._user
-        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
-        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
     }
     load();
   </script>

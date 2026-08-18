@@ -3,85 +3,174 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="img/uas-emblem.png">
+  <link rel="icon" type="image/png" href="/img/uas-emblem.png">
   <title>Events — Uganda Astronomical Society</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/base.css">
+  <meta name="description" content="Upcoming astronomy events, observing nights, workshops, and star parties in Uganda.">
+  <meta property="og:title" content="Events — Uganda Astronomical Society">
+  <meta property="og:description" content="Upcoming astronomy events, observing nights, workshops, and star parties in Uganda.">
+  <meta property="og:image" content="/img/uas-emblem.png">
+  <meta property="og:type" content="website">
+  <link rel="stylesheet" href="/css/base.css">
   <style>
-    .page-header { padding: 3rem 0 2rem; text-align: center; }
-    .page-header h1 { font-size: 2.2rem; font-weight: 800; }
-    .page-header p { color: var(--text-dim); max-width: 600px; margin: 0.5rem auto 0; }
+    .page-hero {
+      position:relative; min-height:45vh; display:flex; flex-direction:column;
+      justify-content:center; align-items:flex-start; padding:6rem 1.5rem 4rem; background:url('/img/header-events.jpg') center/cover no-repeat; color:#fff;
+    }
+    .page-hero::before { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(15,23,42,0.6) 0%,rgba(15,23,42,0.85) 100%); }
+    .page-hero > * { position:relative; z-index:1; }
+    .page-hero h1 { font-size:2.8rem; font-weight:700; color:#fff; margin-bottom:0.75rem; }
+    .page-hero p { font-size:1.1rem; color:rgba(255,255,255,0.85); max-width:600px; }
+
+    .section { padding:4rem 0; }
+    .section-alt { background:var(--bg-card); border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+
+    .filter-bar { display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1.5rem; justify-content:center; }
+    .filter-chip {
+      padding:0.45rem 1rem; border-radius:999px; border:1px solid var(--border);
+      background:transparent; color:var(--text-dim); font-size:0.85rem; cursor:pointer;
+      font-family:inherit; transition:all 0.2s;
+    }
+    .filter-chip:hover, .filter-chip.active { border-color:var(--accent); color:var(--accent); background:var(--accent-glow); }
+
+    .event-list { max-width:900px; margin:0 auto; }
     .event-card {
-      display: flex;
-      gap: 1.25rem;
-      padding: 1.25rem;
-      margin-bottom: 1rem;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      background: var(--bg-card);
+      display:flex; gap:1.25rem; padding:1.5rem; background:var(--bg-card); border:1px solid var(--border);
+      border-radius:var(--radius-lg); margin-bottom:1rem; transition:all 0.3s; cursor:pointer;
     }
+    .event-card:hover { border-color:var(--border-focus); box-shadow:var(--shadow-md); }
+    .event-card img { width:180px; height:120px; object-fit:cover; border-radius:var(--radius); flex-shrink:0; }
     .event-date-box {
-      min-width: 70px;
-      text-align: center;
-      padding: 0.75rem;
-      background: var(--accent-glow);
-      border-radius: var(--radius);
-      align-self: flex-start;
+      min-width:64px; text-align:center; padding:0.75rem 0.5rem; background:var(--accent-glow);
+      border-radius:var(--radius); flex-shrink:0; align-self:flex-start;
     }
-    .event-date-box .day { font-size: 1.8rem; font-weight: 700; color: var(--accent); line-height: 1; }
-    .event-date-box .month { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; }
-    .event-date-box .year { font-size: 0.7rem; color: var(--text-faint); }
-    .event-body h3 { font-size: 1.1rem; margin-bottom: 0.35rem; }
-    .event-body p { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 0.5rem; }
-    .event-meta { display: flex; gap: 1rem; font-size: 0.8rem; color: var(--text-faint); flex-wrap: wrap; }
+    .event-date-box .day { font-size:1.6rem; font-weight:700; color:var(--accent); line-height:1; font-family:var(--font-heading); }
+    .event-date-box .month { font-size:0.72rem; color:var(--text-dim); text-transform:uppercase; margin-top:0.2rem; }
+    .event-body { flex:1; min-width:0; }
+    .event-body h3 { font-size:1.1rem; margin-bottom:0.35rem; display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; }
+    .event-body p { font-size:0.9rem; color:var(--text-dim); line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .event-meta { display:flex; gap:0.75rem; font-size:0.82rem; color:var(--text-dim); flex-wrap:wrap; margin-top:0.5rem; }
+    .event-meta span { display:flex; align-items:center; gap:0.25rem; }
+    .capacity-bar { background:var(--border); border-radius:4px; height:5px; margin-top:0.5rem; overflow:hidden; max-width:200px; }
+    .capacity-bar .fill { height:100%; background:var(--success); border-radius:4px; transition:width 0.3s; }
+    .event-actions { display:flex; gap:0.5rem; margin-top:0.75rem; flex-wrap:wrap; align-items:center; }
+
+    .stat-row { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; max-width:600px; margin:0 auto 2.5rem; }
+    .stat-item { text-align:center; padding:1.25rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); }
+    .stat-item .stat-val { font-size:1.8rem; font-weight:700; color:var(--accent); }
+    .stat-item .stat-lbl { font-size:0.8rem; color:var(--text-dim); margin-top:0.25rem; }
+
+    .empty-state { text-align:center; padding:4rem 0; }
+    .empty-state p { color:var(--text-dim); font-size:1rem; }
+
+    @media (max-width:768px) {
+      .page-hero { min-height:35vh; padding:4rem 1rem 3rem; }
+      .page-hero h1 { font-size:1.8rem; }
+      .event-card { flex-direction:column; padding:1rem; }
+      .event-card img { width:100%; height:160px; }
+      .event-card > div { flex-direction:column; }
+      .stat-row { grid-template-columns:repeat(3,1fr); }
+    }
   </style>
 </head>
 <body>
-  <nav class="nav">
-    <div class="container" style="display:flex;align-items:center;width:100%">
-      <a href="/" class="nav-brand">UAS</a>
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="container">
+      <a href="/" class="nav-brand"><img src="/img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
+      <button class="nav-burger" aria-label="Toggle navigation menu" onclick="this.closest('.nav').classList.toggle('open')" aria-label="Menu">&#9776;</button>
       <div class="nav-links">
         <a href="/" class="nav-link">Home</a>
         <a href="/about" class="nav-link">About</a>
         <a href="/programmes" class="nav-link">Programmes</a>
         <a href="/events" class="nav-link active">Events</a>
         <a href="/knowledge" class="nav-link">Knowledge</a>
-        <a href="/library" class="nav-link">Library</a>
-        <a href="/ecosystem" class="nav-link">Ecosystem</a>
-        <a href="/members" class="nav-link">Members</a>
         <a href="/contact" class="nav-link">Contact</a>
-        <a href="/search" class="nav-link">Search</a>
-        <a href="/dashboard" class="nav-link">Dashboard</a>
-        <a href="/profile" class="nav-link">Profile</a>
-        </div>
-      <div class="nav-user" id="navUser"></div>
+      </div>
+      <div class="nav-right"><div class="nav-user" id="navUser"></div></div>
     </div>
   </nav>
 
-  <div class="container">
-    <div class="page-header">
+  <section class="page-hero">
+    <div class="container">
       <h1>Events</h1>
       <p>Observing sessions, lectures, workshops, and community gatherings</p>
     </div>
-    <div style="display:flex;gap:0.5rem;margin-bottom:1.25rem">
-      <button class="btn btn-primary btn-sm" id="fAll" onclick="setFilter('all')">All</button>
-      <button class="btn btn-outline btn-sm" id="fUpcoming" onclick="setFilter('upcoming')">Upcoming</button>
-      <button class="btn btn-outline btn-sm" id="fPast" onclick="setFilter('past')">Past</button>
-    </div>
-    <div id="eventsList"></div>
-  </div>
+  </section>
 
-  <footer>
+  <section class="section">
     <div class="container">
-      <p>&copy; 2026 Uganda Astronomical Society. All rights reserved.</p>
+      <div class="stat-row">
+        <div class="stat-item"><div class="stat-val" id="statTotal">&mdash;</div><div class="stat-lbl">Total Events</div></div>
+        <div class="stat-item"><div class="stat-val" id="statUpcoming">&mdash;</div><div class="stat-lbl">Upcoming</div></div>
+        <div class="stat-item"><div class="stat-val" id="statAttending">&mdash;</div><div class="stat-lbl">Your RSVPs</div></div>
+      </div>
+
+      <div class="filter-bar">
+        <button class="filter-chip active" data-filter="all">All Events</button>
+        <button class="filter-chip" data-filter="upcoming">Upcoming</button>
+        <button class="filter-chip" data-filter="past">Past Events</button>
+      </div>
+
+      <div class="event-list" id="eventsList"></div>
+      <div class="pagination" id="eventsPagination"></div>
+    </div>
+  </section>
+
+  <section class="section section-alt">
+    <div class="container" style="text-align:center">
+      <h2 class="section-title">Don't Miss Out</h2>
+      <p class="section-subtitle">Join UAS to get notified about upcoming observing sessions, lectures, and workshops.</p>
+      <a href="/login" class="btn btn-primary btn-lg">Become a Member</a>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">Uganda Astronomical Society</div>
+          <p class="footer-desc">A public scientific society advancing astronomy, space science and scientific discovery in Uganda since 2024.</p>
+        </div>
+        <div>
+          <div class="footer-heading">Explore</div>
+          <ul class="footer-links">
+            <li><a href="/about">About UAS</a></li>
+            <li><a href="/programmes">Programmes</a></li>
+            <li><a href="/events">Events</a></li>
+            <li><a href="/knowledge">Knowledge Base</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Community</div>
+          <ul class="footer-links">
+            <li><a href="/members">Members</a></li>
+            <li><a href="/ecosystem">Ecosystem</a></li>
+            <li><a href="/library">Library</a></li>
+            <li><a href="/contact">Contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-heading">Connect</div>
+          <ul class="footer-links">
+            <li><a href="mailto:contact@astronomy.ug">contact@astronomy.ug</a></li>
+            <li><a href="/login">Member Login</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2026 Uganda Astronomical Society. All rights reserved.</span>
+        <span>Kampala, Uganda</span>
+      </div>
     </div>
   </footer>
 
-  <script src="js/api.js"></script>
+  <script src="/js/api.js"></script>
   <script>
+    const eventImgs = ['/img/event-nightwatch.jpg','/img/event-workshop.jpg','/img/event-lecture.jpg'];
     let myRsvps = {};
     let allEvents = [];
     let currentFilter = 'all';
+    let evPage = 1;
+    const EV_PER = 6;
 
     async function load() {
       try { await api.me(); } catch(e) {}
@@ -93,75 +182,103 @@
       ]);
       myEvents.forEach(e => { if (e.status === 'published') myRsvps[e.id] = true; });
       allEvents = events;
+
+      // Stats
+      const now = new Date();
+      document.getElementById('statTotal').textContent = allEvents.length;
+      document.getElementById('statUpcoming').textContent = allEvents.filter(e => new Date(e.date) >= now && e.status === 'published').length;
+      document.getElementById('statAttending').textContent = Object.keys(myRsvps).length;
+
+      // Filter chips
+      document.querySelectorAll('.filter-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          currentFilter = chip.dataset.filter;
+          evPage = 1;
+          renderEvents();
+        });
+      });
+
       renderEvents();
     }
 
-    function setFilter(f) {
-      currentFilter = f;
-      ['all', 'upcoming', 'past'].forEach(k => {
-        const btn = document.getElementById('f' + k[0].toUpperCase() + k.slice(1));
-        if (btn) btn.className = 'btn ' + (k === f ? 'btn-primary' : 'btn-outline') + ' btn-sm';
-      });
-      renderEvents();
+    function renderRsvpButton(e, full, cancelled, past) {
+      if (cancelled || past) return '';
+      if (!api._user) return '<a href="/login" class="btn btn-outline btn-sm">Sign in to RSVP</a>';
+      if (myRsvps[e.id]) return '<button class="btn btn-outline btn-sm" onclick="cancelRsvp(' + e.id + ')">Cancel RSVP</button>';
+      if (full) return '<button class="btn btn-sm" disabled style="opacity:0.5">Full</button>';
+      return '<button class="btn btn-primary btn-sm" onclick="rsvp(' + e.id + ')">RSVP</button>';
     }
 
     function renderEvents() {
       const div = document.getElementById('eventsList');
+      const pag = document.getElementById('eventsPagination');
       const now = new Date();
       const events = allEvents.filter(e => {
         if (currentFilter === 'upcoming') return new Date(e.date) >= now && e.status === 'published';
         if (currentFilter === 'past') return new Date(e.date) < now || e.status === 'cancelled' || e.status === 'completed';
         return true;
       });
+
       if (!events.length) {
-        div.innerHTML = '<p class="text-center text-dim" style="padding:3rem 0">No events here yet. Check back soon!</p>';
+        div.innerHTML = '<div class="empty-state"><p>No events here yet. Check back soon!</p></div>';
+        pag.innerHTML = '';
         return;
       }
-      div.innerHTML = events.map(e => {
-          const d = new Date(e.date);
-          const full = e.capacity ? e.rsvp_count >= e.capacity : false;
-          const cancelled = e.status === 'cancelled';
-          return `
-            <div class="event-card">
-              <div class="event-date-box">
-                <div class="day">${d.getDate()}</div>
-                <div class="month">${d.toLocaleString('en',{month:'short'})}</div>
-                <div class="year">${d.getFullYear()}</div>
-              </div>
-              <div class="event-body">
-                <h3>${esc(e.title)} ${cancelled ? '<span class="badge badge-inactive">cancelled</span>' : ''}</h3>
-                <p>${esc(e.description || '').slice(0, 200)}</p>
-                <div class="event-meta">
-                  ${e.location ? `<span>📍 ${esc(e.location)}</span>` : ''}
-                  <span>🕐 ${d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}</span>
-                  ${e.end_date ? `<span>→ ${new Date(e.end_date).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}</span>` : ''}
-                  <span>👥 ${e.rsvp_count || 0}${e.capacity ? ' / ' + e.capacity : ''} attending</span>
-                </div>
-                <div class="event-actions" style="margin-top:0.75rem">
-                  ${cancelled ? '' : `
-                  ${e.capacity ? `
-                    <div class="capacity-bar" style="background:var(--border);border-radius:4px;height:6px;margin-bottom:0.5rem;overflow:hidden">
-                      <div style="width:${Math.min(100, e.rsvp_count / e.capacity * 100)}%;height:100%;background:var(--success)"></div>
-                    </div>` : ''}
-                  ${api._user ? (myRsvps[e.id] ? `
-                    <button class="btn btn-outline btn-sm" onclick="cancelRsvp(${e.id})">Cancel RSVP</button>
-                  ` : (full ? `
-                    <button class="btn btn-sm" disabled style="opacity:0.6">Event Full</button>
-                  ` : `
-                    <button class="btn btn-primary btn-sm" onclick="rsvp(${e.id})">RSVP</button>
-                  `)) : `
-                    <a href="/login" class="btn btn-outline btn-sm">Sign in to RSVP</a>
-                  `}`}
-                  ${canManage(e) && !cancelled ? `
-                    <button class="btn btn-outline btn-sm" onclick="toggleAttendees(${e.id}, this)">View Attendees (${e.rsvp_count || 0})</button>
-                  ` : ''}
-                  <a class="btn btn-outline btn-sm" href="/event/${e.id}">Details</a>
-                </div>
-                ${canManage(e) ? `<div class="attendee-list" id="attendees-${e.id}" style="display:none;margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem"></div>` : ''}
-              </div>
+
+      const totalPages = Math.ceil(events.length / EV_PER);
+      if (evPage > totalPages) evPage = totalPages;
+      const start = (evPage - 1) * EV_PER;
+      const page = events.slice(start, start + EV_PER);
+
+      div.innerHTML = page.map((e, i) => {
+        const idx = start + i;
+        const d = new Date(e.date);
+        const full = e.capacity ? e.rsvp_count >= e.capacity : false;
+        const cancelled = e.status === 'cancelled';
+        const past = new Date(e.date) < now;
+        const pct = e.capacity ? Math.min(100, (e.rsvp_count || 0) / e.capacity * 100) : 0;
+
+        return `
+          <div class="event-card" onclick="location.href=ua('/event/${e.id}')">
+            <img src="${eventImgs[idx % eventImgs.length]}" alt="" loading="lazy">
+            <div class="event-date-box">
+              <div class="day">${d.getDate()}</div>
+              <div class="month">${d.toLocaleString('en',{month:'short'})}</div>
             </div>
-          `;
-        }).join('');
+            <div class="event-body">
+              <h3>
+                ${esc(e.title)}
+                ${cancelled ? '<span class="badge badge-inactive" style="font-size:0.7rem">cancelled</span>' : ''}
+                ${past && !cancelled ? '<span class="badge badge-dim" style="font-size:0.7rem">past</span>' : ''}
+              </h3>
+              <p>${esc(e.description || '').slice(0, 200)}</p>
+              <div class="event-meta">
+                ${e.location ? `<span><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>${esc(e.location)}</span>` : ''}
+                <span><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>${d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}${e.end_date ? ' — ' + new Date(e.end_date).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}) : ''}</span>
+                <span><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>${e.rsvp_count || 0}${e.capacity ? ' / ' + e.capacity : ''} attending</span>
+              </div>
+              ${e.capacity ? `<div class="capacity-bar"><div class="fill" style="width:${pct}%"></div></div>` : ''}
+              <div class="event-actions" onclick="event.stopPropagation()">
+                ${renderRsvpButton(e, full, cancelled, past)}
+                ${canManage(e) && !cancelled && !past ? '<button class="btn btn-outline btn-sm" onclick="toggleAttendees(' + e.id + ', this)">Attendees (' + (e.rsvp_count || 0) + ')</button>' : ''}
+                <a class="btn btn-outline btn-sm" href="/event/${e.id}">Details</a>
+              </div>
+              ${canManage(e) ? `<div class="attendee-list" id="attendees-${e.id}" style="display:none;margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem" onclick="event.stopPropagation()"></div>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Pagination controls
+      if (totalPages <= 1) { pag.innerHTML = ''; return; }
+      let btns = '<button ' + (evPage<=1?'disabled':'') + ' onclick="evPage--;renderEvents()">&#8249; Prev</button>';
+      for (let p=1; p<=totalPages; p++) {
+        btns += '<button class="' + (p===evPage?'active':'') + '" onclick="evPage=' + p + ';renderEvents()">' + p + '</button>';
+      }
+      btns += '<button ' + (evPage>=totalPages?'disabled':'') + ' onclick="evPage++;renderEvents()">Next &#8250;</button>';
+      pag.innerHTML = btns;
     }
 
     function canManage(e) {
@@ -178,9 +295,9 @@
       try {
         const list = await api.getEventRsvps(id);
         box.innerHTML = list.length ? list.map(r => `
-          <div class="flex-between" style="padding:0.25rem 0;font-size:0.85rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:0.35rem 0;font-size:0.85rem">
             <span>${esc(r.name)} <span class="text-dim">${esc(r.email)}</span></span>
-            <span class="flex gap-2" style="align-items:center">
+            <span style="display:flex;gap:0.5rem;align-items:center">
               <span class="badge badge-${r.status === 'registered' ? 'active' : (r.status === 'attended' ? 'active' : 'inactive')}">${esc(r.status)}</span>
               ${r.status === 'registered' ? `<button class="btn btn-outline btn-xs" onclick="markAttended(${id}, ${r.id})">Attended</button>` : ''}
             </span>
@@ -207,13 +324,7 @@
       catch(e) { alert(e.error || 'Failed'); }
     }
 
-    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
-    function updateNavUser() {
-      const el = document.getElementById('navUser');
-      el.innerHTML = api._user
-        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
-        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
-    }
+
     load();
   </script>
 </body>

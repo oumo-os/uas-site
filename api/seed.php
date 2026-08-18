@@ -29,6 +29,19 @@ if (!$stmt->fetch()) {
   echo "Admin already exists (id={$adminId})\n";
 }
 
+// Ensure admin has Board Director role
+$stmt = db()->prepare('SELECT id FROM roles WHERE title = ?');
+$stmt->execute(['Board Director']);
+$boardRoleId = $stmt->fetchColumn();
+if ($boardRoleId) {
+  $stmt = db()->prepare('SELECT id FROM role_assignments WHERE role_id = ? AND user_id = ? AND status = "active"');
+  $stmt->execute([$boardRoleId, $adminId]);
+  if (!$stmt->fetch()) {
+    assign_role($boardRoleId, $adminId, $adminId);
+    echo "Assigned Admin → Board Director\n";
+  }
+}
+
 // 2. Create board members
 $boardMembers = [
   ['name' => 'Cosmus Ngabirano', 'email' => 'cosmus@astronomy.ug', 'title' => 'President'],

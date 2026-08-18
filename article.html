@@ -3,84 +3,201 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/png" href="../img/uas-emblem.png">
-  <title id="docTitle">Article — Uganda Astronomical Society</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../css/base.css">
+  <link rel="icon" type="image/png" href="/img/uas-emblem.png">
+  <title>Article — Uganda Astronomical Society</title>
+  <meta name="description" content="Article — Uganda Astronomical Society.">
+  <meta property="og:title" content="Article — Uganda Astronomical Society">
+  <meta property="og:description" content="Article — Uganda Astronomical Society.">
+  <meta property="og:image" content="/img/uas-emblem.png">
+  <meta property="og:type" content="website">
+  <link rel="stylesheet" href="/css/base.css">
   <style>
-    .article-hero { padding: 3rem 0 1.5rem; border-bottom: 1px solid var(--border); margin-bottom: 2rem; }
-    .article-hero h1 { font-size: 2.1rem; font-weight: 800; line-height: 1.25; margin: 0 0 0.75rem; }
-    .article-body { font-size: 1.02rem; line-height: 1.85; color: var(--text); }
-    .article-body p { margin-bottom: 1.1rem; }
-    .article-body h2, .article-body h3 { color: #fff; margin: 1.5rem 0 0.75rem; }
-    .article-body img { max-width: 100%; border-radius: var(--radius-lg); margin: 1rem 0; }
-    .article-body blockquote { border-left: 3px solid var(--accent); margin: 1rem 0; padding: 0.5rem 1rem; background: var(--bg-card); border-radius: 0 var(--radius) var(--radius) 0; }
-    .article-body a { color: var(--accent); }
+    .page-hero {
+      position:relative; min-height:35vh; display:flex; flex-direction:column;
+      justify-content:flex-end; padding:6rem 1.5rem 3rem; color:#fff;
+    }
+    .page-hero .hero-bg { position:absolute; inset:0; background-size:cover; background-position:center; }
+    .page-hero .hero-bg::after { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(15,23,42,0.4) 0%,rgba(15,23,42,0.85) 100%); }
+    .page-hero > * { position:relative; z-index:1; }
+    .page-hero .breadcrumb { font-size:0.85rem; margin-bottom:0.75rem; }
+    .page-hero .breadcrumb a { color:rgba(255,255,255,0.7); text-decoration:none; }
+    .page-hero .breadcrumb a:hover { color:#fff; }
+    .page-hero h1 { font-size:2.2rem; font-weight:700; color:#fff; margin-bottom:0.5rem; line-height:1.25; }
+    .hero-meta { display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; margin-top:0.5rem; font-size:0.9rem; }
+    .hero-meta span { color:rgba(255,255,255,0.8); display:flex; align-items:center; gap:0.3rem; }
+    .reading-time { display:inline-flex; align-items:center; gap:0.3rem; padding:0.2rem 0.6rem; background:rgba(255,255,255,0.15); border-radius:999px; font-size:0.78rem; }
+
+    .section { padding:3rem 0; }
+    .content-grid { display:grid; grid-template-columns:2fr 1fr; gap:2rem; align-items:start; }
+    .sidebar { position:sticky; top:100px; }
+
+    .article-body { font-size:1.02rem; line-height:1.85; color:var(--text); }
+    .article-body p { margin-bottom:1.1rem; }
+    .article-body h2, .article-body h3 { color:var(--text); margin:1.5rem 0 0.75rem; }
+    .article-body img { max-width:100%; border-radius:var(--radius-lg); margin:1rem 0; }
+    .article-body blockquote { border-left:3px solid var(--accent); margin:1rem 0; padding:0.5rem 1rem; background:var(--bg-card); border-radius:0 var(--radius) var(--radius) 0; }
+    .article-body a { color:var(--accent); }
+
+    .card-section { padding:1.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); margin-bottom:1.5rem; }
+    .card-section h3 { font-size:1rem; font-weight:700; margin-bottom:0.75rem; padding-bottom:0.5rem; border-bottom:1px solid var(--border); }
+
+    .tags-row { display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.5rem; }
+    .tag-pill { padding:0.2rem 0.6rem; border-radius:999px; background:var(--accent-glow); color:var(--accent); font-size:0.78rem; font-weight:500; text-decoration:none; transition:all 0.2s; }
+    .tag-pill:hover { background:var(--accent); color:#fff; }
+
+    .related-card { display:block; padding:1rem; border:1px solid var(--border); border-radius:var(--radius-lg); margin-bottom:0.75rem; text-decoration:none; color:var(--text); transition:all 0.2s; }
+    .related-card:hover { border-color:var(--border-focus); box-shadow:var(--shadow); }
+    .related-card h4 { font-size:0.9rem; margin-bottom:0.2rem; }
+    .related-card p { font-size:0.78rem; color:var(--text-dim); }
+
+    .share-row { display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:1rem; }
+    .share-btn { display:inline-flex; align-items:center; gap:0.3rem; padding:0.4rem 0.75rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-card); color:var(--text-dim); font-size:0.78rem; text-decoration:none; transition:all 0.2s; }
+    .share-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+    @media (max-width:768px) {
+      .page-hero { min-height:25vh; padding:4rem 1rem 2rem; }
+      .page-hero h1 { font-size:1.5rem; }
+      .content-grid { grid-template-columns:1fr; }
+      .sidebar { position:static; }
+    }
   </style>
 </head>
 <body>
-  <nav class="nav">
-    <div class="container" style="display:flex;align-items:center;width:100%">
-      <a href="/" class="nav-brand">UAS</a>
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="container">
+      <a href="/" class="nav-brand"><img src="/img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
+      <button class="nav-burger" onclick="this.closest('.nav').classList.toggle('open')" aria-label="Menu">&#9776;</button>
       <div class="nav-links">
         <a href="/" class="nav-link">Home</a>
         <a href="/about" class="nav-link">About</a>
         <a href="/programmes" class="nav-link">Programmes</a>
         <a href="/events" class="nav-link">Events</a>
-        <a href="/knowledge" class="nav-link">Knowledge</a>
-        <a href="/library" class="nav-link">Library</a>
-        <a href="/ecosystem" class="nav-link">Ecosystem</a>
-        <a href="/members" class="nav-link">Members</a>
+        <a href="/knowledge" class="nav-link active">Knowledge</a>
         <a href="/contact" class="nav-link">Contact</a>
-        <a href="/search" class="nav-link">Search</a>
-        <a href="/dashboard" class="nav-link">Dashboard</a>
       </div>
-      <div class="nav-user" id="navUser"></div>
+      <div class="nav-right"><div class="nav-user" id="navUser"></div></div>
     </div>
   </nav>
 
-  <div class="container" style="max-width:780px">
-    <div class="article-hero">
-      <a href="/" class="text-dim" style="font-size:0.85rem;text-decoration:none">← Home</a>
+  <section class="page-hero">
+    <div class="hero-bg" id="aHeroBg"></div>
+    <div class="container" style="max-width:780px">
+      <div class="breadcrumb"><a href="/knowledge">Knowledge Base</a> &rsaquo; <span id="aBreadcrumb"></span></div>
       <h1 id="aTitle"></h1>
-      <div class="text-dim" id="aMeta"></div>
+      <div class="hero-meta" id="aMeta"></div>
     </div>
-    <div class="article-body" id="aBody"></div>
-  </div>
+  </section>
 
-  <footer>
+  <section class="section" style="padding-top:0">
+    <div class="container" style="max-width:1000px">
+      <div class="content-grid">
+        <div class="content-main">
+          <div class="article-body" id="aBody"></div>
+          <div id="aTags" class="tags-row" style="margin-top:2rem;padding-top:1rem;border-top:1px solid var(--border)"></div>
+          <div class="share-row" id="aShare"></div>
+        </div>
+        <div class="sidebar">
+          <div class="card-section" id="aAuthorCard">
+            <h3>About the Author</h3>
+            <div id="aAuthor"></div>
+          </div>
+          <div class="card-section" id="aRelatedCard" style="display:none">
+            <h3>Related Articles</h3>
+            <div id="aRelated"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
     <div class="container">
-      <p>&copy; 2026 Uganda Astronomical Society. All rights reserved.</p>
+      <div class="footer-grid">
+        <div><div class="footer-brand">Uganda Astronomical Society</div><p class="footer-desc">Advancing astronomy education, research, and outreach across Uganda since 2024.</p></div>
+        <div><div class="footer-heading">Explore</div><ul class="footer-links"><li><a href="/about">About UAS</a></li><li><a href="/programmes">Programmes</a></li><li><a href="/events">Events</a></li><li><a href="/knowledge">Knowledge Base</a></li></ul></div>
+        <div><div class="footer-heading">Community</div><ul class="footer-links"><li><a href="/members">Members</a></li><li><a href="/ecosystem">Ecosystem</a></li><li><a href="/library">Library</a></li><li><a href="/contact">Contact</a></li></ul></div>
+        <div><div class="footer-heading">Connect</div><ul class="footer-links"><li><a href="mailto:contact@astronomy.ug">contact@astronomy.ug</a></li><li><a href="/login">Member Login</a></li></ul></div>
+      </div>
+      <div class="footer-bottom"><span>&copy; 2026 Uganda Astronomical Society. All rights reserved.</span><span>Kampala, Uganda</span></div>
     </div>
   </footer>
 
-  <script src="../js/api.js"></script>
+  <script src="/js/api.js"></script>
   <script>
+    var articleImgs = {'article':'/img/article-solar.jpg','observing_report':'/img/article-moon.jpg','educational':'/img/article-galaxy.jpg','project_report':'/img/article-deepsky.jpg','announcement':'/img/event-workshop.jpg','paper':'/img/article-moon.jpg'};
+
     async function load() {
       try { await api.me(); } catch(e) {}
       updateNavUser();
-
-      const id = new URLSearchParams(location.search).get('id');
+      var id = new URLSearchParams(location.search).get('id') || (location.pathname.match(/\/(\d+)$/) || [])[1];
       if (!id) { document.getElementById('aTitle').textContent = 'Article not found'; return; }
-      const a = await api.request('/public/articles/' + id).catch(() => null);
+      var a = await api.request('/public/articles/' + id).catch(function(){ return null; });
       if (!a) { document.getElementById('aTitle').textContent = 'Article not found'; return; }
-
-      document.title = a.title + ' — Uganda Astronomical Society';
-      document.getElementById('aTitle').textContent = a.title;
-      document.getElementById('aMeta').innerHTML = `
-        By <strong>${esc(a.author_name)}</strong> · ${esc(a.category)} ·
-        ${new Date(a.published_at).toLocaleDateString('en', { year: 'numeric', month: 'long', day: 'numeric' })}
-      `;
-      document.getElementById('aBody').innerHTML = a.body || '<p class="text-dim">No content.</p>';
-      window.scrollTo(0, 0);
+      render(a);
     }
 
-    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
-    function updateNavUser() {
-      const el = document.getElementById('navUser');
-      el.innerHTML = api._user
-        ? `<a href="/dashboard" class="btn btn-outline btn-sm">${esc(api._user.name)}</a>`
-        : `<a href="/login" class="btn btn-primary btn-sm">Login</a>`;
+    function render(a) {
+      document.title = a.title + ' — Uganda Astronomical Society';
+      document.getElementById('aBreadcrumb').textContent = a.title;
+      document.getElementById('aTitle').textContent = a.title;
+
+      var coverImg = a.image_url || articleImgs[a.category] || '/img/header-knowledge.jpg';
+      document.getElementById('aHeroBg').style.backgroundImage = 'url(' + esc(coverImg) + ')';
+
+      var bodyText = a.body || '';
+      var wordCount = bodyText.replace(/<[^>]*>/g, '').split(/\s+/).filter(Boolean).length;
+      var readMin = Math.max(1, Math.ceil(wordCount / 200));
+
+      document.getElementById('aMeta').innerHTML =
+        '<span class="badge badge-active">' + esc((a.category||'').replace(/_/g,' ')) + '</span>' +
+        '<span>By <strong>' + esc(a.author_name) + '</strong></span>' +
+        '<span>' + new Date(a.published_at).toLocaleDateString('en',{year:'numeric',month:'long',day:'numeric'}) + '</span>' +
+        '<span class="reading-time"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>' + readMin + ' min read</span>';
+
+      document.getElementById('aBody').innerHTML = a.body || '<p class="text-dim">No content.</p>';
+
+      var tags = parseTags(a.tags);
+      if (tags.length) {
+        document.getElementById('aTags').innerHTML = tags.map(function(t){
+          return '<a href="/knowledge" class="tag-pill">#' + esc(t) + '</a>';
+        }).join('');
+      }
+
+      var pageUrl = encodeURIComponent(window.location.href);
+      var shareText = encodeURIComponent(a.title + ' — Uganda Astronomical Society');
+      document.getElementById('aShare').innerHTML =
+        '<span style="font-size:0.82rem;color:var(--text-dim);align-self:center">Share:</span>' +
+        '<a class="share-btn" href="https://twitter.com/intent/tweet?url=' + pageUrl + '&text=' + shareText + '" target="_blank">Twitter</a>' +
+        '<a class="share-btn" href="https://www.facebook.com/sharer/sharer.php?u=' + pageUrl + '" target="_blank">Facebook</a>' +
+        '<a class="share-btn" href="https://wa.me/?text=' + shareText + '%20' + pageUrl + '" target="_blank">WhatsApp</a>' +
+        '<a class="share-btn" href="https://www.linkedin.com/sharing/share-offsite/?url=' + pageUrl + '" target="_blank">LinkedIn</a>';
+
+      var initials = (a.author_name || '?').split(' ').map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
+      document.getElementById('aAuthor').innerHTML =
+        '<div style="display:flex;align-items:center;gap:0.75rem">' +
+        '<div style="width:44px;height:44px;border-radius:50%;background:var(--accent-glow);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;flex-shrink:0">' + initials + '</div>' +
+        '<div><div style="font-weight:600">' + esc(a.author_name) + '</div>' +
+        '<div style="font-size:0.8rem;color:var(--text-dim)">UAS Author</div></div></div>' +
+        '<div style="margin-top:0.75rem;font-size:0.82rem;color:var(--text-dim)">Published ' + new Date(a.published_at).toLocaleDateString('en',{year:'numeric',month:'long',day:'numeric'}) + '</div>';
+
+      if (a.related && a.related.length) {
+        document.getElementById('aRelatedCard').style.display = 'block';
+        document.getElementById('aRelated').innerHTML = a.related.map(function(r){
+          return '<a href="/article/' + r.id + '" class="related-card">' +
+            '<h4>' + esc(r.title) + '</h4>' +
+            '<p>' + esc((r.category||'').replace(/_/g,' ')) + ' &middot; ' + (r.published_at ? new Date(r.published_at).toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'}) : '') + '</p></a>';
+        }).join('');
+      }
+    }
+
+    function parseTags(t) {
+      if (!t) return [];
+      if (Array.isArray(t)) return t;
+      if (typeof t === 'string') {
+        try { var v = JSON.parse(t); return Array.isArray(v) ? v : []; }
+        catch(e) { return t.split(',').map(function(s){ return s.trim(); }).filter(Boolean); }
+      }
+      return [];
     }
     load();
   </script>

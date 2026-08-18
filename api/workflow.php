@@ -194,72 +194,139 @@ function object_type_to_table(string $objectType): string {
 /**
  * Get pending items across all object types.
  * Returns items awaiting someone's action.
+ * If $userId is provided, returns only items relevant to that user.
  */
-function get_pending_items(array $filters = []): array {
+function get_pending_items(?int $userId = null): array {
   $items = [];
 
-  // Articles pending review/approval
-  $sql = "SELECT a.id, a.title, a.status, a.created_at, u.name AS author_name,
-          'article' AS item_type, r.title AS approver_role
-          FROM articles a
-          JOIN users u ON u.id = a.author_id
-          LEFT JOIN roles r ON r.id = a.approver_role_id
-          WHERE a.status IN ('submitted','under_review')";
-  $stmt = db()->prepare($sql);
-  $stmt->execute();
-  $items = array_merge($items, $stmt->fetchAll());
+  if ($userId) {
+    // MY ITEMS: items created by user, assigned to user, or in user's roles
+    $userRoleIds = [];
+    $stmt = db()->prepare('SELECT role_id FROM role_assignments WHERE user_id = ? AND status = "active"');
+    $stmt->execute([$userId]);
+    $userRoleIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
-  // Events pending approval
-  $sql = "SELECT e.id, e.title, e.status, e.created_at, u.name AS author_name,
-          'event' AS item_type, r.title AS approver_role
-          FROM events e
-          JOIN users u ON u.id = e.created_by
-          LEFT JOIN roles r ON r.id = (
-            SELECT ra.role_id FROM role_assignments ra
-            JOIN role_capabilities rc ON rc.role_id = ra.role_id
-            JOIN capabilities c ON c.id = rc.capability_id
-            WHERE c.slug = 'events.approve' AND ra.status = 'active'
-            LIMIT 1
-          )
-          WHERE e.status IN ('submitted','draft')";
-  $stmt = db()->prepare($sql);
-  $stmt->execute();
-  $items = array_merge($items, $stmt->fetchAll());
+    // Articles by user
+    $sql = "SELECT a.id, a.title, a.status, a.created_at, u.name AS author_name,
+            'article' AS item_type, a.approver_role_id AS related_id
+            FROM articles a JOIN users u ON u.id = a.author_id
+            WHERE a.author_id = ? AND a.status IN ('submitted','under_review','approved')";
+    $stmt = db()->prepare($sql);
+    $stmt->execute([$userId]);
+    $items = array_merge($items, $stmt->fetchAll());
 
-  // Documents pending approval
-  $sql = "SELECT d.id, d.title, d.status, d.created_at, u.name AS author_name,
-          'document' AS item_type, 'Documents' AS approver_role
-          FROM documents d
-          JOIN users u ON u.id = d.owner_id
-          WHERE d.status IN ('submitted','draft')";
-  $stmt = db()->prepare($sql);
-  $stmt->execute();
-  $items = array_merge($items, $stmt->fetchAll());
+    // Events by user or where user's role approves
+    $sql = "SELECT e.id, e.title, e.status, e.created_at, u.name AS author_name,
+            'event' AS item_type, e.id AS related_id
+            FROM events e JOIN users u ON u.id = e.created_by
+            WHERE e.created_by = ? AND e.status IN ('submitted','draft')
+            AND e.approval_required = 1";
+    $stmt = db()->prepare($sql);
+    $stmt->execute([$userId]);
+    $items = array_merge($items, $stmt->fetchAll());
 
-  // Resolutions awaiting votes
-  $sql = "SELECT r.id, r.title AS name, r.status, r.created_at, u.name AS author_name,
-          'resolution' AS item_type, CONCAT(r.votes_for, ' for / ', r.votes_against, ' against') AS approver_role
-          FROM resolutions r
-          JOIN users u ON u.id = r.proposed_by
-          WHERE r.status = 'voting'
-            AND (r.voting_deadline IS NULL OR r.voting_deadline > NOW())";
-  $stmt = db()->prepare($sql);
-  $stmt->execute();
-  $items = array_merge($items, $stmt->fetchAll());
+    // Documents by user
+    $sql = "SELECT d.id, d.title, d.status, d.created_at, u.name AS author_name,
+            'document' AS item_type, d.id AS related_id
+            FROM documents d JOIN users u ON u.id = d.owner_id
+            WHERE d.owner_id = ? AND d.status IN ('submitted','draft')";
+    $stmt = db()->prepare($sql);
+    $stmt->execute([$userId]);
+    $items = array_merge($items, $stmt->fetchAll());
 
-  // Assignments overdue or not started
-  $sql = "SELECT a.id, a.title, a.status, a.due_date AS created_at, u.name AS author_name,
-          'assignment' AS item_type,
-          COALESCE(au.name, r.title, 'Unassigned') AS approver_role
-          FROM assignments a
-          LEFT JOIN users au ON au.id = a.assignee_id
-          LEFT JOIN roles r ON r.id = a.role_id
-          LEFT JOIN users u ON u.id = a.assigner_id
-          WHERE a.status IN ('not_started','in_progress','overdue')
-            AND (a.due_date IS NULL OR a.due_date <= DATE_ADD(NOW(), INTERVAL 7 DAY))";
-  $stmt = db()->prepare($sql);
-  $stmt->execute();
-  $items = array_merge($items, $stmt->fetchAll());
+    // Resolutions by user or where user can vote
+    if ($userRoleIds) {
+      $placeholders = implode(',', array_fill(0, count($userRoleIds), '?'));
+      $sql = "SELECT DISTINCT r.id, r.title AS name, r.status, r.created_at, u.name AS author_name,
+              'resolution' AS item_type, r.id AS related_id
+              FROM resolutions r
+              JOIN users u ON u.id = r.proposed_by
+              LEFT JOIN role_capabilities rc ON rc.role_id IN ($placeholders)
+              LEFT JOIN capabilities c ON c.id = rc.capability_id AND c.slug = 'resolutions.vote'
+              WHERE r.status = 'voting'
+                AND (r.voting_deadline IS NULL OR r.voting_deadline > NOW())
+                AND (r.proposed_by = ? OR c.id IS NOT NULL)";
+      $params = array_merge($userRoleIds, [$userId]);
+      $stmt = db()->prepare($sql);
+      $stmt->execute($params);
+      $items = array_merge($items, $stmt->fetchAll());
+    }
+
+    // Assignments to user
+    $sql = "SELECT a.id, a.title, a.status, COALESCE(a.due_date, a.created_at) AS created_at,
+            u.name AS author_name, 'assignment' AS item_type, a.id AS related_id
+            FROM assignments a LEFT JOIN users u ON u.id = a.assigner_id
+            WHERE a.assignee_id = ? AND a.status IN ('not_started','in_progress','overdue')";
+    $stmt = db()->prepare($sql);
+    $stmt->execute([$userId]);
+    $items = array_merge($items, $stmt->fetchAll());
+
+  } else {
+    // ORG WIDE: all pending items
+    // Articles pending review/approval
+    $sql = "SELECT a.id, a.title, a.status, a.created_at, u.name AS author_name,
+            'article' AS item_type, r.title AS approver_role
+            FROM articles a
+            JOIN users u ON u.id = a.author_id
+            LEFT JOIN roles r ON r.id = a.approver_role_id
+            WHERE a.status IN ('submitted','under_review')";
+    $stmt = db()->prepare($sql);
+    $stmt->execute();
+    $items = array_merge($items, $stmt->fetchAll());
+
+    // Events pending approval
+    $sql = "SELECT e.id, e.title, e.status, e.created_at, u.name AS author_name,
+            'event' AS item_type, r.title AS approver_role
+            FROM events e
+            JOIN users u ON u.id = e.created_by
+            LEFT JOIN roles r ON r.id = (
+              SELECT ra.role_id FROM role_assignments ra
+              JOIN role_capabilities rc ON rc.role_id = ra.role_id
+              JOIN capabilities c ON c.id = rc.capability_id
+              WHERE c.slug = 'events.approve' AND ra.status = 'active'
+              LIMIT 1
+            )
+            WHERE e.status IN ('submitted','draft')
+            AND e.approval_required = 1";
+    $stmt = db()->prepare($sql);
+    $stmt->execute();
+    $items = array_merge($items, $stmt->fetchAll());
+
+    // Documents pending approval
+    $sql = "SELECT d.id, d.title, d.status, d.created_at, u.name AS author_name,
+            'document' AS item_type, 'Documents' AS approver_role
+            FROM documents d
+            JOIN users u ON u.id = d.owner_id
+            WHERE d.status IN ('submitted','draft')";
+    $stmt = db()->prepare($sql);
+    $stmt->execute();
+    $items = array_merge($items, $stmt->fetchAll());
+
+    // Resolutions awaiting votes
+    $sql = "SELECT r.id, r.title AS name, r.status, r.created_at, u.name AS author_name,
+            'resolution' AS item_type, CONCAT(r.votes_for, ' for / ', r.votes_against, ' against') AS approver_role
+            FROM resolutions r
+            JOIN users u ON u.id = r.proposed_by
+            WHERE r.status = 'voting'
+              AND (r.voting_deadline IS NULL OR r.voting_deadline > NOW())";
+    $stmt = db()->prepare($sql);
+    $stmt->execute();
+    $items = array_merge($items, $stmt->fetchAll());
+
+    // Assignments overdue or not started
+    $sql = "SELECT a.id, a.title, a.status, a.due_date AS created_at, u.name AS author_name,
+            'assignment' AS item_type,
+            COALESCE(au.name, r.title, 'Unassigned') AS approver_role
+            FROM assignments a
+            LEFT JOIN users au ON au.id = a.assignee_id
+            LEFT JOIN roles r ON r.id = a.role_id
+            LEFT JOIN users u ON u.id = a.assigner_id
+            WHERE a.status IN ('not_started','in_progress','overdue')
+              AND (a.due_date IS NULL OR a.due_date <= DATE_ADD(NOW(), INTERVAL 7 DAY))";
+    $stmt = db()->prepare($sql);
+    $stmt->execute();
+    $items = array_merge($items, $stmt->fetchAll());
+  }
 
   // Sort by date (oldest first)
   usort($items, fn($a, $b) => strtotime($a['created_at'] ?? 'now') - strtotime($b['created_at'] ?? 'now'));
