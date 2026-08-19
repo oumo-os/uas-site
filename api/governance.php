@@ -220,7 +220,10 @@ function apply_resolution(int $resolutionId): void {
             $payload['description'] ?? '',
             $payload['capabilities'] ?? $payload['capability_ids'] ?? [],
             $res['proposed_by'],
-            $resolutionId
+            $payload['scope'] ?? null,
+            $resolutionId,
+            $payload['role_type'] ?? null,
+            $payload['target'] ?? null
           );
           // Auto-assign if specified
           if (!empty($payload['assign_to_user_id'])) {
@@ -303,9 +306,10 @@ function apply_resolution(int $resolutionId): void {
             $payload['description'] ?? '',
             $payload['capabilities'] ?? $payload['capability_ids'] ?? [],
             $res['proposed_by'],
-            $resolutionId
+            'committee',
+            $resolutionId,
+            'administrative'
           );
-          db()->prepare("UPDATE roles SET scope = 'committee' WHERE id = ?")->execute([$roleId]);
           if (!empty($payload['chair_user_id'])) {
             assign_role($roleId, $payload['chair_user_id'], $res['proposed_by'], $resolutionId);
           }

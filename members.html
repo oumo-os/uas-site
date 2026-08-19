@@ -38,6 +38,40 @@
     }
     .filter-chip:hover, .filter-chip.active { border-color:var(--accent); color:var(--accent); background:var(--accent-glow); }
 
+    .role-section { margin-bottom:2.5rem; }
+    .role-section-header {
+      display:flex; align-items:center; gap:0.75rem; margin-bottom:1rem;
+      padding-bottom:0.5rem; border-bottom:2px solid var(--accent);
+    }
+    .role-section-header h3 { font-size:1.05rem; font-weight:700; margin:0; color:var(--accent); }
+    .role-section-header .role-count { font-size:0.78rem; color:var(--text-dim); }
+    .role-badge {
+      display:inline-block; font-size:0.68rem; padding:0.15rem 0.5rem; border-radius:999px;
+      font-weight:600; line-height:1.4;
+    }
+    .role-badge.governance { background:rgba(30,96,145,0.12); color:var(--info); }
+    .role-badge.administrative { background:rgba(184,134,11,0.12); color:var(--gold); }
+    .role-badge.programme { background:rgba(45,106,79,0.12); color:var(--success); }
+    .role-badge.working_group { background:rgba(124,58,237,0.12); color:#7c3aed; }
+    .role-badge.cohort { background:rgba(236,72,153,0.12); color:#ec4899; }
+    .role-badge.member { background:var(--accent-glow); color:var(--accent); }
+    .role-badge.general { background:rgba(45,106,79,0.12); color:var(--success); }
+
+    .user-roles-list { display:flex; flex-wrap:wrap; gap:0.3rem; margin-top:0.5rem; }
+
+    .wg-section { margin-bottom:2rem; }
+    .wg-section h4 { font-size:0.95rem; font-weight:600; margin:0 0 0.5rem; }
+    .wg-member-row {
+      display:flex; justify-content:space-between; align-items:center;
+      padding:0.5rem 0.65rem; border-bottom:1px solid var(--border);
+      font-size:0.88rem;
+    }
+    .wg-member-row:last-child { border-bottom:none; }
+    .wg-member-role {
+      font-size:0.72rem; padding:0.15rem 0.5rem; border-radius:999px;
+      background:var(--accent-glow); color:var(--accent); font-weight:600; text-transform:capitalize;
+    }
+
     .search-box { max-width:500px; margin:0 auto 2rem; position:relative; }
     .search-box input {
       width:100%; padding:0.75rem 1rem 0.75rem 2.75rem; border:1px solid var(--border); border-radius:var(--radius);
@@ -122,11 +156,10 @@
         <input type="text" id="memberSearch" placeholder="Search by name, institution, interests, location...">
       </div>
 
-      <div class="filter-bar" id="catFilter"></div>
+      <div class="filter-bar" id="roleFilter"></div>
 
-      <div class="member-grid" id="membersGrid"></div>
+      <div id="membersContent"></div>
       <div class="empty-state" id="emptyMsg" style="display:none"><p>No members found.</p></div>
-      <div class="pagination" id="membersPagination"></div>
     </div>
   </section>
 
@@ -181,25 +214,40 @@
   <script src="js/api.js"></script>
   <script>
     let allMembers = [];
-    let activeCat = '';
-    let memPage = 1;
-    const MEM_PER = 8;
+    let allWgData = [];
+    let activeSection = '';
+    const ROLE_TYPE_PRIORITY = ['governance', 'administrative'];
+    const ROLE_TYPE_LABELS = {
+      governance: 'Governance', administrative: 'Administrative', programme: 'Programmes',
+      working_group: 'Working Groups', cohort: 'Cohorts', member: 'Members'
+    };
+
+    const ROLE_TYPE_LABELS = {
+      governance: 'Governance', administrative: 'Administrative', programme: 'Programmes',
+      working_group: 'Working Groups', cohort: 'Cohorts', member_class: 'Members'
+    };
+    const ROLE_TYPE_CSS = {
+      governance: 'governance', administrative: 'administrative', programme: 'programme',
+      working_group: 'working_group', cohort: 'cohort', member_class: 'general'
+    };
+    const MEMBERSHIP_CLASSES = {
+      regular: 'Member', student: 'Student', affiliate: 'Affiliate',
+      honorary: 'Honorary', corporate: 'Corporate'
+    };
 
     async function load() {
       try { await api.me(); } catch(e) {}
       updateNavUser();
-
-      if (api._user) {
-        allMembers = await api.getMembers().catch(() => []);
-      } else {
-        allMembers = await api.request('/members?public=1').catch(() => []);
-      }
-
+      const [members, wgData] = await Promise.all([
+        api.getMembersGrouped().catch(() => []),
+        api.getWorkingGroupsWithMembers().catch(() => []),
+      ]);
+      allMembers = members;
+      allWgData = wgData;
       renderStats();
-      renderCatFilter();
-      renderMembers(allMembers);
-
-      document.getElementById('memberSearch').addEventListener('input', filterMembers);
+      renderFilter();
+      renderAll();
+      document.getElementById('memberSearch').addEventListener('input', renderAll);
     }
 
     function renderStats() {
@@ -208,11 +256,8 @@
       const locations = [...new Set(allMembers.map(m => m.location).filter(Boolean))].length;
       const recent = allMembers.filter(m => {
         if (!m.joined_date) return false;
-        const d = new Date(m.joined_date);
-        const now = new Date();
-        return (now - d) < 90 * 24 * 60 * 60 * 1000;
+        return (Date.now() - new Date(m.joined_date).getTime()) < 90 * 86400000;
       }).length;
-
       document.getElementById('memberStats').innerHTML = `
         <div class="stat-item"><div class="stat-val">${total}</div><div class="stat-lbl">Members</div></div>
         <div class="stat-item"><div class="stat-val">${institutions}</div><div class="stat-lbl">Institutions</div></div>
@@ -221,34 +266,83 @@
       `;
     }
 
-    function renderCatFilter() {
-      const cats = [...new Set(allMembers.map(m => m.category).filter(Boolean))];
-      document.getElementById('catFilter').innerHTML = `
-        <button class="filter-chip ${!activeCat ? 'active' : ''}" onclick="filterCat('')">All</button>
-        ${cats.map(c => `<button class="filter-chip ${activeCat === c ? 'active' : ''}" onclick="filterCat('${esc(c)}')">${esc(c)}</button>`).join('')}
-      `;
+    function renderFilter() {
+      const sections = [
+        { key: '', label: 'All' },
+        { key: 'governance', label: 'Governance' },
+        { key: 'administrative', label: 'Administrative' },
+        { key: 'programme', label: 'Programmes' },
+        { key: 'working_groups', label: 'Working Groups' },
+        { key: 'general', label: 'Members' },
+      ];
+      document.getElementById('roleFilter').innerHTML = sections.map(s =>
+        `<button class="filter-chip ${activeSection === s.key ? 'active' : ''}" onclick="filterSection('${s.key}')">${s.label}</button>`
+      ).join('');
     }
 
-    function filterCat(cat) {
-      activeCat = cat;
-      renderCatFilter();
-      filterMembers();
+    function filterSection(key) { activeSection = key; renderFilter(); renderAll(); }
+
+    function getFilteredMembers() {
+      const q = (document.getElementById('memberSearch')?.value || '').toLowerCase();
+      let list = allMembers;
+      if (q) list = list.filter(m =>
+        (m.name || '').toLowerCase().includes(q) ||
+        (m.institution || '').toLowerCase().includes(q) ||
+        (m.bio || '').toLowerCase().includes(q) ||
+        (m.interests || '').toLowerCase().includes(q) ||
+        (m.location || '').toLowerCase().includes(q)
+      );
+      return list;
     }
 
-    function renderMembers(list) {
-      const grid = document.getElementById('membersGrid');
-      const pag = document.getElementById('membersPagination');
-      document.getElementById('emptyMsg').style.display = list.length ? 'none' : 'block';
+    function renderAll() {
+      const content = document.getElementById('membersContent');
+      const members = getFilteredMembers();
+      document.getElementById('emptyMsg').style.display = members.length || allWgData.length ? 'none' : 'block';
 
-      if (!list.length) { grid.innerHTML = ''; pag.innerHTML = ''; return; }
+      let html = '';
 
-      const totalPages = Math.ceil(list.length / MEM_PER);
-      if (memPage > totalPages) memPage = totalPages;
-      const start = (memPage - 1) * MEM_PER;
-      const page = list.slice(start, start + MEM_PER);
+      if (!activeSection || activeSection === 'governance') {
+        html += renderUserSection(members, 'governance', 'Governance');
+      }
+      if (!activeSection || activeSection === 'administrative') {
+        html += renderUserSection(members, 'administrative', 'Administrative');
+      }
+      if (!activeSection || activeSection === 'programme') {
+        html += renderUserSection(members, 'programme', 'Programmes');
+      }
+      if (activeSection === 'working_groups') {
+        html += renderWorkingGroupsSection();
+      }
+      if (!activeSection || activeSection === 'general') {
+        html += renderGeneralSection(members);
+      }
 
-      grid.innerHTML = page.map(m => {
+      content.innerHTML = html || '<div class="empty-state"><p>No members found.</p></div>';
+    }
+
+    function formatRoleBadges(roles) {
+      if (!roles || !roles.length) return '';
+      return roles.map(r => {
+        const cssClass = ROLE_TYPE_CSS[r.role_type] || 'general';
+        let label = esc(r.title);
+        if (r.target) {
+          label += ` <span style="opacity:0.6;font-size:0.65rem">→ ${esc(r.target)}</span>`;
+        }
+        return `<span class="role-badge ${cssClass}">${label}</span>`;
+      }).join('');
+    }
+
+    function renderUserSection(members, type, label) {
+      const users = members.filter(m => {
+        if (!m.roles || !m.roles.length) return false;
+        return m.roles.some(r => r.role_type === type);
+      });
+      if (!users.length) return '';
+      const cards = users.map(m => {
         const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        const roles = m.roles;
+        const rolesHtml = formatRoleBadges(roles);
         const interests = m.interests ? m.interests.split(',').slice(0, 3) : [];
         const joined = m.joined_date ? new Date(m.joined_date).toLocaleDateString('en', { month: 'short', year: 'numeric' }) : '';
         return `
@@ -262,6 +356,7 @@
             </div>
             ${m.bio ? `<div class="member-bio">${esc(m.bio)}</div>` : ''}
             ${interests.length ? `<div class="member-tags">${interests.map(i => `<span class="member-tag">${esc(i.trim())}</span>`).join('')}</div>` : ''}
+            <div class="user-roles-list">${rolesHtml}</div>
             <div class="member-meta">
               <span>${esc(m.category || 'member')}${m.membership_number ? ' &middot; #' + esc(m.membership_number) : ''}</span>
               <span>${joined}</span>
@@ -269,34 +364,88 @@
           </div>
         `;
       }).join('');
-
-      // Pagination
-      if (totalPages <= 1) { pag.innerHTML = ''; return; }
-      let btns = '<button ' + (memPage<=1?'disabled':'') + ' onclick="memPage--;renderMembers(getFilteredList())">&#8249; Prev</button>';
-      for (let p=1; p<=totalPages; p++) {
-        btns += '<button class="' + (p===memPage?'active':'') + '" onclick="memPage=' + p + ';renderMembers(getFilteredList())">' + p + '</button>';
-      }
-      btns += '<button ' + (memPage>=totalPages?'disabled':'') + ' onclick="memPage++;renderMembers(getFilteredList())">Next &#8250;</button>';
-      pag.innerHTML = btns;
+      return `
+        <div class="role-section">
+          <div class="role-section-header">
+            <h3>${label}</h3>
+            <span class="role-count">${users.length} member${users.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div class="member-grid">${cards}</div>
+        </div>
+      `;
     }
 
-    function getFilteredList() {
-      const q = document.getElementById('memberSearch').value.toLowerCase();
-      let filtered = allMembers;
-      if (activeCat) filtered = filtered.filter(m => m.category === activeCat);
-      if (q) filtered = filtered.filter(m =>
-        (m.name || '').toLowerCase().includes(q) ||
-        (m.institution || '').toLowerCase().includes(q) ||
-        (m.bio || '').toLowerCase().includes(q) ||
-        (m.interests || '').toLowerCase().includes(q) ||
-        (m.location || '').toLowerCase().includes(q)
-      );
-      return filtered;
+    function renderWorkingGroupsSection() {
+      if (!allWgData.length) return '';
+      const groupsHtml = allWgData.map(g => {
+        const members = g.members || [];
+        const membersHtml = members.length ? members.map(m => `
+          <div class="wg-member-row">
+            <span style="font-weight:500">${esc(m.user_name)}</span>
+            <span class="wg-member-role">${esc(m.role)}</span>
+          </div>
+        `).join('') : '<div style="padding:0.5rem 0;color:var(--text-dim);font-size:0.85rem">No members</div>';
+        const chairLabel = g.chair_name ? ` &middot; Chair: ${esc(g.chair_name)}` : '';
+        return `
+          <div class="wg-section">
+            <h4>${esc(g.name)}<span style="font-weight:400;color:var(--text-dim);font-size:0.82rem">${chairLabel}</span></h4>
+            ${g.description ? `<p style="font-size:0.85rem;color:var(--text-dim);margin:0 0 0.5rem">${esc(g.description)}</p>` : ''}
+            ${membersHtml}
+          </div>
+        `;
+      }).join('');
+      return `
+        <div class="role-section">
+          <div class="role-section-header">
+            <h3>Working Groups</h3>
+            <span class="role-count">${allWgData.length} group${allWgData.length !== 1 ? 's' : ''}</span>
+          </div>
+          ${groupsHtml}
+        </div>
+      `;
     }
 
-    function filterMembers() {
-      memPage = 1;
-      renderMembers(getFilteredList());
+    function renderGeneralSection(members) {
+      const users = members.filter(m => {
+        if (!m.roles || !m.roles.length) return true;
+        return m.roles.some(r => r.role_type === 'member_class');
+      });
+      if (!users.length) return '';
+      const cards = users.map(m => {
+        const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        const classKey = (m.category || 'regular').toLowerCase();
+        const classLabel = MEMBERSHIP_CLASSES[classKey] || classKey;
+        const rolesHtml = formatRoleBadges(m.roles);
+        const interests = m.interests ? m.interests.split(',').slice(0, 3) : [];
+        const joined = m.joined_date ? new Date(m.joined_date).toLocaleDateString('en', { month: 'short', year: 'numeric' }) : '';
+        return `
+          <div class="member-card" onclick="showMemberDetail(${m.user_id || m.id})">
+            <div class="member-header">
+              <div class="member-avatar">${initials}</div>
+              <div>
+                <div class="member-name">${esc(m.name)}</div>
+                <div class="member-inst">${esc(m.institution || 'Independent')}${m.location ? ' &middot; ' + esc(m.location) : ''}</div>
+              </div>
+            </div>
+            ${m.bio ? `<div class="member-bio">${esc(m.bio)}</div>` : ''}
+            ${interests.length ? `<div class="member-tags">${interests.map(i => `<span class="member-tag">${esc(i.trim())}</span>`).join('')}</div>` : ''}
+            <div class="user-roles-list">${rolesHtml}</div>
+            <div class="member-meta">
+              <span><span class="role-badge general">${esc(classLabel)}</span>${m.membership_number ? ' &middot; #' + esc(m.membership_number) : ''}</span>
+              <span>${joined}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+      return `
+        <div class="role-section">
+          <div class="role-section-header">
+            <h3>Members</h3>
+            <span class="role-count">${users.length} member${users.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div class="member-grid">${cards}</div>
+        </div>
+      `;
     }
 
     async function showMemberDetail(userId) {
@@ -304,6 +453,13 @@
         const m = await api.getMember(userId);
         const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
         const interests = m.interests ? m.interests.split(',') : [];
+        const roles = m.roles || [];
+        const rolesHtml = roles.length ? `<div class="field"><div class="field-label">Roles</div><div style="display:flex;flex-wrap:wrap;gap:0.35rem">${roles.map(r => {
+          const cssClass = ROLE_TYPE_CSS[r.role_type] || 'general';
+          let label = esc(r.title);
+          if (r.target) label += ` → ${esc(r.target)}`;
+          return `<span class="role-badge ${cssClass}">${label}</span>`;
+        }).join('')}</div></div>` : '';
         const html = `
           <div style="display:flex;gap:1rem;align-items:center;margin-bottom:1rem">
             <div class="member-avatar" style="width:60px;height:60px;font-size:1.3rem">${initials}</div>
@@ -312,6 +468,7 @@
               <div class="text-dim">${esc(m.institution || 'Independent')}${m.location ? ' &middot; ' + esc(m.location) : ''}</div>
             </div>
           </div>
+          ${rolesHtml}
           ${m.bio ? `<div class="field"><div class="field-label">Bio</div><div style="line-height:1.7">${esc(m.bio)}</div></div>` : ''}
           ${interests.length ? `<div class="field"><div class="field-label">Interests</div><div class="member-tags">${interests.map(i => `<span class="member-tag">${esc(i.trim())}</span>`).join('')}</div></div>` : ''}
           ${m.contributions ? `<div class="field"><div class="field-label">Contributions</div><div style="line-height:1.6">${esc(m.contributions)}</div></div>` : ''}
@@ -340,7 +497,6 @@
       overlay.classList.add('open');
     }
     function closeModal() { const m = document.getElementById('detailModal'); if (m) m.classList.remove('open'); }
-
 
     load();
   </script>

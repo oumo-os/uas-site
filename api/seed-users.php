@@ -18,6 +18,9 @@ $users = [
     'location' => 'Kampala',
     'role' => 'Programme Lead',
     'role_desc' => 'Oversees programme execution and project delivery',
+    'role_scope' => 'programme',
+    'role_type' => 'programme',
+    'role_target' => 'General Programme',
   ],
   [
     'name' => 'James Okello',
@@ -28,6 +31,8 @@ $users = [
     'location' => 'Entebbe',
     'role' => 'Communications Officer',
     'role_desc' => 'Manages public communications and media relations',
+    'role_scope' => 'committee',
+    'role_type' => 'administrative',
   ],
   [
     'name' => 'Nansubuga Florence',
@@ -38,6 +43,9 @@ $users = [
     'location' => 'Kampala',
     'role' => 'Education WG Lead',
     'role_desc' => 'Leads the Education Working Group',
+    'role_scope' => 'working_group',
+    'role_type' => 'working_group',
+    'role_target' => 'Education Working Group',
   ],
   [
     'name' => 'Brian Mugisha',
@@ -108,7 +116,7 @@ foreach ($users as $u) {
         $capId = $stmt->fetchColumn();
         if ($capId) $capIds[] = (int) $capId;
       }
-      $roleId = create_role($u['role'], $u['role_desc'], $capIds, $adminId);
+      $roleId = create_role($u['role'], $u['role_desc'], $capIds, $adminId, $u['role_scope'] ?? null, null, $u['role_type'] ?? null, $u['role_target'] ?? null);
       echo "  Created role: {$u['role']} (id={$roleId})\n";
     } else {
       $roleId = $roleRow['id'];

@@ -138,11 +138,11 @@ function revoke_capability(int $roleId, int $capabilityId, ?string $scopeType = 
  * Create a role and optionally assign capabilities.
  * $caps can be: ['slug1', 'slug2'] or [['slug' => 'slug1', 'scope_type' => 'programme', 'scope_id' => 5], ...]
  */
-function create_role(string $title, string $description, array $caps, int $createdBy, ?string $scope = null, ?int $resolutionId = null): int {
+function create_role(string $title, string $description, array $caps, int $createdBy, ?string $scope = null, ?int $resolutionId = null, ?string $roleType = null, ?string $target = null): int {
   $stmt = db()->prepare(
-    'INSERT INTO roles (title, description, scope, created_by, resolution_id) VALUES (?, ?, ?, ?, ?)'
+    'INSERT INTO roles (title, description, scope, role_type, target, created_by, resolution_id) VALUES (?, ?, ?, ?, ?, ?, ?)'
   );
-  $stmt->execute([$title, $description, $scope, $createdBy, $resolutionId]);
+  $stmt->execute([$title, $description, $scope, $roleType ?? 'member_class', $target, $createdBy, $resolutionId]);
   $roleId = (int) db()->lastInsertId();
 
   $slugStmt = db()->prepare('SELECT id FROM capabilities WHERE slug = ?');

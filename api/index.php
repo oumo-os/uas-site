@@ -513,12 +513,69 @@ try {
     }
     json_response(['ok' => true]);
   }
+  elseif ($path === '/members/grouped' && $method === 'GET') {
+    $isPublic = isset($_GET['public']) && $_GET['public'] === '1';
+    $loggedIn = !empty($_SESSION['user_id']);
+    if ($isPublic || !$loggedIn) {
+      $stmt = db()->prepare("
+        SELECT DISTINCT m.id, m.user_id, m.category, m.membership_number, m.interests, m.joined_date,
+               u.name, u.institution, u.location, u.avatar_url, u.bio
+        FROM members m
+        JOIN users u ON u.id = m.user_id
+        LEFT JOIN role_assignments ra ON ra.user_id = m.user_id AND ra.status = 'active'
+        LEFT JOIN roles r ON r.id = ra.role_id AND r.status = 'active'
+        WHERE m.status = 'active' AND u.status = 'active'
+          AND (m.profile_visible = 1 OR r.scope IN ('board','institutional','committee','programme') OR r.scope LIKE 'programme:%' OR r.scope LIKE 'working_group:%')
+        ORDER BY u.name
+      ");
+      $stmt->execute();
+      $members = $stmt->fetchAll();
+    } else {
+      $stmt = db()->prepare('SELECT m.*, u.name, u.email, u.avatar_url, u.institution, u.location, u.bio, u.status AS user_status FROM members m JOIN users u ON u.id = m.user_id ORDER BY u.name');
+      $stmt->execute();
+      $members = $stmt->fetchAll();
+    }
+    $memberIds = array_map(fn($m) => (int)($m['user_id'] ?? $m['id']), $members);
+    $rolesByUser = [];
+    if ($memberIds) {
+      $placeholders = implode(',', array_fill(0, count($memberIds), '?'));
+      $stmt = db()->prepare(
+        "SELECT ra.user_id, r.id AS role_id, r.title, r.role_type, r.scope, r.target, r.description
+         FROM role_assignments ra
+         JOIN roles r ON r.id = ra.role_id
+         WHERE ra.user_id IN ($placeholders) AND ra.status = 'active' AND r.status = 'active'"
+      );
+      $stmt->execute($memberIds);
+      foreach ($stmt->fetchAll() as $row) {
+        $uid = (int) $row['user_id'];
+        if (!isset($rolesByUser[$uid])) $rolesByUser[$uid] = [];
+        $rolesByUser[$uid][] = [
+          'role_id' => (int) $row['role_id'],
+          'title' => $row['title'],
+          'role_type' => $row['role_type'],
+          'scope' => $row['scope'],
+          'target' => $row['target'],
+          'description' => $row['description'],
+        ];
+      }
+    }
+    foreach ($members as &$m) {
+      $uid = (int)($m['user_id'] ?? $m['id']);
+      $m['roles'] = $rolesByUser[$uid] ?? [];
+    }
+    json_response($members);
+  }
   elseif (preg_match('#^/members/(\d+)$#', $path, $m) && $method === 'GET') {
     require_login();
+    $userId = (int) $m[1];
     $stmt = db()->prepare('SELECT m.*, u.name, u.email, u.avatar_url, u.bio, u.institution, u.location, u.website FROM members m JOIN users u ON u.id = m.user_id WHERE m.user_id = ?');
-    $stmt->execute([$m[1]]);
+    $stmt->execute([$userId]);
     $member = $stmt->fetch();
     if (!$member) json_error('Member not found', 404);
+    $stmt = db()->prepare("SELECT r.id AS role_id, r.title, r.role_type, r.scope, r.target, r.description
+      FROM role_assignments ra JOIN roles r ON r.id = ra.role_id WHERE ra.user_id = ? AND ra.status = 'active' AND r.status = 'active'");
+    $stmt->execute([$userId]);
+    $member['roles'] = $stmt->fetchAll();
     json_response($member);
   }
   elseif (preg_match('#^/members/(\d+)/reset-password$#', $path, $m) && $method === 'POST') {
@@ -606,8 +663,7 @@ try {
   elseif ($path === '/roles' && $method === 'POST') {
     $user = require_cap('roles.create');
     $data = input_json();
-    $scope = $data['scope'] ?? null;
-    $roleId = create_role($data['title'], $data['description'] ?? '', $data['capabilities'] ?? [], $user['id'], $scope);
+    $roleId = create_role($data['title'], $data['description'] ?? '', $data['capabilities'] ?? [], $user['id'], $data['scope'] ?? null, null, $data['role_type'] ?? null, $data['target'] ?? null);
     json_response(['id' => $roleId], 201);
   }
   elseif (preg_match('#^/roles/(\d+)$#', $path, $m) && $method === 'PUT') {
@@ -616,7 +672,7 @@ try {
     $roleId = (int) $m[1];
     $sets = [];
     $args = [];
-    foreach (['title', 'description', 'scope', 'status'] as $f) {
+    foreach (['title', 'description', 'scope', 'role_type', 'target', 'status'] as $f) {
       if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = $data[$f]; }
     }
     if ($sets) {
@@ -633,6 +689,15 @@ try {
     db()->prepare("UPDATE role_assignments SET status = 'inactive' WHERE role_id = ? AND status = 'active'")->execute([$roleId]);
     audit_log('role_deactivate', 'role', $roleId);
     json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/roles/(\d+)$#', $path, $m) && $method === 'GET') {
+    require_login();
+    $roleId = (int) $m[1];
+    $stmt = db()->prepare('SELECT r.*, (SELECT COUNT(*) FROM role_assignments ra WHERE ra.role_id = r.id AND ra.status = \'active\') AS member_count FROM roles r WHERE r.id = ?');
+    $stmt->execute([$roleId]);
+    $role = $stmt->fetch();
+    if (!$role) json_response(['error' => 'Role not found'], 404);
+    json_response($role);
   }
   elseif (preg_match('#^/roles/(\d+)/capabilities$#', $path, $m) && $method === 'GET') {
     require_login();
@@ -1277,14 +1342,24 @@ try {
   elseif ($path === '/finance/summary' && $method === 'GET') {
     require_cap('finance.view');
 
+    $groupBy = $_GET['group_by'] ?? 'category';
+    $validGroups = ['category', 'programme', 'event', 'project'];
+    if (!in_array($groupBy, $validGroups)) $groupBy = 'category';
+
     $stmt = db()->prepare('SELECT type, SUM(amount) as total FROM financial_records GROUP BY type');
     $stmt->execute();
     $byType = [];
     foreach ($stmt->fetchAll() as $row) $byType[$row['type']] = (float) $row['total'];
 
-    $stmt = db()->prepare('SELECT category, type, SUM(amount) as total FROM financial_records GROUP BY category, type ORDER BY category');
+    $groupQueries = [
+      'category' => 'SELECT category AS group_name, type, SUM(amount) AS total FROM financial_records GROUP BY category, type ORDER BY category',
+      'programme' => 'SELECT COALESCE(p.title, \'Unassigned\') AS group_name, f.type, SUM(f.amount) AS total FROM financial_records f LEFT JOIN programmes p ON p.id = f.programme_id GROUP BY group_name, f.type ORDER BY group_name',
+      'event' => 'SELECT COALESCE(e.title, \'Unassigned\') AS group_name, f.type, SUM(f.amount) AS total FROM financial_records f LEFT JOIN events e ON e.id = f.event_id GROUP BY group_name, f.type ORDER BY group_name',
+      'project' => 'SELECT COALESCE(pr.title, \'Unassigned\') AS group_name, f.type, SUM(f.amount) AS total FROM financial_records f LEFT JOIN projects pr ON pr.id = f.project_id GROUP BY group_name, f.type ORDER BY group_name',
+    ];
+    $stmt = db()->prepare($groupQueries[$groupBy]);
     $stmt->execute();
-    $byCategory = $stmt->fetchAll();
+    $byGroup = $stmt->fetchAll();
 
     $stmt = db()->prepare('SELECT id, type, amount, category, description, record_date FROM financial_records ORDER BY record_date DESC, id DESC LIMIT 10');
     $stmt->execute();
@@ -1295,7 +1370,8 @@ try {
       'expense' => $byType['expense'] ?? 0,
       'commitment' => $byType['commitment'] ?? 0,
       'available' => ($byType['income'] ?? 0) - ($byType['expense'] ?? 0) - ($byType['commitment'] ?? 0),
-      'by_category' => $byCategory,
+      'by_group' => $byGroup,
+      'group_by' => $groupBy,
       'recent' => $recent,
     ]);
   }
@@ -1352,6 +1428,33 @@ try {
       ORDER BY wg.name');
     $stmt->execute();
     json_response($stmt->fetchAll());
+  }
+  elseif ($path === '/working-groups/with-members' && $method === 'GET') {
+    $isPublic = isset($_GET['public']) && $_GET['public'] === '1';
+    $stmt = db()->prepare('SELECT wg.*, u.name AS chair_name, p.title AS programme_name
+      FROM working_groups wg
+      LEFT JOIN users u ON u.id = wg.chair_id
+      LEFT JOIN programmes p ON p.id = wg.programme_id
+      WHERE wg.status = "active"
+      ORDER BY wg.name');
+    $stmt->execute();
+    $groups = $stmt->fetchAll();
+    $groupIds = array_map(fn($g) => (int) $g['id'], $groups);
+    $membersByGroup = [];
+    if ($groupIds) {
+      $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
+      $stmt = db()->prepare("SELECT wgm.*, u.name AS user_name, u.email FROM working_group_members wgm JOIN users u ON u.id = wgm.user_id WHERE wgm.group_id IN ($placeholders) AND wgm.status = 'active' ORDER BY wgm.role, u.name");
+      $stmt->execute($groupIds);
+      foreach ($stmt->fetchAll() as $row) {
+        $gid = (int) $row['group_id'];
+        if (!isset($membersByGroup[$gid])) $membersByGroup[$gid] = [];
+        $membersByGroup[$gid][] = $row;
+      }
+    }
+    foreach ($groups as &$g) {
+      $g['members'] = $membersByGroup[(int) $g['id']] ?? [];
+    }
+    json_response($groups);
   }
   elseif ($path === '/working-groups' && $method === 'POST') {
     $user = require_cap('roles.create');

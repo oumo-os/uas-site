@@ -120,6 +120,28 @@
     }
     .dash-card-header h4 { font-size: 0.88rem; font-weight: 600; margin: 0; }
 
+    /* ── Finance Toggle ── */
+    .fin-toggle { display: flex; gap: 0; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+    .fin-toggle-btn {
+      padding: 0.3rem 0.6rem; font-size: 0.72rem; font-weight: 500; border: none; cursor: pointer;
+      background: transparent; color: var(--text-dim); transition: all 0.15s;
+    }
+    .fin-toggle-btn:not(:last-child) { border-right: 1px solid var(--border); }
+    .fin-toggle-btn.active { background: var(--accent); color: #fff; }
+    .fin-toggle-btn:hover:not(.active) { background: var(--bg-card-alt, var(--bg-card)); }
+    .fin-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .fin-table th {
+      text-align: left; font-size: 0.72rem; font-weight: 600; color: var(--text-dim);
+      text-transform: uppercase; padding: 0.5rem 0.65rem; border-bottom: 2px solid var(--border);
+    }
+    .fin-table th:not(:first-child) { text-align: right; }
+    .fin-table td { padding: 0.55rem 0.65rem; border-bottom: 1px solid var(--border); }
+    .fin-table td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+    .fin-table tr:last-child { border-bottom: none; }
+    .fin-table tfoot td {
+      font-weight: 700; border-top: 2px solid var(--border); padding-top: 0.65rem;
+    }
+
     /* ── Calendar Items ── */
     .cal-item {
       display: flex; align-items: center; gap: 0.65rem; padding: 0.55rem 0;
@@ -684,8 +706,16 @@
         <div class="stat-grid" id="financeStatGrid"></div>
         <div class="dash-grid">
           <div class="dash-card">
-            <div class="dash-card-header"><h4>By Category</h4></div>
-            <div id="financeCategoryBreakdown"></div>
+            <div class="dash-card-header">
+              <h4>Breakdown</h4>
+              <div class="fin-toggle" id="finGroupToggle">
+                <button class="fin-toggle-btn active" data-group="category">Category</button>
+                <button class="fin-toggle-btn" data-group="programme">Programme</button>
+                <button class="fin-toggle-btn" data-group="event">Event</button>
+                <button class="fin-toggle-btn" data-group="project">Project</button>
+              </div>
+            </div>
+            <div id="financeBreakdown"></div>
           </div>
           <div class="dash-card">
             <div class="dash-card-header"><h4>Recent Transactions</h4></div>
@@ -1191,10 +1221,11 @@
       return 'update';
     }
 
+    let finCurrentGroup = 'category';
     function renderFinance(fin) {
       if (!fin || (fin.income === 0 && fin.expense === 0)) {
         document.getElementById('financeStatGrid').innerHTML = '<div class="empty-state"><h4>No financial records</h4><p>Record your first income or expense to start tracking finances.</p>' + (api.hasCap('finance.record') ? '<button class="btn btn-primary btn-sm" onclick="showFinanceForm()">Record Transaction</button>' : '') + '</div>';
-        document.getElementById('financeCategoryBreakdown').innerHTML = '';
+        document.getElementById('financeBreakdown').innerHTML = '';
         document.getElementById('financeRecent').innerHTML = '';
         return;
       }
@@ -1222,25 +1253,8 @@
         </div>
       `;
 
-      const catDiv = document.getElementById('financeCategoryBreakdown');
-      if (fin.by_category && fin.by_category.length) {
-        const cats = {};
-        fin.by_category.forEach(r => {
-          if (!cats[r.category]) cats[r.category] = { income: 0, expense: 0 };
-          cats[r.category][r.type] = parseFloat(r.total);
-        });
-        catDiv.innerHTML = Object.entries(cats).map(([cat, vals]) => `
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:0.65rem 0;border-bottom:1px solid var(--border)">
-            <span style="font-weight:500;font-size:0.9rem;text-transform:capitalize">${esc(cat)}</span>
-            <div style="text-align:right;font-size:0.85rem">
-              ${vals.income > 0 ? `<span style="color:var(--success)">+${vals.income.toLocaleString()}</span>` : ''}
-              ${vals.expense > 0 ? `<span style="color:var(--danger);margin-left:0.5rem">-${vals.expense.toLocaleString()}</span>` : ''}
-            </div>
-          </div>
-        `).join('');
-      } else {
-        catDiv.innerHTML = '<div class="empty-state"><p>No category data yet</p></div>';
-      }
+      finCurrentGroup = fin.group_by || 'category';
+      renderFinBreakdown(fin.by_group || []);
 
       const recentDiv = document.getElementById('financeRecent');
       if (fin.recent && fin.recent.length) {
@@ -1257,6 +1271,48 @@
         recentDiv.innerHTML = '<div class="empty-state"><p>No recent transactions</p></div>';
       }
     }
+
+    function renderFinBreakdown(rows) {
+      const div = document.getElementById('financeBreakdown');
+      if (!rows.length) { div.innerHTML = '<div class="empty-state"><p>No data yet</p></div>'; return; }
+      const groups = {};
+      rows.forEach(r => {
+        if (!groups[r.group_name]) groups[r.group_name] = { income: 0, expense: 0 };
+        groups[r.group_name][r.type] = parseFloat(r.total);
+      });
+      let totIncome = 0, totExpense = 0;
+      const rowsHtml = Object.entries(groups).map(([name, v]) => {
+        totIncome += v.income; totExpense += v.expense;
+        const net = v.income - v.expense;
+        return `<tr>
+          <td>${esc(name)}</td>
+          <td style="color:var(--success)">${v.income ? '+' + v.income.toLocaleString() : '—'}</td>
+          <td style="color:var(--danger)">${v.expense ? '-' + v.expense.toLocaleString() : '—'}</td>
+          <td style="color:${net >= 0 ? 'var(--success)' : 'var(--danger)'}">${net.toLocaleString()}</td>
+        </tr>`;
+      }).join('');
+      const totNet = totIncome - totExpense;
+      div.innerHTML = `<table class="fin-table">
+        <thead><tr><th>Group</th><th>Inflow</th><th>Outflow</th><th>Net</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+        <tfoot><tr><td>Total</td><td style="color:var(--success)">+${totIncome.toLocaleString()}</td><td style="color:var(--danger)">-${totExpense.toLocaleString()}</td><td style="color:${totNet >= 0 ? 'var(--success)' : 'var(--danger)'}">${totNet.toLocaleString()}</td></tr></tfoot>
+      </table>`;
+    }
+
+    async function switchFinGroup(group) {
+      if (group === finCurrentGroup) return;
+      document.querySelectorAll('.fin-toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.group === group));
+      try {
+        const fin = await api.getFinanceSummary(group);
+        finCurrentGroup = group;
+        renderFinBreakdown(fin.by_group || []);
+      } catch(e) {}
+    }
+
+    document.getElementById('finGroupToggle')?.addEventListener('click', e => {
+      const btn = e.target.closest('.fin-toggle-btn');
+      if (btn) switchFinGroup(btn.dataset.group);
+    });
 
     // ================= MEETINGS =================
     let meetingsData = [];

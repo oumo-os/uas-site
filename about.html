@@ -85,6 +85,17 @@
     .leader-card .role { font-size:0.82rem; color:var(--accent); margin-bottom:0.25rem; }
     .leader-card .institution { font-size:0.78rem; color:var(--text-dim); }
 
+    .role-badge {
+      display:inline-block; font-size:0.68rem; padding:0.15rem 0.5rem; border-radius:999px;
+      font-weight:600; line-height:1.4;
+    }
+    .role-badge.governance { background:rgba(30,96,145,0.12); color:var(--info); }
+    .role-badge.administrative { background:rgba(184,134,11,0.12); color:var(--gold); }
+    .role-badge.programme { background:rgba(45,106,79,0.12); color:var(--success); }
+    .role-badge.working_group { background:rgba(124,58,237,0.12); color:#7c3aed; }
+    .role-badge.cohort { background:rgba(236,72,153,0.12); color:#ec4899; }
+    .role-badge.general { background:rgba(45,106,79,0.12); color:var(--success); }
+
     .cta-section { padding:4rem 0; text-align:center; background:var(--accent); color:#fff; }
     .cta-section h2 { font-size:1.8rem; font-weight:700; color:#fff; margin-bottom:0.75rem; }
     .cta-section p { color:rgba(255,255,255,0.85); max-width:500px; margin:0 auto 2rem; font-size:1rem; }
@@ -269,7 +280,7 @@
       <div class="about-content" style="margin-bottom:2rem">
         <p>UAS operates through four institutional levels: Governance → Administration → Programmes → Activities. General Membership elects a Governing Executive, which directs Executive Officers, who coordinate Programme Leads, who mobilise Working Groups and Volunteers for specific activities.</p>
       </div>
-      <h3 style="text-align:center;font-size:1.1rem;margin-bottom:1.5rem">Governing Officers</h3>
+      <h3 style="text-align:center;font-size:1.1rem;margin-bottom:1.5rem">Board of Directors</h3>
       <div class="leadership-grid" id="leadershipGrid"></div>
     </div>
   </section>
@@ -327,27 +338,41 @@
 
   <script src="js/api.js"></script>
   <script>
-    const officers = [
-      { name: 'Obwengye Cosmus', role: 'President', resp: 'Institutional leadership, representation, strategic direction, continuity, oversight of major partnerships.' },
-      { name: 'Dr. Christopher Byaruhanga Malcom', role: 'General Secretary', resp: 'Administration, records, correspondence, meetings, documentation, resolutions, institutional memory, governance development.' },
-      { name: 'Vacant', role: 'Vice President', resp: 'Supports the President; delegated leadership; cross-functional coordination; institutional continuity.' },
-      { name: 'Vacant', role: 'Treasurer', resp: 'Financial governance, records, budgeting, accountability, financial reporting.' },
-    ];
+    const ROLE_TYPE_CSS = {
+      governance: 'governance', administrative: 'administrative', programme: 'programme',
+      working_group: 'working_group', cohort: 'cohort', member_class: 'general'
+    };
 
     async function load() {
       try { await api.me(); } catch(e) {}
       updateNavUser();
 
+      const members = await api.getMembersGrouped().catch(() => []);
       const grid = document.getElementById('leadershipGrid');
-      grid.innerHTML = officers.map(o => {
-        const initials = o.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-        const isVacant = o.name === 'Vacant';
+
+      const governance = members.filter(m =>
+        m.roles && m.roles.some(r => r.role_type === 'governance')
+      );
+
+      if (!governance.length) {
+        grid.innerHTML = '<div class="empty-state"><p>Leadership information coming soon.</p></div>';
+        return;
+      }
+
+      grid.innerHTML = governance.map(m => {
+        const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        const roles = m.roles.filter(r => r.role_type === 'governance');
+        const rolesHtml = roles.map(r => {
+          let label = esc(r.title);
+          if (r.target) label += ` → ${esc(r.target)}`;
+          return `<span class="role-badge governance">${label}</span>`;
+        }).join(' ');
         return `
-          <div class="leader-card" style="${isVacant ? 'opacity:0.7;border-style:dashed' : ''}">
-            <div class="leader-avatar" style="${isVacant ? 'background:var(--border);color:var(--text-dim)' : ''}">${isVacant ? '?' : initials}</div>
-            <h4>${esc(o.name)}</h4>
-            <div class="role">${esc(o.role)}</div>
-            <div class="institution" style="font-size:0.78rem;line-height:1.5;margin-top:0.5rem">${esc(o.resp)}</div>
+          <div class="leader-card">
+            <div class="leader-avatar">${initials}</div>
+            <h4>${esc(m.name)}</h4>
+            <div class="role">${rolesHtml}</div>
+            <div class="institution">${esc(m.institution || 'Independent')}${m.location ? ' &middot; ' + esc(m.location) : ''}</div>
           </div>
         `;
       }).join('');

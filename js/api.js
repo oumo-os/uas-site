@@ -118,11 +118,13 @@ const api = {
 
   // Members
   async getMembers() { return this.request('/members'); },
+  async getMembersGrouped() { return this.request('/members/grouped'); },
   async getMember(id) { return this.request('/members/' + id); },
   async approveMember(userId, status) { return this.request('/members', { method: 'POST', body: { user_id: userId, status } }); },
 
   // Roles
   async getRoles() { return this.request('/roles'); },
+  async getRole(id) { return this.request('/roles/' + id); },
   async createRole(data) { return this.request('/roles', { method: 'POST', body: data }); },
   async updateRole(id, data) { return this.request('/roles/' + id, { method: 'PUT', body: data }); },
   async deleteRole(id) { return this.request('/roles/' + id, { method: 'DELETE' }); },
@@ -220,6 +222,7 @@ const api = {
 
   // Working Groups
   async getWorkingGroups() { return this.request('/working-groups'); },
+  async getWorkingGroupsWithMembers() { return this.request('/working-groups/with-members'); },
   async createWorkingGroup(data) { return this.request('/working-groups', { method: 'POST', body: data }); },
   async getWorkingGroupMembers(groupId) { return this.request('/working-groups/' + groupId + '/members'); },
   async addWorkingGroupMember(groupId, userId, role) {
@@ -259,7 +262,7 @@ const api = {
   async getPublicProgrammes() { return this.request('/public/programmes'); },
   async getPublicProgramme(id) { return this.request('/public/programmes/' + id); },
   async getPublicDocuments() { return this.request('/public/documents'); },
-  async getFinanceSummary() { return this.request('/finance/summary'); },
+  async getFinanceSummary(groupBy) { return this.request('/finance/summary' + (groupBy ? '?group_by=' + encodeURIComponent(groupBy) : '')); },
   async getMemberDocuments() { return this.request('/member/documents'); },
   async getMemberAssignments() { return this.request('/member/assignments'); },
   async getMemberCalendar() { return this.request('/member/calendar'); },

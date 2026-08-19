@@ -64,6 +64,16 @@
       font-size: 0.68rem; padding: 0.15rem 0.4rem; border-radius: 4px;
       background: var(--accent-glow); color: var(--accent); font-family: monospace;
     }
+    .role-type-badge {
+      display:inline-block; font-size:0.68rem; padding:0.15rem 0.5rem; border-radius:999px;
+      font-weight:600; margin-left:0.5rem; vertical-align:middle;
+    }
+    .role-type-badge.governance { background:rgba(30,96,145,0.12); color:var(--info); }
+    .role-type-badge.administrative { background:rgba(184,134,11,0.12); color:var(--gold); }
+    .role-type-badge.programme { background:rgba(45,106,79,0.12); color:var(--success); }
+    .role-type-badge.working_group { background:rgba(124,58,237,0.12); color:#7c3aed; }
+    .role-type-badge.cohort { background:rgba(236,72,153,0.12); color:#ec4899; }
+    .role-type-badge.general { background:rgba(45,106,79,0.12); color:var(--success); }
     .resolution-card {
       padding: 1.1rem; margin-bottom: 0.75rem; background: var(--bg-card);
       border: 1px solid var(--border); border-radius: var(--radius-lg);
@@ -370,35 +380,53 @@
       } catch(e) { out.textContent = 'Error: ' + (e.error || 'unknown'); }
     }
 
+    const ROLE_TYPE_LABELS = {
+      governance: 'Governance', administrative: 'Administrative', programme: 'Programme',
+      working_group: 'Working Group', cohort: 'Cohort', member_class: 'Member'
+    };
+    const ROLE_TYPE_CSS = {
+      governance: 'governance', administrative: 'administrative', programme: 'programme',
+      working_group: 'working_group', cohort: 'cohort', member_class: 'general'
+    };
+
     function renderRoles(roles) {
       const div = document.getElementById('rolesList');
       if (!roles.length) { div.innerHTML = '<div class="empty-state"><p>No roles defined.</p></div>'; return; }
-      div.innerHTML = roles.map(r => `
-        <div class="role-card" style="cursor:pointer" onclick="showRoleDetail(${r.id})">
-          <div class="flex-between">
-            <div>
-              <h4>${esc(r.title)}</h4>
-              <span class="badge badge-${esc(r.status)}">${esc(r.status)}</span>
-              <span class="text-sm text-dim" style="margin-left:0.5rem">${esc(r.scope || 'institutional')}</span>
+      div.innerHTML = roles.map(r => {
+        const cssClass = ROLE_TYPE_CSS[r.role_type] || 'general';
+        const typeLabel = ROLE_TYPE_LABELS[r.role_type] || r.role_type;
+        const badge = `<span class="role-type-badge ${cssClass}">${esc(typeLabel)}</span>`;
+        const targetDisplay = r.target ? ` → ${esc(r.target)}` : '';
+        return `
+          <div class="role-card" style="cursor:pointer" onclick="showRoleDetail(${r.id})">
+            <div class="flex-between">
+              <div>
+                <h4>${esc(r.title)}${targetDisplay}${badge}</h4>
+                <span class="badge badge-${esc(r.status)}">${esc(r.status)}</span>
+                <span class="text-sm text-dim" style="margin-left:0.5rem">${esc(r.scope || 'institutional')}</span>
+              </div>
+              <div style="text-align:right">
+                ${r.member_count ? `<span class="text-sm text-dim">${r.member_count} member${r.member_count > 1 ? 's' : ''}</span>` : ''}
+                <span class="text-sm text-dim" style="margin-left:0.5rem">&rsaquo;</span>
+              </div>
             </div>
-            <div style="text-align:right">
-              ${r.member_count ? `<span class="text-sm text-dim">${r.member_count} member${r.member_count > 1 ? 's' : ''}</span>` : ''}
-              <span class="text-sm text-dim" style="margin-left:0.5rem">&rsaquo;</span>
-            </div>
+            ${r.description ? `<p class="text-sm text-dim mt-1">${esc(r.description).slice(0, 120)}${r.description.length > 120 ? '...' : ''}</p>` : ''}
           </div>
-          ${r.description ? `<p class="text-sm text-dim mt-1">${esc(r.description).slice(0, 120)}${r.description.length > 120 ? '...' : ''}</p>` : ''}
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
     async function showRoleDetail(roleId) {
       const detail = document.getElementById('roleDetail');
       detail.style.display = '';
       try {
-        const [caps, users] = await Promise.all([
+        const [role, caps, users] = await Promise.all([
+          api.getRole(roleId).catch(() => null),
           api.getRoleCapabilities(roleId).catch(() => []),
           api.getRoleUsers(roleId).catch(() => []),
         ]);
+        const typeLabel = ROLE_TYPE_LABELS[role?.role_type] || role?.role_type || '';
+        const targetDisplay = role?.target ? ` → ${esc(role.target)}` : '';
         const grouped = {};
         caps.forEach(c => { const cat = c.category || 'other'; if (!grouped[cat]) grouped[cat] = []; grouped[cat].push(c); });
         const capsHtml = Object.entries(grouped).map(([cat, items]) => `
@@ -428,6 +456,11 @@
             <button class="btn btn-outline btn-sm" onclick="document.getElementById('roleDetail').style.display='none'">&larr; Back</button>
             <button class="btn btn-danger btn-xs" onclick="deleteRole(${roleId})">Deactivate</button>
           </div>
+          <div style="margin-bottom:1rem">
+            <h3>${esc(role?.title || 'Role')}${targetDisplay} <span class="role-type-badge ${ROLE_TYPE_CSS[role?.role_type] || 'general'}" style="font-size:0.7rem;vertical-align:middle">${esc(typeLabel)}</span></h3>
+            ${role?.description ? `<p class="text-dim text-sm">${esc(role.description)}</p>` : ''}
+            <div class="text-dim text-sm">Scope: ${esc(role?.scope || 'institutional')} &middot; Status: <span class="badge badge-${esc(role?.status || 'active')}">${esc(role?.status || 'active')}</span> &middot; ${role?.member_count || 0} member(s)</div>
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
             <div>
               <div class="dash-card">
@@ -438,14 +471,19 @@
                     <select class="form-select" id="addCapSelect" style="flex:1;font-size:0.82rem;padding:0.4rem"></select>
                     <button class="btn btn-primary btn-xs" onclick="addCapToRole(${roleId})">Add</button>
                   </div>
-                  <div style="display:flex;gap:0.5rem">
-                    <select class="form-select" id="addCapScope" style="font-size:0.82rem;padding:0.4rem">
+                  <div style="display:flex;gap:0.5rem;margin-bottom:0.4rem">
+                    <select class="form-select" id="addCapScope" style="font-size:0.82rem;padding:0.4rem" onchange="onCapScopeTypeChange()">
                       <option value="">Global</option>
                       <option value="programme">Programme</option>
                       <option value="event">Event</option>
                       <option value="project">Project</option>
+                      <option value="working_group">Working Group</option>
                     </select>
-                    <input class="form-input" id="addCapScopeId" type="number" placeholder="ID" style="width:60px;font-size:0.82rem;padding:0.4rem">
+                  </div>
+                  <div id="capScopeResourceWrap" style="display:none">
+                    <select class="form-select" id="addCapScopeResource" style="font-size:0.82rem;padding:0.4rem;width:100%">
+                      <option value="">— Select —</option>
+                    </select>
                   </div>
                 </div>
               </div>
@@ -495,8 +533,27 @@
       const slug = document.getElementById('addCapSelect').value;
       if (!slug) return;
       const scopeType = document.getElementById('addCapScope').value || null;
-      const scopeId = document.getElementById('addCapScopeId').value ? parseInt(document.getElementById('addCapScopeId').value) : null;
+      const scopeResource = document.getElementById('addCapScopeResource')?.value;
+      const scopeId = scopeResource ? parseInt(scopeResource) : null;
       try { await api.addRoleCapability(roleId, slug, scopeType, scopeId); showRoleDetail(roleId); } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function onCapScopeTypeChange() {
+      const type = document.getElementById('addCapScope').value;
+      const wrap = document.getElementById('capScopeResourceWrap');
+      const sel = document.getElementById('addCapScopeResource');
+      if (!type) { wrap.style.display = 'none'; return; }
+      wrap.style.display = '';
+      const loaders = {
+        programme: () => api.getProgrammes(),
+        event: () => api.getEvents(),
+        project: () => api.getProjects(),
+        working_group: () => api.getWorkingGroups(),
+      };
+      try {
+        const items = await (loaders[type] || (() => Promise.resolve([])))();
+        sel.innerHTML = '<option value="">— Select —</option>' + items.map(i => `<option value="${i.id}">${esc(i.title || i.name)}</option>`).join('');
+      } catch(e) { sel.innerHTML = '<option value="">Failed to load</option>'; }
     }
 
     async function removeCap(roleId, capId) {
@@ -774,14 +831,29 @@
           <h4 class="mb-1">Create Role</h4>
           <div class="form-group"><label class="form-label">Title *</label><input class="form-input" id="newRoleTitle"></div>
           <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="newRoleDesc" rows="2"></textarea></div>
+          <div class="form-group"><label class="form-label">Role Type *</label>
+            <select class="form-select" id="newRoleType">
+              <option value="governance">Governance</option>
+              <option value="administrative">Administrative</option>
+              <option value="programme">Programme</option>
+              <option value="working_group">Working Group</option>
+              <option value="cohort">Cohort</option>
+              <option value="member_class" selected>Member Class</option>
+            </select>
+          </div>
           <div class="form-group"><label class="form-label">Scope</label>
-            <select class="form-select" id="newRoleScope">
-              <option value="">Institutional (global)</option>
+            <select class="form-select" id="newRoleScope" onchange="onRoleScopeChange()">
+              <option value="">None (global)</option>
               <option value="board">Board</option>
               <option value="committee">Committee</option>
               <option value="programme">Programme</option>
               <option value="project">Project</option>
+              <option value="working_group">Working Group</option>
             </select>
+          </div>
+          <div class="form-group" id="roleScopeResourceWrap" style="display:none">
+            <label class="form-label" id="roleScopeResourceLabel">Target</label>
+            <select class="form-select" id="newRoleScopeResource"></select>
           </div>
           <div class="form-group"><label class="form-label">Capabilities</label>
             <div id="roleCapCheckboxes" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:0.5rem"></div>
@@ -790,6 +862,26 @@
         </div>
       `;
       loadCapCheckboxes();
+    }
+
+    async function onRoleScopeChange() {
+      const type = document.getElementById('newRoleScope').value;
+      const wrap = document.getElementById('roleScopeResourceWrap');
+      const label = document.getElementById('roleScopeResourceLabel');
+      const sel = document.getElementById('newRoleScopeResource');
+      if (!type || type === 'board' || type === 'committee') { wrap.style.display = 'none'; return; }
+      wrap.style.display = '';
+      const loaders = {
+        programme: () => api.getProgrammes(),
+        project: () => api.getProjects(),
+        working_group: () => api.getWorkingGroups(),
+      };
+      const labels = { programme: 'Programme', project: 'Project', working_group: 'Working Group' };
+      label.textContent = labels[type] || 'Resource';
+      try {
+        const items = await (loaders[type] || (() => Promise.resolve([])))();
+        sel.innerHTML = '<option value="">— Select —</option>' + items.map(i => `<option value="${esc(i.title || i.name)}">${esc(i.title || i.name)}</option>`).join('');
+      } catch(e) { sel.innerHTML = '<option value="">Failed to load</option>'; }
     }
 
     async function loadCapCheckboxes() {
@@ -820,11 +912,16 @@
 
     async function createRole() {
       const caps = Array.from(document.querySelectorAll('.cap-cb:checked')).map(cb => cb.value);
+      const scope = document.getElementById('newRoleScope').value || null;
+      const target = document.getElementById('newRoleScopeResource')?.value || null;
+      const roleType = document.getElementById('newRoleType').value;
       try {
         await api.createRole({
           title: document.getElementById('newRoleTitle').value,
           description: document.getElementById('newRoleDesc').value,
-          scope: document.getElementById('newRoleScope').value || null,
+          role_type: roleType,
+          scope: scope,
+          target: target,
           capabilities: caps,
         });
         const roles = await api.getRoles();
