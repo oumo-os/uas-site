@@ -1240,13 +1240,7 @@
               ${members || '<p class="text-dim text-sm">No members yet</p>'}
               <div style="display:flex;gap:0.4rem;margin-top:0.75rem">
                 <select class="form-select" id="addWgMemberSelect" style="flex:1;font-size:0.8rem;padding:0.35rem"></select>
-                <select class="form-select" id="addWgMemberRole" style="font-size:0.8rem;padding:0.35rem;width:120px">
-                  <option value="member">Member</option>
-                  <option value="chair">Chair</option>
-                  <option value="coordinator">Coordinator</option>
-                  <option value="secretary">Secretary</option>
-                  <option value="advisor">Advisor</option>
-                </select>
+                <input type="text" class="form-input" id="addWgMemberRole" placeholder="Role" style="font-size:0.8rem;padding:0.35rem;width:120px">
                 <button class="btn btn-primary btn-xs" onclick="addGroupMember(${groupId})">Add</button>
               </div>
             </div>
