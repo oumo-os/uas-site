@@ -280,8 +280,8 @@
       <div class="about-content" style="margin-bottom:2rem">
         <p>UAS operates through four institutional levels: Governance → Administration → Programmes → Activities. General Membership elects a Governing Executive, which directs Executive Officers, who coordinate Programme Leads, who mobilise Working Groups and Volunteers for specific activities.</p>
       </div>
-      <h3 style="text-align:center;font-size:1.1rem;margin-bottom:1.5rem">Board of Directors</h3>
-      <div class="leadership-grid" id="leadershipGrid"></div>
+      <h3 style="text-align:center;font-size:1.1rem;margin-bottom:1.5rem">Governance</h3>
+      <div id="leadershipGrid"></div>
     </div>
   </section>
 
@@ -348,34 +348,53 @@
       updateNavUser();
 
       const members = await api.getMembersGrouped().catch(() => []);
-      const grid = document.getElementById('leadershipGrid');
+      const container = document.getElementById('leadershipGrid');
 
       const governance = members.filter(m =>
         m.roles && m.roles.some(r => r.role_type === 'governance')
       );
 
       if (!governance.length) {
-        grid.innerHTML = '<div class="empty-state"><p>Leadership information coming soon.</p></div>';
+        container.innerHTML = '<div class="empty-state"><p>Leadership information coming soon.</p></div>';
         return;
       }
 
-      grid.innerHTML = governance.map(m => {
-        const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-        const roles = m.roles.filter(r => r.role_type === 'governance');
-        const rolesHtml = roles.map(r => {
-          let label = esc(r.title);
-          if (r.target) label += ` → ${esc(r.target)}`;
-          return `<span class="role-badge governance">${label}</span>`;
-        }).join(' ');
-        return `
-          <div class="leader-card">
-            <div class="leader-avatar">${initials}</div>
-            <h4>${esc(m.name)}</h4>
-            <div class="role">${rolesHtml}</div>
-            <div class="institution">${esc(m.institution || 'Independent')}${m.location ? ' &middot; ' + esc(m.location) : ''}</div>
-          </div>
-        `;
-      }).join('');
+      // Group by target (committee name), no-target members go first
+      const groups = {};
+      governance.forEach(m => {
+        const govRoles = m.roles.filter(r => r.role_type === 'governance');
+        const target = govRoles.find(r => r.target)?.target || '';
+        const key = target || '__institutional__';
+        if (!groups[key]) groups[key] = [];
+        groups[key].push({ member: m, roles: govRoles });
+      });
+
+      let html = '';
+      // Render institutional (no target) first
+      if (groups['__institutional__']) {
+        html += '<div class="leadership-grid">' + groups['__institutional__'].map(({ member: m, roles }) => renderLeaderCard(m, roles)).join('') + '</div>';
+        delete groups['__institutional__'];
+      }
+      // Render each committee/target group
+      Object.keys(groups).sort().forEach(target => {
+        html += `<h4 style="text-align:center;font-size:0.9rem;font-weight:600;margin:1.5rem 0 0.75rem;color:var(--accent)">${esc(target)}</h4>`;
+        html += '<div class="leadership-grid">' + groups[target].map(({ member: m, roles }) => renderLeaderCard(m, roles)).join('') + '</div>';
+      });
+
+      container.innerHTML = html;
+    }
+
+    function renderLeaderCard(m, roles) {
+      const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+      const rolesHtml = roles.map(r => `<span class="role-badge governance">${esc(r.title)}</span>`).join(' ');
+      return `
+        <div class="leader-card">
+          <div class="leader-avatar">${initials}</div>
+          <h4>${esc(m.name)}</h4>
+          <div class="role">${rolesHtml}</div>
+          <div class="institution">${esc(m.institution || 'Independent')}${m.location ? ' &middot; ' + esc(m.location) : ''}</div>
+        </div>
+      `;
     }
 
 

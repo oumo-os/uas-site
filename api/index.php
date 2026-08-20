@@ -1506,6 +1506,36 @@ try {
     audit_log('working_group_member_add', 'working_group', $groupId, ['user_id' => $userId]);
     json_response(['ok' => true], 201);
   }
+  elseif (preg_match('#^/working-groups/(\d+)$#', $path, $m) && $method === 'PUT') {
+    $user = require_cap('roles.manage');
+    $wgId = (int) $m[1];
+    $data = input_json();
+    $sets = []; $args = [];
+    foreach (['name','description','type','chair_id','programme_id','term_start','term_end','status'] as $f) {
+      if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = $data[$f]; }
+    }
+    if (!$sets) json_error('No fields to update', 400);
+    $args[] = $wgId;
+    db()->prepare('UPDATE working_groups SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($args);
+    audit_log('working_group_update', 'working_group', $wgId, $data);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/working-groups/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    $user = require_cap('roles.manage');
+    $wgId = (int) $m[1];
+    db()->prepare("UPDATE working_groups SET status = 'inactive' WHERE id = ?")->execute([$wgId]);
+    db()->prepare("UPDATE working_group_members SET status = 'inactive' WHERE group_id = ?")->execute([$wgId]);
+    audit_log('working_group_delete', 'working_group', $wgId);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/working-groups/(\d+)/members/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    $user = require_cap('roles.manage');
+    $groupId = (int) $m[1];
+    $userId = (int) $m[2];
+    db()->prepare('UPDATE working_group_members SET status = \'inactive\' WHERE group_id = ? AND user_id = ?')->execute([$groupId, $userId]);
+    audit_log('working_group_member_remove', 'working_group', $groupId, ['user_id' => $userId]);
+    json_response(['ok' => true]);
+  }
 
   // --- ASSIGNMENTS ---
   elseif ($path === '/assignments' && $method === 'GET') {

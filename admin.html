@@ -189,6 +189,7 @@
     <div class="dash-tabs" id="adminTabs">
       <button class="dash-tab active" data-panel="members">Members</button>
       <button class="dash-tab" data-panel="roles">Roles</button>
+      <button class="dash-tab" data-panel="groups">Groups</button>
       <button class="dash-tab" data-panel="resolutions">Resolutions</button>
       <button class="dash-tab" data-panel="operations">Operations</button>
       <button class="dash-tab" data-panel="inbox">Inbox</button>
@@ -289,6 +290,19 @@
         <button class="btn btn-outline btn-sm" onclick="markAllRead()">Mark all read</button>
       </div>
       <div id="inboxList"></div>
+    </div>
+
+    <!-- Groups -->
+    <div class="dash-panel" id="panel-groups">
+      <div class="flex-between mb-2">
+        <h3 class="section-title" style="margin:0">Committees & Working Groups</h3>
+        <div style="display:flex;gap:0.5rem">
+          <button class="btn btn-primary btn-sm" onclick="showGroupForm('committee')">New Committee</button>
+          <button class="btn btn-outline btn-sm" onclick="showGroupForm('working_group')">New Working Group</button>
+        </div>
+      </div>
+      <div id="groupsList"></div>
+      <div id="groupDetail" style="display:none"></div>
     </div>
 
     <!-- Audit -->
@@ -1148,12 +1162,182 @@
       if (e.key === 'Escape' && document.getElementById('roleModal').classList.contains('open')) closeRoleModal();
     });
 
+    // ── Groups (Committees & Working Groups) ──
+    async function loadGroups() {
+      const div = document.getElementById('groupsList');
+      try {
+        const groups = await api.getWorkingGroupsWithMembers();
+        if (!groups.length) { div.innerHTML = '<div class="empty-state"><p>No committees or working groups yet.</p></div>'; return; }
+        const committees = groups.filter(g => g.type === 'committee');
+        const wgs = groups.filter(g => g.type !== 'committee');
+        div.innerHTML = '';
+        if (committees.length) {
+          div.innerHTML += '<h4 style="font-size:0.85rem;font-weight:600;margin:0 0 0.5rem;color:var(--accent)">Committees</h4>' + renderGroupList(committees);
+        }
+        if (wgs.length) {
+          div.innerHTML += '<h4 style="font-size:0.85rem;font-weight:600;margin:1rem 0 0.5rem;color:#7c3aed">Working Groups</h4>' + renderGroupList(wgs);
+        }
+      } catch(e) { div.innerHTML = '<div class="empty-state"><p>Failed to load groups</p></div>'; }
+    }
+
+    function renderGroupList(groups) {
+      return groups.map(g => {
+        const chair = g.chair_name ? `<span class="text-dim text-sm"> &middot; Chair: ${esc(g.chair_name)}</span>` : '';
+        const prog = g.programme_name ? `<span class="text-dim text-sm"> &middot; ${esc(g.programme_name)}</span>` : '';
+        const terms = g.term_start ? `<span class="text-dim text-sm"> &middot; ${esc(g.term_start)}${g.term_end ? ' – ' + esc(g.term_end) : ''}</span>` : '';
+        const members = (g.members || []).slice(0, 5).map(m => {
+          const ini = (m.user_name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+          const roleBadge = m.role !== 'member' ? `<span style="font-size:0.6rem;background:var(--accent-glow);color:var(--accent);padding:0.1rem 0.35rem;border-radius:999px;margin-left:0.25rem">${esc(m.role)}</span>` : '';
+          return `<span title="${esc(m.user_name)}" style="display:inline-flex;align-items:center;gap:0.15rem"><span style="width:26px;height:26px;border-radius:50%;background:var(--border);display:inline-flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:600">${ini}</span>${roleBadge}</span>`;
+        }).join('');
+        const extra = g.member_count > 5 ? `<span class="text-dim text-sm" style="margin-left:0.25rem">+${g.member_count - 5}</span>` : '';
+        return `
+          <div class="card" style="padding:0.85rem 1rem;margin-bottom:0.5rem;cursor:pointer" onclick="showGroupDetail(${g.id})">
+            <div class="flex-between">
+              <div>
+                <span style="font-weight:600;font-size:0.9rem">${esc(g.name)}</span>
+                <span class="badge badge-${g.type === 'committee' ? 'governance' : 'working_group'}" style="font-size:0.6rem;margin-left:0.4rem">${g.type === 'committee' ? 'Committee' : 'WG'}</span>
+                ${chair}${prog}${terms}
+              </div>
+              <span class="text-dim text-sm">${g.member_count || 0} member${(g.member_count||0) !== 1 ? 's' : ''}</span>
+            </div>
+            ${members || extra ? `<div style="display:flex;align-items:center;gap:0.3rem;margin-top:0.45rem;flex-wrap:wrap">${members}${extra}</div>` : ''}
+          </div>`;
+      }).join('');
+    }
+
+    async function showGroupDetail(groupId) {
+      const el = document.getElementById('groupDetail');
+      const list = document.getElementById('groupsList');
+      el.style.display = '';
+      list.style.display = 'none';
+      try {
+        const groups = await api.getWorkingGroupsWithMembers();
+        const g = groups.find(x => x.id == groupId);
+        if (!g) { el.innerHTML = '<p class="text-dim">Group not found</p>'; return; }
+        const members = (g.members || []).map(m => {
+          const ini = (m.user_name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+          return `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0;border-bottom:1px solid var(--border)">
+              <div style="display:flex;align-items:center;gap:0.5rem">
+                <span style="width:28px;height:28px;border-radius:50%;background:var(--accent-glow);color:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:600">${ini}</span>
+                <div>
+                  <div style="font-weight:500;font-size:0.85rem">${esc(m.user_name)}</div>
+                  <div class="text-dim" style="font-size:0.75rem">${esc(m.email)}</div>
+                </div>
+                ${m.role !== 'member' ? `<span style="font-size:0.65rem;background:var(--accent-glow);color:var(--accent);padding:0.1rem 0.4rem;border-radius:999px;margin-left:0.3rem">${esc(m.role)}</span>` : ''}
+              </div>
+              <button class="btn btn-outline btn-xs" onclick="removeGroupMember(${groupId},${m.user_id})">Remove</button>
+            </div>`;
+        }).join('');
+        el.innerHTML = `
+          <div class="card" style="padding:1.25rem">
+            <div class="flex-between" style="margin-bottom:0.75rem">
+              <div>
+                <div style="display:flex;align-items:center;gap:0.5rem">
+                  <button class="btn btn-outline btn-xs" onclick="closeGroupDetail()">&larr; Back</button>
+                  <h3 style="margin:0;font-size:1.1rem">${esc(g.name)}</h3>
+                  <span class="badge badge-${g.type === 'committee' ? 'governance' : 'working_group'}" style="font-size:0.6rem">${g.type === 'committee' ? 'Committee' : 'Working Group'}</span>
+                </div>
+                ${g.description ? `<p class="text-dim text-sm" style="margin:0.25rem 0 0">${esc(g.description)}</p>` : ''}
+                <div class="text-dim text-sm" style="margin-top:0.3rem">
+                  ${g.chair_name ? `Chair: ${esc(g.chair_name)}` : ''}
+                  ${g.programme_name ? ` &middot; Programme: ${esc(g.programme_name)}` : ''}
+                  ${g.term_start ? ` &middot; Term: ${esc(g.term_start)}${g.term_end ? ' – ' + esc(g.term_end) : ''}` : ''}
+                </div>
+              </div>
+              <button class="btn btn-danger btn-xs" onclick="deleteGroup(${groupId},'${esc(g.name)}')">Delete</button>
+            </div>
+            <div style="border-top:1px solid var(--border);padding-top:0.75rem">
+              <h4 style="font-size:0.85rem;font-weight:600;margin:0 0 0.5rem">Members (${g.members ? g.members.length : 0})</h4>
+              ${members || '<p class="text-dim text-sm">No members yet</p>'}
+              <div style="display:flex;gap:0.4rem;margin-top:0.75rem">
+                <select class="form-select" id="addWgMemberSelect" style="flex:1;font-size:0.8rem;padding:0.35rem"></select>
+                <select class="form-select" id="addWgMemberRole" style="font-size:0.8rem;padding:0.35rem;width:120px">
+                  <option value="member">Member</option>
+                  <option value="chair">Chair</option>
+                  <option value="coordinator">Coordinator</option>
+                  <option value="secretary">Secretary</option>
+                  <option value="advisor">Advisor</option>
+                </select>
+                <button class="btn btn-primary btn-xs" onclick="addGroupMember(${groupId})">Add</button>
+              </div>
+            </div>
+          </div>`;
+        loadGroupMemberDropdown();
+      } catch(e) { el.innerHTML = '<p class="text-dim">Failed to load group details</p>'; }
+    }
+
+    function closeGroupDetail() {
+      document.getElementById('groupDetail').style.display = 'none';
+      document.getElementById('groupsList').style.display = '';
+    }
+
+    async function loadGroupMemberDropdown() {
+      try {
+        const users = await api.getUsers();
+        const sel = document.getElementById('addWgMemberSelect');
+        if (!sel) return;
+        sel.innerHTML = users.map(u => `<option value="${u.id}">${esc(u.name)} (${esc(u.email)})</option>`).join('');
+      } catch(e) {}
+    }
+
+    async function addGroupMember(groupId) {
+      const sel = document.getElementById('addWgMemberSelect');
+      const role = document.getElementById('addWgMemberRole').value;
+      const userId = parseInt(sel.value);
+      if (!userId) return;
+      try { await api.addWorkingGroupMember(groupId, userId, role); showGroupDetail(groupId); } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function removeGroupMember(groupId, userId) {
+      if (!confirm('Remove this member?')) return;
+      try { await api.removeWorkingGroupMember(groupId, userId); showGroupDetail(groupId); } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function deleteGroup(groupId, name) {
+      if (!confirm(`Delete "${name}"? This will deactivate the group and all its members.`)) return;
+      try { await api.deleteWorkingGroup(groupId); closeGroupDetail(); loadGroups(); } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function showGroupForm(type) {
+      const isCommittee = type === 'committee';
+      const fields = [
+        { name: 'name', label: 'Name', type: 'text', required: true, placeholder: isCommittee ? 'e.g. Advisory Board' : 'e.g. Education Working Group' },
+        { name: 'description', label: 'Description', type: 'textarea', rows: 2, placeholder: 'Brief description' },
+        { name: 'chair_id', label: 'Chair', type: 'select', options: [{ label: '— None —', value: '' }], help: 'Optional: designate a chairperson' },
+        { name: 'term_start', label: 'Term Start', type: 'date' },
+        { name: 'term_end', label: 'Term End', type: 'date' },
+      ];
+      if (!isCommittee) {
+        fields.splice(3, 0, { name: 'programme_id', label: 'Programme', type: 'select', options: [{ label: '— None —', value: '' }], help: 'Link to a programme (optional)' });
+      }
+      const formHtml = FormBuilder.render(fields, { id: 'wg-create', submitLabel: `Create ${isCommittee ? 'Committee' : 'Working Group'}`, submitClass: 'btn btn-primary' });
+      openRoleModal(`New ${isCommittee ? 'Committee' : 'Working Group'}`, formHtml);
+      FormBuilder.init('wg-create', fields, async (data) => {
+        const payload = { ...data, type, chair_id: data.chair_id || null, programme_id: data.programme_id || null, term_start: data.term_start || null, term_end: data.term_end || null };
+        try { await api.createWorkingGroup(payload); closeRoleModal(); loadGroups(); } catch(e) { alert(e.error || 'Failed'); }
+      });
+      // Load user options for chair
+      try {
+        const users = await api.getUsers();
+        const chairSel = document.getElementById('wg-create-chair_id');
+        if (chairSel) { chairSel.innerHTML = '<option value="">— None —</option>' + users.map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join(''); }
+        if (!isCommittee) {
+          const progs = await api.request('/programmes');
+          const progSel = document.getElementById('wg-create-programme_id');
+          if (progSel) { progSel.innerHTML = '<option value="">— None —</option>' + progs.map(p => `<option value="${p.id}">${esc(p.title)}</option>`).join(''); }
+        }
+      } catch(e) {}
+    }
+
     function setupTabs() {
       document.getElementById('adminTabs').addEventListener('click', e => {
         const tab = e.target.closest('.dash-tab');
         if (!tab) return;
         document.querySelectorAll('.dash-tab').forEach(t => t.classList.toggle('active', t.dataset.panel === tab.dataset.panel));
         document.querySelectorAll('.dash-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab.dataset.panel));
+        if (tab.dataset.panel === 'groups') loadGroups();
       });
     }
     load();

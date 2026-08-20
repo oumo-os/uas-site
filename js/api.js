@@ -235,6 +235,11 @@ const api = {
   async addWorkingGroupMember(groupId, userId, role) {
     return this.request('/working-groups/' + groupId + '/members', { method: 'POST', body: { user_id: userId, role } });
   },
+  async updateWorkingGroup(id, data) { return this.request('/working-groups/' + id, { method: 'PUT', body: data }); },
+  async deleteWorkingGroup(id) { return this.request('/working-groups/' + id, { method: 'DELETE' }); },
+  async removeWorkingGroupMember(groupId, userId) {
+    return this.request('/working-groups/' + groupId + '/members/' + userId, { method: 'DELETE' });
+  },
 
   // Assignments
   async getAssignments() { return this.request('/assignments'); },
