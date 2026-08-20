@@ -112,9 +112,49 @@
     .cap-search:focus { outline:none; border-color:var(--border-focus); }
     .role-detail-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1rem; gap:1rem; }
     .role-detail-header h3 { margin:0; }
-    .role-meta-edit { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; padding:0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:1rem; }
-    .role-meta-edit .form-group { margin-bottom:0; }
     .role-actions { display:flex; gap:0.5rem; align-items:center; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,0);
+      z-index:1000; align-items:center; justify-content:center; padding:1rem;
+      transition:background 0.25s ease;
+    }
+    .modal-overlay.open { display:flex; background:rgba(0,0,0,0.5); }
+    .modal {
+      background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg);
+      max-width:640px; width:100%; max-height:85vh; overflow-y:auto; padding:1.5rem;
+      box-shadow:0 25px 80px rgba(0,0,0,0.35);
+      transform:translateY(20px) scale(0.97); opacity:0;
+      transition:transform 0.25s cubic-bezier(0.34,1.56,0.64,1), opacity 0.2s ease;
+    }
+    .modal-overlay.open .modal { transform:translateY(0) scale(1); opacity:1; }
+    .modal-header {
+      display:flex; justify-content:space-between; align-items:flex-start;
+      margin-bottom:1.25rem; padding-bottom:0.85rem; border-bottom:1px solid var(--border);
+    }
+    .modal-header h3 { font-size:1.1rem; font-weight:700; margin:0; display:flex; align-items:center; gap:0.5rem; }
+    .modal-close {
+      background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-dim);
+      padding:0.2rem; line-height:1; flex-shrink:0; border-radius:var(--radius);
+      transition:all 0.15s; width:32px; height:32px; display:flex; align-items:center; justify-content:center;
+    }
+    .modal-close:hover { color:var(--text); background:var(--border); }
+    .modal-body { font-size:0.88rem; line-height:1.6; }
+    .modal-body .field { margin-bottom:0.75rem; }
+    .modal-body .field-label { font-size:0.72rem; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:0.2rem; display:block; }
+    .modal-body .field-value { color:var(--text); }
+    .modal-body .field-group {
+      display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;
+      padding:0.75rem; background:var(--bg); border-radius:var(--radius); border:1px solid var(--border);
+    }
+    .modal-body .field-group .field { margin-bottom:0; }
+    .modal-section { margin-top:1rem; }
+    .modal-section-title {
+      font-size:0.78rem; font-weight:600; color:var(--text-dim); text-transform:uppercase;
+      letter-spacing:0.04em; margin-bottom:0.65rem; display:flex; align-items:center; gap:0.4rem;
+    }
+    @media (max-width:600px) { .modal-body .field-group { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
@@ -186,7 +226,6 @@
       </div>
       <div id="rolesList"></div>
       <div id="roleDetail" class="mt-2" style="display:none"></div>
-      <div id="roleForm" class="mt-2"></div>
     </div>
 
     <!-- Resolutions -->
@@ -470,14 +509,11 @@
               <button class="btn btn-danger btn-xs" onclick="deleteRole(${roleId})">Deactivate</button>
             </div>
           </div>
-          <div id="roleMeta">
-            <div style="margin-bottom:1rem">
-              <h3>${esc(role?.title || 'Role')} <span class="role-type-badge ${ROLE_TYPE_CSS[role?.role_type] || 'general'}" style="font-size:0.7rem;vertical-align:middle">${esc(typeLabel)}</span></h3>
-              ${role?.description ? `<p class="text-dim text-sm">${esc(role.description)}</p>` : ''}
-              <div class="text-dim text-sm">${esc(role?.target || role?.scope || 'institutional')} &middot; Status: <span class="badge badge-${esc(role?.status || 'active')}">${esc(role?.status || 'active')}</span> &middot; ${role?.member_count || 0} member(s)</div>
-            </div>
+          <div style="margin-bottom:1rem">
+            <h3>${esc(role?.title || 'Role')} <span class="role-type-badge ${ROLE_TYPE_CSS[role?.role_type] || 'general'}" style="font-size:0.7rem;vertical-align:middle">${esc(typeLabel)}</span></h3>
+            ${role?.description ? `<p class="text-dim text-sm">${esc(role.description)}</p>` : ''}
+            <div class="text-dim text-sm">${esc(role?.target || role?.scope || 'institutional')} &middot; Status: <span class="badge badge-${esc(role?.status || 'active')}">${esc(role?.status || 'active')}</span> &middot; ${role?.member_count || 0} member(s)</div>
           </div>
-          <div id="roleEditForm" style="display:none"></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
             <div>
               <div class="dash-card">
@@ -534,17 +570,8 @@
     }
 
     async function toggleRoleEdit(roleId) {
-      const meta = document.getElementById('roleMeta');
-      const editForm = document.getElementById('roleEditForm');
-      if (editForm.style.display !== 'none') {
-        editForm.style.display = 'none';
-        meta.style.display = '';
-        return;
-      }
       const role = await api.getRole(roleId).catch(() => null);
       if (!role) return;
-      meta.style.display = 'none';
-      editForm.style.display = '';
       const fields = [
         { name: 'title', label: 'Title', type: 'text', required: true, value: role.title || '' },
         { name: 'description', label: 'Description', type: 'textarea', rows: 2, value: role.description || '' },
@@ -570,16 +597,13 @@
         },
         { name: 'target', label: 'Target', type: 'text', value: role.target || '', placeholder: 'e.g. Education Working Group' },
       ];
-      editForm.innerHTML = `
-        <div class="role-meta-edit">
-          ${FormBuilder.render(fields, { id: 'role-edit', submitLabel: 'Save Changes', submitClass: 'btn btn-primary btn-sm' })}
-        </div>
-      `;
+      openRoleModal('Edit Role', FormBuilder.render(fields, { id: 'role-edit', submitLabel: 'Save Changes', submitClass: 'btn btn-primary' }));
       FormBuilder.init('role-edit', fields, async (data) => {
         await api.updateRole(roleId, { ...data, scope: data.scope || null, target: data.target || null });
+        closeRoleModal();
         showRoleDetail(roleId);
       });
-      // Pre-select current values for select fields
+      // Pre-select current values
       const roleTypeEl = document.getElementById('role-edit-role_type');
       const scopeEl = document.getElementById('role-edit-scope');
       if (roleTypeEl) roleTypeEl.value = role.role_type || 'member_class';
@@ -906,7 +930,6 @@
     async function createCalendarItem() { /* replaced by FormBuilder */ }
 
     function showRoleForm() {
-      const div = document.getElementById('roleForm');
       const fields = [
         { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'e.g. Education WG Lead' },
         { name: 'description', label: 'Description', type: 'textarea', rows: 2, placeholder: 'Brief description of this role' },
@@ -919,7 +942,7 @@
             { label: 'Cohort', value: 'cohort' },
             { label: 'Member Class', value: 'member_class' },
           ],
-          help: 'Determines how this role is classified in the system'
+          help: 'Determines how this role is classified'
         },
         { name: 'scope', label: 'Scope', type: 'select',
           options: [
@@ -936,13 +959,20 @@
           help: 'Specific entity this role applies to'
         },
       ];
-      div.innerHTML = FormBuilder.render(fields, { id: 'role-create', submitLabel: 'Create Role', submitClass: 'btn btn-primary' });
+      const formHtml = FormBuilder.render(fields, { id: 'role-create', submitLabel: 'Create Role', submitClass: 'btn btn-primary' });
+      const capHtml = `
+        <div class="modal-section">
+          <div class="modal-section-title">Capabilities</div>
+          <div id="roleCapCheckboxes" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:0.5rem"></div>
+        </div>
+      `;
+      openRoleModal('Create Role', formHtml + capHtml);
       FormBuilder.init('role-create', fields, async (data) => {
         const caps = Array.from(document.querySelectorAll('.cap-cb:checked')).map(cb => cb.value);
         await api.createRole({ ...data, scope: data.scope || null, target: data.target || null, capabilities: caps });
+        closeRoleModal();
         const roles = await api.getRoles();
         renderRoles(roles);
-        document.getElementById('roleForm').innerHTML = '';
       });
       loadCapCheckboxesForCreate();
       initScopeTargetPicker('role-create-scope', 'role-create-target');
@@ -1054,6 +1084,26 @@
       } catch (e) { alert(e.error || 'Delete failed'); }
     }
 
+    // ── Role Modal ──
+    function openRoleModal(title, html) {
+      document.getElementById('roleModalTitle').textContent = title;
+      document.getElementById('roleModalBody').innerHTML = html;
+      const overlay = document.getElementById('roleModal');
+      overlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+      setTimeout(() => { const inp = overlay.querySelector('input, select, textarea'); if (inp) inp.focus(); }, 100);
+    }
+    function closeRoleModal() {
+      document.getElementById('roleModal').classList.remove('open');
+      document.body.style.overflow = '';
+    }
+    document.getElementById('roleModal').addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeRoleModal();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && document.getElementById('roleModal').classList.contains('open')) closeRoleModal();
+    });
+
     function setupTabs() {
       document.getElementById('adminTabs').addEventListener('click', e => {
         const tab = e.target.closest('.dash-tab');
@@ -1064,5 +1114,16 @@
     }
     load();
   </script>
+
+  <!-- Role Modal -->
+  <div class="modal-overlay" id="roleModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="roleModalTitle"></h3>
+        <button class="modal-close" onclick="closeRoleModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="roleModalBody"></div>
+    </div>
+  </div>
 </body>
 </html>
