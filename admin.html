@@ -309,6 +309,18 @@
   </div>
 
   <script src="js/api.js"></script>
+
+  <!-- Role Modal -->
+  <div class="modal-overlay" id="roleModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="roleModalTitle"></h3>
+        <button class="modal-close" onclick="closeRoleModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="roleModalBody"></div>
+    </div>
+  </div>
+
   <script>
     async function load() {
       try {
@@ -1115,15 +1127,5 @@
     load();
   </script>
 
-  <!-- Role Modal -->
-  <div class="modal-overlay" id="roleModal">
-    <div class="modal">
-      <div class="modal-header">
-        <h3 id="roleModalTitle"></h3>
-        <button class="modal-close" onclick="closeRoleModal()">&times;</button>
-      </div>
-      <div class="modal-body" id="roleModalBody"></div>
-    </div>
-  </div>
 </body>
 </html>
