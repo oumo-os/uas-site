@@ -48,6 +48,17 @@
     .empty-state { text-align:center; padding:4rem 0; }
     .empty-state p { color:var(--text-dim); font-size:1rem; }
 
+    .role-badge {
+      display:inline-block; font-size:0.65rem; padding:0.1rem 0.4rem; border-radius:999px;
+      font-weight:600; vertical-align:middle;
+    }
+    .role-badge.governance { background:rgba(30,96,145,0.12); color:var(--info); }
+    .role-badge.administrative { background:rgba(184,134,11,0.12); color:var(--gold); }
+    .role-badge.programme { background:rgba(45,106,79,0.12); color:var(--success); }
+    .role-badge.working_group { background:rgba(124,58,237,0.12); color:#7c3aed; }
+    .role-badge.cohort { background:rgba(236,72,153,0.12); color:#ec4899; }
+    .role-badge.member_class { background:var(--accent-glow); color:var(--accent); }
+
     @media (max-width:768px) {
       .page-hero { min-height:35vh; padding:4rem 1rem 3rem; }
       .page-hero h1 { font-size:1.8rem; }
@@ -221,7 +232,7 @@
                 <p>${esc(p.description || '').slice(0, 160)}</p>
               </div>
               <div class="card-footer">
-                ${p.lead_name ? `<span class="meta"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>${esc(p.lead_name)}</span>` : ''}
+                ${p.lead_name ? `<span class="meta"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>${esc(p.lead_name)} <span class="role-badge programme">Lead</span></span>` : ''}
                 ${p.start_date ? `<span class="meta"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>${esc(p.start_date)}</span>` : ''}
                 <span class="meta" style="margin-left:auto;color:var(--accent)">View &rarr;</span>
               </div>

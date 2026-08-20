@@ -139,6 +139,9 @@ const api = {
   async assignRoleToUser(roleId, userId, effectiveTo) {
     return this.request('/roles/' + roleId + '/users', { method: 'POST', body: { user_id: userId, effective_to: effectiveTo } });
   },
+  async bulkAssignRole(roleId, userIds, effectiveTo) {
+    return this.request('/roles/' + roleId + '/users/bulk', { method: 'POST', body: { user_ids: userIds, effective_to: effectiveTo } });
+  },
   async revokeRoleFromUser(roleId, userId) {
     return this.request('/roles/' + roleId + '/users/' + userId, { method: 'DELETE' });
   },

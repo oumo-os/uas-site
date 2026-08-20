@@ -745,6 +745,24 @@ try {
     assign_role($roleId, $targetUserId, $user['id'], null, $effectiveTo);
     json_response(['ok' => true], 201);
   }
+  elseif (preg_match('#^/roles/(\d+)/users/bulk$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('roles.manage');
+    $roleId = (int) $m[1];
+    $data = input_json();
+    $userIds = $data['user_ids'] ?? [];
+    $effectiveTo = $data['effective_to'] ?? null;
+    if (!is_array($userIds) || empty($userIds)) json_error('user_ids array is required', 400);
+    $assigned = 0;
+    foreach ($userIds as $uid) {
+      $uid = (int) $uid;
+      if ($uid > 0) {
+        assign_role($roleId, $uid, $user['id'], null, $effectiveTo);
+        $assigned++;
+      }
+    }
+    audit_log('role_bulk_assign', 'role', $roleId, ['user_ids' => $userIds, 'assigned' => $assigned]);
+    json_response(['ok' => true, 'assigned' => $assigned], 201);
+  }
   elseif (preg_match('#^/roles/(\d+)/users/(\d+)$#', $path, $m) && $method === 'DELETE') {
     $user = require_cap('roles.manage');
     revoke_role((int) $m[1], (int) $m[2]);

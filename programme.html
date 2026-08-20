@@ -87,6 +87,11 @@
       .finance-grid { grid-template-columns:1fr; }
       .stat-row { gap:0.5rem; }
     }
+    .role-badge {
+      display:inline-block; font-size:0.65rem; padding:0.1rem 0.4rem; border-radius:999px;
+      font-weight:600; vertical-align:middle;
+    }
+    .role-badge.programme { background:rgba(45,106,79,0.12); color:var(--success); }
   </style>
 </head>
 <body>
@@ -250,7 +255,7 @@
         document.getElementById('pLead').innerHTML =
           '<div style="display:flex;align-items:center;gap:0.75rem">' +
           '<div style="width:44px;height:44px;border-radius:50%;background:var(--accent-glow);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;flex-shrink:0">' + initials + '</div>' +
-          '<div><div style="font-weight:600">' + esc(p.lead_name) + '</div>' +
+          '<div><div style="font-weight:600">' + esc(p.lead_name) + ' <span class="role-badge programme">Lead</span></div>' +
           (p.lead_email ? '<div style="font-size:0.82rem;color:var(--text-dim)">' + esc(p.lead_email) + '</div>' : '') +
           '</div></div>';
       }
