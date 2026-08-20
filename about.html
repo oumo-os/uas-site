@@ -351,7 +351,6 @@
       let html = '';
       committees.forEach(g => {
         const members = (g.members || []);
-        const chairLabel = g.chair_name ? ` &middot; Chair: ${esc(g.chair_name)}` : '';
         const membersHtml = members.length ? '<div class="leadership-grid">' + members.map(m => {
           const initials = (m.user_name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
           const roleHtml = m.role && m.role !== 'member' ? `<span class="role-badge governance">${esc(m.role)}</span>` : '';
@@ -366,7 +365,7 @@
         }).join('') + '</div>' : '<p class="text-dim text-sm">No members assigned yet</p>';
 
         html += `<div style="margin-bottom:2rem">
-          <h4 style="text-align:center;font-size:0.95rem;font-weight:600;margin:1.5rem 0 0.75rem;color:var(--accent)">${esc(g.name)}<span style="font-weight:400;color:var(--text-dim);font-size:0.82rem">${chairLabel}</span></h4>
+          <h4 style="text-align:center;font-size:0.95rem;font-weight:600;margin:1.5rem 0 0.75rem;color:var(--accent)">${esc(g.name)}</h4>
           ${g.description ? `<p style="text-align:center;font-size:0.85rem;color:var(--text-dim);margin:0 0 0.75rem">${esc(g.description)}</p>` : ''}
           ${membersHtml}
         </div>`;

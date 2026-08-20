@@ -2187,30 +2187,21 @@
         ];
       } else if (type === 'programme') {
         title = 'Propose Programme';
-        let leadOpts = [{ label: '— Select Lead —', value: '' }];
-        try {
-          const members = await api.request('/members');
-          members.forEach(m => leadOpts.push({ label: m.name, value: m.id }));
-        } catch(e) {}
         fields = [
           { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Programme title' },
-          { name: 'lead_id', label: 'Programme Lead', type: 'select', options: leadOpts },
           { name: 'description', label: 'Description', type: 'textarea', rows: 4, required: true },
           { name: 'objectives', label: 'Objectives', type: 'textarea', rows: 3, placeholder: 'Key objectives and goals' },
         ];
       } else if (type === 'project') {
         title = 'Create Project';
         let progOpts = [{ label: '— None —', value: '' }];
-        let leadOpts = [{ label: '— Select Lead —', value: '' }];
         try {
-          const [progs, members] = await Promise.all([api.getProgrammes(), api.request('/members')]);
+          const progs = await api.getProgrammes();
           progs.forEach(p => progOpts.push({ label: p.title, value: p.id }));
-          members.forEach(m => leadOpts.push({ label: m.name, value: m.id }));
         } catch(e) {}
         fields = [
           { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Project title' },
           { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts },
-          { name: 'lead_id', label: 'Project Lead', type: 'select', options: leadOpts },
           { name: 'description', label: 'Description', type: 'textarea', rows: 4, required: true },
           { name: 'objectives', label: 'Objectives', type: 'textarea', rows: 3 },
           { name: 'deadline', label: 'Deadline', type: 'date' },

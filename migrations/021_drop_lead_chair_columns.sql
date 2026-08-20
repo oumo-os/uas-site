@@ -1,0 +1,26 @@
+-- Drop lead_id from programmes and projects, chair_id from working_groups
+-- These are redundant with the RBAC roles system (scope + target)
+
+-- programmes.lead_id
+SET @fk = (SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'programmes' AND COLUMN_NAME = 'lead_id' AND REFERENCED_TABLE_NAME = 'users' LIMIT 1);
+SET @sql = IF(@fk IS NOT NULL, CONCAT('ALTER TABLE programmes DROP FOREIGN KEY `', @fk, '`'), 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'programmes' AND COLUMN_NAME = 'lead_id');
+SET @sql = IF(@col > 0, 'ALTER TABLE programmes DROP COLUMN lead_id', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- projects.lead_id
+SET @fk = (SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projects' AND COLUMN_NAME = 'lead_id' AND REFERENCED_TABLE_NAME = 'users' LIMIT 1);
+SET @sql = IF(@fk IS NOT NULL, CONCAT('ALTER TABLE projects DROP FOREIGN KEY `', @fk, '`'), 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'projects' AND COLUMN_NAME = 'lead_id');
+SET @sql = IF(@col > 0, 'ALTER TABLE projects DROP COLUMN lead_id', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- working_groups.chair_id
+SET @fk = (SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'working_groups' AND COLUMN_NAME = 'chair_id' AND REFERENCED_TABLE_NAME = 'users' LIMIT 1);
+SET @sql = IF(@fk IS NOT NULL, CONCAT('ALTER TABLE working_groups DROP FOREIGN KEY `', @fk, '`'), 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @col = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'working_groups' AND COLUMN_NAME = 'chair_id');
+SET @sql = IF(@col > 0, 'ALTER TABLE working_groups DROP COLUMN chair_id', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

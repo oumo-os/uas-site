@@ -324,11 +324,10 @@ function apply_resolution(int $resolutionId): void {
 
         case 'programme_create':
           db()->prepare(
-            'INSERT INTO programmes (title, description, lead_id, status, objectives, created_by) VALUES (?, ?, ?, ?, ?, ?)'
+            'INSERT INTO programmes (title, description, status, objectives, created_by) VALUES (?, ?, ?, ?, ?)'
           )->execute([
             $payload['title'],
             $payload['description'] ?? null,
-            $payload['lead_id'] ?? null,
             'active',
             $payload['objectives'] ?? null,
             $res['proposed_by']

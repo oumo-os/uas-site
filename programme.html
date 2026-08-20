@@ -141,10 +141,6 @@
           </div>
         </div>
         <div class="sidebar">
-          <div class="card-section" id="pLeadCard" style="display:none">
-            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span> Programme Lead</h3>
-            <div id="pLead"></div>
-          </div>
           <div class="card-section" id="pFinanceCard" style="display:none">
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span> Financial Summary</h3>
             <div class="finance-grid" id="pFinance"></div>
@@ -190,7 +186,6 @@
         (p.start_date ? '<span style="color:rgba(255,255,255,0.8)"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span> ' + fmtDate(p.start_date) + (p.end_date ? ' — ' + fmtDate(p.end_date) : '') + '</span>' : '');
 
       document.getElementById('pStats').innerHTML =
-        (p.lead_name ? '<div class="stat-chip"><div><div class="label">Lead</div><div class="value">' + esc(p.lead_name) + '</div></div></div>' : '') +
         '<div class="stat-chip"><div><div class="label">Projects</div><div class="value">' + p.projects.length + '</div></div></div>' +
         (p.events && p.events.length ? '<div class="stat-chip"><div><div class="label">Events</div><div class="value">' + p.events.length + '</div></div></div>' : '') +
         (Number(p.budget) > 0 ? '<div class="stat-chip"><div><div class="label">Budget</div><div class="value">UGX ' + Number(p.budget).toLocaleString() + '</div></div></div>' : '');
@@ -247,17 +242,6 @@
             '<div class="ev-date"><div class="day">' + d.getDate() + '</div><div class="month">' + d.toLocaleString('en',{month:'short'}) + '</div></div>' +
             '<div class="ev-info"><h4>' + esc(ev.title) + '</h4><p>' + esc(ev.location || 'TBD') + ' &middot; ' + esc(ev.status) + '</p></div></div>';
         }).join('');
-      }
-
-      if (p.lead_name) {
-        document.getElementById('pLeadCard').style.display = 'block';
-        var initials = p.lead_name.split(' ').map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
-        document.getElementById('pLead').innerHTML =
-          '<div style="display:flex;align-items:center;gap:0.75rem">' +
-          '<div style="width:44px;height:44px;border-radius:50%;background:var(--accent-glow);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;flex-shrink:0">' + initials + '</div>' +
-          '<div><div style="font-weight:600">' + esc(p.lead_name) + ' <span class="role-badge programme">Lead</span></div>' +
-          (p.lead_email ? '<div style="font-size:0.82rem;color:var(--text-dim)">' + esc(p.lead_email) + '</div>' : '') +
-          '</div></div>';
       }
 
       if (p.finance && (p.finance.income > 0 || p.finance.expense > 0)) {

@@ -897,15 +897,15 @@ try {
   // --- PROGRAMMES ---
   elseif ($path === '/programmes' && $method === 'GET') {
     require_login();
-    $stmt = db()->prepare('SELECT p.*, u.name AS lead_name FROM programmes p LEFT JOIN users u ON u.id = p.lead_id ORDER BY p.created_at DESC');
+    $stmt = db()->prepare('SELECT p.* FROM programmes p ORDER BY p.created_at DESC');
     $stmt->execute();
     json_response($stmt->fetchAll());
   }
   elseif ($path === '/programmes' && $method === 'POST') {
     $user = require_cap('programmes.create');
     $data = input_json();
-    db()->prepare('INSERT INTO programmes (title, description, lead_id, objectives, created_by) VALUES (?, ?, ?, ?, ?)')
-      ->execute([$data['title'], $data['description'] ?? null, $data['lead_id'] ?? null, $data['objectives'] ?? null, $user['id']]);
+    db()->prepare('INSERT INTO programmes (title, description, objectives, created_by) VALUES (?, ?, ?, ?)')
+      ->execute([$data['title'], $data['description'] ?? null, $data['objectives'] ?? null, $user['id']]);
     $id = (int) db()->lastInsertId();
     audit_log('programme_create', 'programme', $id);
     json_response(['id' => $id], 201);
@@ -914,7 +914,7 @@ try {
   // --- PROJECTS ---
   elseif ($path === '/projects' && $method === 'GET') {
     require_login();
-    $stmt = db()->prepare('SELECT p.*, u.name AS lead_name, pr.title AS programme_title FROM projects p LEFT JOIN users u ON u.id = p.lead_id LEFT JOIN programmes pr ON pr.id = p.programme_id ORDER BY p.created_at DESC');
+    $stmt = db()->prepare('SELECT p.*, pr.title AS programme_title FROM projects p LEFT JOIN programmes pr ON pr.id = p.programme_id ORDER BY p.created_at DESC');
     $stmt->execute();
     json_response($stmt->fetchAll());
   }
@@ -928,8 +928,8 @@ try {
     if (!user_has_cap($user['id'], 'projects.create') && !($progId && user_has_cap($user['id'], 'projects.create', 'programme', (int)$progId))) {
       json_error('Insufficient permissions: projects.create', 403);
     }
-    db()->prepare('INSERT INTO projects (programme_id, title, description, lead_id, objectives, deadline, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      ->execute([$progId, $data['title'], $data['description'] ?? null, $data['lead_id'] ?? null, $data['objectives'] ?? null, $data['deadline'] ?? null, $user['id']]);
+    db()->prepare('INSERT INTO projects (programme_id, title, description, objectives, deadline, created_by) VALUES (?, ?, ?, ?, ?, ?)')
+      ->execute([$progId, $data['title'], $data['description'] ?? null, $data['objectives'] ?? null, $data['deadline'] ?? null, $user['id']]);
     $id = (int) db()->lastInsertId();
     audit_log('project_create', 'project', $id);
     json_response(['id' => $id], 201);
@@ -1437,10 +1437,9 @@ try {
   // --- WORKING GROUPS ---
   elseif ($path === '/working-groups' && $method === 'GET') {
     require_login();
-    $stmt = db()->prepare('SELECT wg.*, u.name AS chair_name, p.title AS programme_name,
+    $stmt = db()->prepare('SELECT wg.*, p.title AS programme_name,
       (SELECT COUNT(*) FROM working_group_members wgm WHERE wgm.group_id = wg.id AND wgm.status = "active") AS member_count
       FROM working_groups wg
-      LEFT JOIN users u ON u.id = wg.chair_id
       LEFT JOIN programmes p ON p.id = wg.programme_id
       WHERE wg.status = "active"
       ORDER BY wg.name');
@@ -1449,9 +1448,8 @@ try {
   }
   elseif ($path === '/working-groups/with-members' && $method === 'GET') {
     $isPublic = isset($_GET['public']) && $_GET['public'] === '1';
-    $stmt = db()->prepare('SELECT wg.*, u.name AS chair_name, p.title AS programme_name
+    $stmt = db()->prepare('SELECT wg.*, p.title AS programme_name
       FROM working_groups wg
-      LEFT JOIN users u ON u.id = wg.chair_id
       LEFT JOIN programmes p ON p.id = wg.programme_id
       WHERE wg.status = "active"
       ORDER BY wg.name');
@@ -1461,9 +1459,32 @@ try {
     $membersByGroup = [];
     if ($groupIds) {
       $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
-      $stmt = db()->prepare("SELECT wgm.*, u.name AS user_name, u.email FROM working_group_members wgm JOIN users u ON u.id = wgm.user_id WHERE wgm.group_id IN ($placeholders) AND wgm.status = 'active' ORDER BY wgm.role, u.name");
+      // Fetch members
+      $stmt = db()->prepare("SELECT wgm.*, u.name AS user_name, u.email FROM working_group_members wgm JOIN users u ON u.id = wgm.user_id WHERE wgm.group_id IN ($placeholders) AND wgm.status = 'active' ORDER BY u.name");
       $stmt->execute($groupIds);
-      foreach ($stmt->fetchAll() as $row) {
+      $allMembers = $stmt->fetchAll();
+      // Build group name lookup
+      $groupNameMap = [];
+      foreach ($groups as $g) { $groupNameMap[(int)$g['id']] = $g['name']; }
+      // Fetch all roles targeting these groups
+      $roleMap = []; // user_id => [role_title, ...]
+      if ($allMembers) {
+        $userIds = array_unique(array_map(fn($m) => (int)$m['user_id'], $allMembers));
+        $namePlaceholders = implode(',', array_fill(0, count($groupIds), '?'));
+        $userPlaceholders = implode(',', array_fill(0, count($userIds), '?'));
+        $rstmt = db()->prepare("SELECT ra.user_id, r.title FROM role_assignments ra JOIN roles r ON r.id = ra.role_id WHERE ra.user_id IN ($userPlaceholders) AND r.target IN ($namePlaceholders) AND ra.status = 'active' AND r.status = 'active'");
+        $args = array_merge($userIds, array_values($groupNameMap));
+        $rstmt->execute($args);
+        foreach ($rstmt->fetchAll() as $row) {
+          $uid = (int)$row['user_id'];
+          if (!isset($roleMap[$uid])) $roleMap[$uid] = [];
+          $roleMap[$uid][] = $row['title'];
+        }
+      }
+      // Attach roles to members
+      foreach ($allMembers as &$row) {
+        $uid = (int)$row['user_id'];
+        $row['role'] = isset($roleMap[$uid]) ? implode(', ', $roleMap[$uid]) : null;
         $gid = (int) $row['group_id'];
         if (!isset($membersByGroup[$gid])) $membersByGroup[$gid] = [];
         $membersByGroup[$gid][] = $row;
@@ -1477,10 +1498,10 @@ try {
   elseif ($path === '/working-groups' && $method === 'POST') {
     $user = require_cap('roles.create');
     $data = input_json();
-    db()->prepare('INSERT INTO working_groups (name, description, type, chair_id, programme_id, created_by, resolution_id, term_start, term_end) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    db()->prepare('INSERT INTO working_groups (name, description, type, programme_id, created_by, resolution_id, term_start, term_end) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       ->execute([
         $data['name'], $data['description'] ?? null, $data['type'] ?? 'working_group',
-        $data['chair_id'] ?? null, $data['programme_id'] ?? null,
+        $data['programme_id'] ?? null,
         $user['id'], $data['resolution_id'] ?? null,
         $data['term_start'] ?? null, $data['term_end'] ?? null
       ]);
@@ -1491,18 +1512,25 @@ try {
   elseif (preg_match('#^/working-groups/(\d+)/members$#', $path, $m) && $method === 'GET') {
     require_login();
     $groupId = (int) $m[1];
-    $stmt = db()->prepare('SELECT wgm.*, u.name AS user_name, u.email FROM working_group_members wgm JOIN users u ON u.id = wgm.user_id WHERE wgm.group_id = ? AND wgm.status = "active" ORDER BY wgm.role, u.name');
+    $stmt = db()->prepare('SELECT wgm.*, u.name AS user_name, u.email, wg.name AS group_name FROM working_group_members wgm JOIN users u ON u.id = wgm.user_id JOIN working_groups wg ON wg.id = wgm.group_id WHERE wgm.group_id = ? AND wgm.status = "active" ORDER BY u.name');
     $stmt->execute([$groupId]);
-    json_response($stmt->fetchAll());
+    $members = $stmt->fetchAll();
+    // Derive role from roles table
+    foreach ($members as &$mem) {
+      $rstmt = db()->prepare('SELECT r.title FROM role_assignments ra JOIN roles r ON r.id = ra.role_id WHERE ra.user_id = ? AND r.target = ? AND ra.status = "active" AND r.status = "active" ORDER BY r.title');
+      $rstmt->execute([(int)$mem['user_id'], $mem['group_name']]);
+      $roles = $rstmt->fetchAll(PDO::FETCH_COLUMN);
+      $mem['role'] = $roles ? implode(', ', $roles) : null;
+    }
+    json_response($members);
   }
   elseif (preg_match('#^/working-groups/(\d+)/members$#', $path, $m) && $method === 'POST') {
     $user = require_cap('roles.manage');
     $groupId = (int) $m[1];
     $data = input_json();
     $userId = (int) $data['user_id'];
-    $role = $data['role'] ?? 'member';
-    db()->prepare('INSERT INTO working_group_members (group_id, user_id, role, joined_date) VALUES (?, ?, ?, CURDATE()) ON DUPLICATE KEY UPDATE role = VALUES(role), status = "active"')
-      ->execute([$groupId, $userId, $role]);
+    db()->prepare('INSERT INTO working_group_members (group_id, user_id, joined_date) VALUES (?, ?, CURDATE()) ON DUPLICATE KEY UPDATE status = "active"')
+      ->execute([$groupId, $userId]);
     audit_log('working_group_member_add', 'working_group', $groupId, ['user_id' => $userId]);
     json_response(['ok' => true], 201);
   }
@@ -1511,7 +1539,7 @@ try {
     $wgId = (int) $m[1];
     $data = input_json();
     $sets = []; $args = [];
-    foreach (['name','description','type','chair_id','programme_id','term_start','term_end','status'] as $f) {
+    foreach (['name','description','type','programme_id','term_start','term_end','status'] as $f) {
       if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = $data[$f]; }
     }
     if (!$sets) json_error('No fields to update', 400);
@@ -1879,13 +1907,13 @@ try {
     json_response($stmt->fetchAll());
   }
   elseif ($path === '/public/programmes' && $method === 'GET') {
-    $stmt = db()->prepare('SELECT p.id, p.title, p.description, p.status, u.name AS lead_name FROM programmes p LEFT JOIN users u ON u.id = p.lead_id WHERE p.status = "active" ORDER BY p.title');
+    $stmt = db()->prepare('SELECT p.id, p.title, p.description, p.status FROM programmes p WHERE p.status = "active" ORDER BY p.title');
     $stmt->execute();
     json_response($stmt->fetchAll());
   }
   elseif (preg_match('#^/public/programmes/(\d+)$#', $path, $m) && $method === 'GET') {
     $pid = (int) $m[1];
-    $stmt = db()->prepare('SELECT p.*, u.name AS lead_name, u.email AS lead_email FROM programmes p LEFT JOIN users u ON u.id = p.lead_id WHERE p.id = ?');
+    $stmt = db()->prepare('SELECT p.* FROM programmes p WHERE p.id = ?');
     $stmt->execute([$pid]);
     $programme = $stmt->fetch();
     if (!$programme) json_error('Programme not found', 404);
@@ -1964,7 +1992,7 @@ try {
     $id = (int) $m[1];
     $sets = [];
     $args = [];
-    foreach (['title', 'description', 'objectives', 'outputs', 'status', 'lead_id'] as $f) {
+    foreach (['title', 'description', 'objectives', 'outputs', 'status'] as $f) {
       if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = $data[$f]; }
     }
     if (array_key_exists('budget', $data)) { $sets[] = 'budget = ?'; $args[] = $data['budget'] !== null ? (float) $data['budget'] : null; }

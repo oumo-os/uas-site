@@ -69,7 +69,6 @@
       font-weight:600; text-transform:capitalize;
     }
     .wg-member-role.chair, .wg-member-role.coordinator { background:rgba(30,96,145,0.12); color:var(--info); }
-    .wg-member-role.lead { background:rgba(45,106,79,0.12); color:var(--success); }
     .wg-member-role.member { background:var(--accent-glow); color:var(--accent); }
 
     .search-box { max-width:500px; margin:0 auto 2rem; position:relative; }
@@ -330,8 +329,7 @@
       const groupsHtml = committees.map(g => {
         const members = g.members || [];
         const membersHtml = members.length ? members.map(m => {
-          const roleClass = (m.role || '').toLowerCase().includes('chair') || (m.role || '').toLowerCase().includes('coordinator') ? 'chair' :
-                            (m.role || '').toLowerCase().includes('lead') ? 'lead' : 'member';
+          const roleClass = (m.role || '').toLowerCase().includes('chair') || (m.role || '').toLowerCase().includes('coordinator') ? 'chair' : 'member';
           return `
           <div class="wg-member-row">
             <span style="font-weight:500">${esc(m.user_name)}</span>
@@ -364,8 +362,7 @@
       const groupsHtml = wgs.map(g => {
         const members = g.members || [];
         const membersHtml = members.length ? members.map(m => {
-          const roleClass = (m.role || '').toLowerCase().includes('chair') || (m.role || '').toLowerCase().includes('coordinator') ? 'chair' :
-                            (m.role || '').toLowerCase().includes('lead') ? 'lead' : 'member';
+          const roleClass = (m.role || '').toLowerCase().includes('chair') || (m.role || '').toLowerCase().includes('coordinator') ? 'chair' : 'member';
           return `
           <div class="wg-member-row">
             <span style="font-weight:500">${esc(m.user_name)}</span>
