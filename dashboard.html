@@ -120,6 +120,12 @@
     }
     .dash-card-header h4 { font-size: 0.88rem; font-weight: 600; margin: 0; }
 
+    /* ── Inbox ── */
+    .inbox-item { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); transition: background 0.15s; }
+    .inbox-item:last-child { border-bottom: none; }
+    .inbox-item:hover { background: rgba(255,255,255,0.04); }
+    .inbox-item.unread { background: rgba(var(--accent-rgb, 99,102,241), 0.06); border-left: 3px solid var(--accent); padding-left: 0.75rem; }
+
     /* ── Finance Toggle ── */
     .fin-toggle { display: flex; gap: 0; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
     .fin-toggle-btn {
@@ -576,7 +582,7 @@
         <div class="dash-hero-roles" id="dashRoles"></div>
       </div>
       <div class="dash-hero-actions">
-        <a href="/profile" class="btn btn-sm">Profile</a>
+        <a href="/profile" class="btn btn-sm">Edit Profile</a>
         <button class="btn btn-sm" onclick="api.logout();window.location.href=ua('/')">Logout</button>
       </div>
     </div>
@@ -585,11 +591,13 @@
   <div class="container">
     <div class="dash-tabs" id="dashTabs">
       <button class="dash-tab active" data-panel="overview">Overview</button>
+      <button class="dash-tab" data-panel="inbox">Inbox <span class="tab-count" id="inboxTabCount"></span></button>
       <button class="dash-tab" data-panel="pending">Pending <span class="tab-count" id="pendingTabCount"></span></button>
       <button class="dash-tab" data-panel="governance">Governance</button>
       <button class="dash-tab" data-panel="finance">Finance</button>
       <button class="dash-tab" data-panel="org">Org</button>
       <button class="dash-tab" data-panel="roles">My Roles</button>
+      <button class="dash-tab" data-panel="profile">Profile</button>
       <button class="dash-tab" data-panel="create">Submit</button>
     </div>
 
@@ -813,6 +821,59 @@
       </div>
       <div id="createForm" class="mt-2"></div>
     </div>
+
+    <!-- Inbox Panel -->
+    <div class="dash-panel" id="panel-inbox">
+      <div class="dash-card">
+        <div class="dash-card-header">
+          <h4>Notifications</h4>
+          <button class="btn btn-outline btn-xs" onclick="markAllDashNotifsRead()">Mark all read</button>
+        </div>
+        <div id="dashInbox"></div>
+      </div>
+    </div>
+
+    <!-- Profile Panel -->
+    <div class="dash-panel" id="panel-profile">
+      <div class="dash-card">
+        <div class="dash-card-header"><h4>Edit Profile</h4></div>
+        <div style="padding:1.25rem">
+          <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem">
+            <div style="width:56px;height:56px;border-radius:50%;background:var(--accent-glow);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.2rem;flex-shrink:0" id="pvAvatar"></div>
+            <div>
+              <div style="font-weight:600;font-size:1rem" id="pvName"></div>
+              <div class="text-dim text-sm" id="pvMeta"></div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+            <div><label class="form-label">Full name</label><input class="form-input" id="fName" style="width:100%"></div>
+            <div><label class="form-label">Phone</label><input class="form-input" id="fPhone" style="width:100%"></div>
+            <div><label class="form-label">Institution</label><input class="form-input" id="fInstitution" style="width:100%"></div>
+            <div><label class="form-label">Location</label><input class="form-input" id="fLocation" style="width:100%"></div>
+          </div>
+          <div style="margin-top:0.75rem"><label class="form-label">Bio</label><textarea class="form-input" id="fBio" rows="3" style="width:100%;resize:vertical"></textarea></div>
+          <div style="margin-top:0.75rem"><label class="form-label">Interests</label><textarea class="form-input" id="fInterests" rows="2" placeholder="e.g. observing, astrophotography, education outreach" style="width:100%;resize:vertical"></textarea></div>
+          <div style="margin-top:0.75rem"><label class="form-label">Contributions</label><textarea class="form-input" id="fContributions" rows="2" style="width:100%;resize:vertical"></textarea></div>
+          <label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.75rem">
+            <input type="checkbox" id="fVisible" style="width:18px;height:18px">
+            <span style="font-size:0.85rem">Show my profile on the public member directory</span>
+          </label>
+          <div style="margin-top:1rem;display:flex;align-items:center;gap:0.75rem">
+            <button class="btn btn-primary btn-sm" onclick="saveDashProfile()">Save changes</button>
+            <span id="saveMsg" class="text-success" style="font-size:0.85rem"></span>
+          </div>
+        </div>
+      </div>
+      <div class="dash-card" style="margin-top:1rem">
+        <div class="dash-card-header"><h4>Change Password</h4></div>
+        <div style="padding:1.25rem;display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap">
+          <div style="flex:1;min-width:150px"><label class="form-label">Current password</label><input class="form-input" id="pwCurrent" type="password" style="width:100%"></div>
+          <div style="flex:1;min-width:150px"><label class="form-label">New password</label><input class="form-input" id="pwNew" type="password" style="width:100%"></div>
+          <div><button class="btn btn-outline btn-sm" onclick="changeDashPassword()">Update</button></div>
+          <span id="pwMsg" class="text-success" style="font-size:0.85rem"></span>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Detail Modal -->
@@ -960,6 +1021,14 @@
           document.getElementById('createPollBtn').style.display = '';
         }
         setupTabs();
+        // Load inbox badge count
+        (async function() {
+          try {
+            const data = await api.request('/notifications');
+            const badge = document.getElementById('inboxTabCount');
+            if (badge && data.unread) { badge.textContent = data.unread; } else if (badge) { badge.style.display = 'none'; }
+          } catch(e) {}
+        })();
       } catch(e) {
         window.location.href = ua('/login');
       }
@@ -2392,6 +2461,108 @@
     function switchTab(panel) {
       document.querySelectorAll('#dashTabs .dash-tab').forEach(t => t.classList.toggle('active', t.dataset.panel === panel));
       document.querySelectorAll('.dash-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + panel));
+      if (panel === 'inbox') loadDashInbox();
+      if (panel === 'profile') loadDashProfile();
+    }
+
+    // ── Inbox ──
+    async function loadDashInbox() {
+      const div = document.getElementById('dashInbox');
+      if (!div) return;
+      try {
+        const data = await api.request('/notifications');
+        const items = data.items || [];
+        const badge = document.getElementById('inboxTabCount');
+        if (badge) { badge.textContent = data.unread || ''; badge.style.display = data.unread ? '' : 'none'; }
+        if (!items.length) {
+          div.innerHTML = '<div class="empty-state" style="padding:2rem"><p>No notifications yet</p></div>';
+          return;
+        }
+        div.innerHTML = items.map(n => `
+          <div class="inbox-item ${n.is_read ? '' : 'unread'}" onclick="readDashNotif(${n.id}, '${esc(n.link || '')}')" style="cursor:pointer">
+            <div style="font-weight:${n.is_read ? '400' : '600'};font-size:0.9rem;margin-bottom:0.2rem">${esc(n.title)}</div>
+            ${n.body ? `<div class="text-dim text-sm">${esc(n.body).slice(0, 120)}${n.body.length > 120 ? '...' : ''}</div>` : ''}
+            <div class="text-faint text-sm" style="margin-top:0.3rem">${fmtTimeAgo(new Date(n.created_at.replace(' ', 'T')))}</div>
+          </div>
+        `).join('');
+      } catch(e) { div.innerHTML = '<div class="empty-state"><p>Failed to load notifications</p></div>'; }
+    }
+
+    function readDashNotif(id, link) {
+      api.request('/notifications/' + id + '/read', { method: 'POST' }).catch(() => {});
+      const el = document.querySelector(`.inbox-item[onclick*="${id}"]`);
+      if (el) el.classList.remove('unread');
+      const badge = document.getElementById('inboxTabCount');
+      if (badge && parseInt(badge.textContent) > 0) {
+        const n = parseInt(badge.textContent) - 1;
+        badge.textContent = n || '';
+        badge.style.display = n ? '' : 'none';
+      }
+      if (link) location.href = ua(link);
+    }
+
+    function markAllDashNotifsRead() {
+      api.request('/notifications/read-all', { method: 'POST' }).catch(() => {});
+      document.querySelectorAll('#dashInbox .inbox-item.unread').forEach(el => el.classList.remove('unread'));
+      const badge = document.getElementById('inboxTabCount');
+      if (badge) { badge.textContent = ''; badge.style.display = 'none'; }
+    }
+
+    // ── Profile ──
+    async function loadDashProfile() {
+      try {
+        const prof = await api.getProfile();
+        const p = api._user;
+        const m = prof.member || {};
+        document.getElementById('pvAvatar').textContent = (p.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        document.getElementById('pvName').textContent = p.name;
+        document.getElementById('pvMeta').textContent = (m.membership_number || '') + ' · ' + (m.category || 'regular');
+        document.getElementById('fName').value = p.name || '';
+        document.getElementById('fPhone').value = p.phone || '';
+        document.getElementById('fInstitution').value = p.institution || '';
+        document.getElementById('fLocation').value = p.location || '';
+        document.getElementById('fBio').value = p.bio || '';
+        document.getElementById('fInterests').value = m.interests || '';
+        document.getElementById('fContributions').value = m.contributions || '';
+        document.getElementById('fVisible').checked = !!m.profile_visible;
+      } catch(e) {}
+    }
+
+    async function saveDashProfile() {
+      const msg = document.getElementById('saveMsg');
+      msg.textContent = '';
+      try {
+        await api.updateProfile({
+          name: document.getElementById('fName').value.trim(),
+          phone: document.getElementById('fPhone').value.trim(),
+          institution: document.getElementById('fInstitution').value.trim(),
+          location: document.getElementById('fLocation').value.trim(),
+          bio: document.getElementById('fBio').value.trim(),
+          interests: document.getElementById('fInterests').value.trim(),
+          contributions: document.getElementById('fContributions').value.trim(),
+          profile_visible: document.getElementById('fVisible').checked,
+        });
+        msg.textContent = 'Saved';
+        api._user.name = document.getElementById('fName').value.trim() || api._user.name;
+        document.getElementById('pvName').textContent = api._user.name;
+        document.getElementById('pvAvatar').textContent = api._user.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        document.getElementById('dashTitle').textContent = `Welcome back, ${api._user.name.split(' ')[0]}`;
+        updateNavUser();
+      } catch(e) { alert(e.error || 'Failed to save'); }
+    }
+
+    async function changeDashPassword() {
+      const msg = document.getElementById('pwMsg');
+      msg.textContent = '';
+      const current = document.getElementById('pwCurrent').value;
+      const next = document.getElementById('pwNew').value;
+      if (!current || !next) { alert('Fill in both fields'); return; }
+      try {
+        await api.changePassword({ current_password: current, new_password: next });
+        msg.textContent = 'Password updated';
+        document.getElementById('pwCurrent').value = '';
+        document.getElementById('pwNew').value = '';
+      } catch(e) { alert(e.error || 'Failed'); }
     }
 
     function renderBudgetItems(items) {
