@@ -712,12 +712,12 @@
       const sel = document.getElementById('assignUserSelect');
       const userIds = Array.from(sel.selectedOptions).map(o => parseInt(o.value)).filter(v => v > 0);
       if (!userIds.length) return;
-      try { await api.bulkAssignRole(roleId, userIds); showRoleDetail(roleId); } catch(e) { alert(e.error || 'Failed'); }
+      try { await api.bulkAssignRole(roleId, userIds); showRoleDetail(roleId); } catch(e) { console.error('Assign role failed:', e); alert(e.error || e.message || 'Failed'); }
     }
 
     async function removeRoleUser(roleId, userId) {
       if (!confirm('Remove this user from the role?')) return;
-      try { await api.revokeRoleFromUser(roleId, userId); showRoleDetail(roleId); } catch(e) { alert(e.error || 'Failed'); }
+      try { await api.revokeRoleFromUser(roleId, userId); showRoleDetail(roleId); } catch(e) { console.error('Remove role user failed:', e); alert(e.error || e.message || 'Failed'); }
     }
 
     async function deleteRole(roleId) {

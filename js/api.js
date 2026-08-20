@@ -62,7 +62,11 @@ const api = {
       body: opts.body ? JSON.stringify(opts.body) : undefined,
       credentials: 'same-origin',
     });
-    const data = await res.json();
+    let data;
+    try { data = await res.json(); } catch (jsonErr) {
+      const text = await res.text().catch(() => '');
+      throw { status: res.status, error: text.slice(0, 200) || 'Invalid server response' };
+    }
     if (!res.ok) throw { status: res.status, ...data };
     return data;
   },
