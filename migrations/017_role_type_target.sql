@@ -1,8 +1,10 @@
--- Add role_type and target columns to roles table
-ALTER TABLE roles
-  ADD COLUMN role_type ENUM('governance','administrative','working_group','programme','cohort','member_class')
-    DEFAULT 'member_class' AFTER scope,
-  ADD COLUMN target VARCHAR(255) NULL AFTER role_type;
+-- Add role_type and target columns to roles table (safe re-run)
+SET @col_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'roles' AND COLUMN_NAME = 'role_type');
+SET @sql = IF(@col_exists = 0,
+  'ALTER TABLE roles ADD COLUMN role_type ENUM(''governance'',''administrative'',''working_group'',''programme'',''cohort'',''member_class'') DEFAULT ''member_class'' AFTER scope, ADD COLUMN target VARCHAR(255) NULL AFTER role_type',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Seed existing roles with explicit role_type and target
 UPDATE roles SET role_type = 'governance',     target = NULL           WHERE id = 1;  -- President (board)
