@@ -216,10 +216,6 @@
     let allMembers = [];
     let allWgData = [];
     let activeSection = '';
-    const ROLE_TYPE_PRIORITY = ['governance', 'administrative'];
-    const ROLE_TYPE_LABELS = {
-      governance: 'Governance', administrative: 'Administrative', member_class: 'Members'
-    };
     const ROLE_TYPE_CSS = {
       governance: 'governance', administrative: 'administrative', member_class: 'general'
     };
@@ -262,10 +258,10 @@
     function renderFilter() {
       const sections = [
         { key: '', label: 'All' },
-        { key: 'governance', label: 'Governance' },
-        { key: 'administrative', label: 'Administrative' },
+        { key: 'committees', label: 'Committees' },
         { key: 'working_groups', label: 'Working Groups' },
-        { key: 'general', label: 'Members' },
+        { key: 'key_members', label: 'Key Members' },
+        { key: 'other', label: 'Other Members' },
       ];
       document.getElementById('roleFilter').innerHTML = sections.map(s =>
         `<button class="filter-chip ${activeSection === s.key ? 'active' : ''}" onclick="filterSection('${s.key}')">${s.label}</button>`
@@ -292,19 +288,25 @@
       const members = getFilteredMembers();
       document.getElementById('emptyMsg').style.display = members.length || allWgData.length ? 'none' : 'block';
 
+      const committeeMembers = new Set();
+      const keyMemberIds = new Set();
+      allWgData.filter(g => g.type === 'committee').forEach(g => {
+        (g.members || []).forEach(m => committeeMembers.add(m.user_id));
+      });
+
       let html = '';
 
-      if (!activeSection || activeSection === 'governance') {
-        html += renderUserSection(members, 'governance', 'Governance');
+      if (!activeSection || activeSection === 'committees') {
+        html += renderCommitteesSection();
       }
-      if (!activeSection || activeSection === 'administrative') {
-        html += renderUserSection(members, 'administrative', 'Administrative');
-      }
-      if (activeSection === 'working_groups') {
+      if (!activeSection || activeSection === 'working_groups') {
         html += renderWorkingGroupsSection();
       }
-      if (!activeSection || activeSection === 'general') {
-        html += renderGeneralSection(members);
+      if (!activeSection || activeSection === 'key_members') {
+        html += renderKeyMembersSection(members, committeeMembers, keyMemberIds);
+      }
+      if (!activeSection || activeSection === 'other') {
+        html += renderOtherSection(members, committeeMembers, keyMemberIds);
       }
 
       content.innerHTML = html || '<div class="empty-state"><p>No members found.</p></div>';
@@ -322,16 +324,86 @@
       }).join('');
     }
 
-    function renderUserSection(members, type, label) {
+    function renderCommitteesSection() {
+      const committees = allWgData.filter(g => g.type === 'committee');
+      if (!committees.length) return '';
+      const groupsHtml = committees.map(g => {
+        const members = g.members || [];
+        const membersHtml = members.length ? members.map(m => {
+          const roleClass = (m.role || '').toLowerCase().includes('chair') || (m.role || '').toLowerCase().includes('coordinator') ? 'chair' :
+                            (m.role || '').toLowerCase().includes('lead') ? 'lead' : 'member';
+          return `
+          <div class="wg-member-row">
+            <span style="font-weight:500">${esc(m.user_name)}</span>
+            <span class="wg-member-role ${roleClass}">${esc(m.role)}</span>
+          </div>
+        `;}).join('') : '<div style="padding:0.5rem 0;color:var(--text-dim);font-size:0.85rem">No members</div>';
+        const chairLabel = g.chair_name ? ` &middot; Chair: ${esc(g.chair_name)}` : '';
+        return `
+          <div class="wg-section">
+            <h4>${esc(g.name)}<span style="font-weight:400;color:var(--text-dim);font-size:0.82rem">${chairLabel}</span></h4>
+            ${g.description ? `<p style="font-size:0.85rem;color:var(--text-dim);margin:0 0 0.5rem">${esc(g.description)}</p>` : ''}
+            ${membersHtml}
+          </div>
+        `;
+      }).join('');
+      return `
+        <div class="role-section">
+          <div class="role-section-header">
+            <h3>Committees</h3>
+            <span class="role-count">${committees.length} committee${committees.length !== 1 ? 's' : ''}</span>
+          </div>
+          ${groupsHtml}
+        </div>
+      `;
+    }
+
+    function renderWorkingGroupsSection() {
+      const wgs = allWgData.filter(g => g.type === 'working_group');
+      if (!wgs.length) return '';
+      const groupsHtml = wgs.map(g => {
+        const members = g.members || [];
+        const membersHtml = members.length ? members.map(m => {
+          const roleClass = (m.role || '').toLowerCase().includes('chair') || (m.role || '').toLowerCase().includes('coordinator') ? 'chair' :
+                            (m.role || '').toLowerCase().includes('lead') ? 'lead' : 'member';
+          return `
+          <div class="wg-member-row">
+            <span style="font-weight:500">${esc(m.user_name)}</span>
+            <span class="wg-member-role ${roleClass}">${esc(m.role)}</span>
+          </div>
+        `;}).join('') : '<div style="padding:0.5rem 0;color:var(--text-dim);font-size:0.85rem">No members</div>';
+        const chairLabel = g.chair_name ? ` &middot; Chair: ${esc(g.chair_name)}` : '';
+        return `
+          <div class="wg-section">
+            <h4>${esc(g.name)}<span style="font-weight:400;color:var(--text-dim);font-size:0.82rem">${chairLabel}</span></h4>
+            ${g.description ? `<p style="font-size:0.85rem;color:var(--text-dim);margin:0 0 0.5rem">${esc(g.description)}</p>` : ''}
+            ${membersHtml}
+          </div>
+        `;
+      }).join('');
+      return `
+        <div class="role-section">
+          <div class="role-section-header">
+            <h3>Working Groups</h3>
+            <span class="role-count">${wgs.length} group${wgs.length !== 1 ? 's' : ''}</span>
+          </div>
+          ${groupsHtml}
+        </div>
+      `;
+    }
+
+    function renderKeyMembersSection(members, committeeMembers, keyMemberIds) {
       const users = members.filter(m => {
+        if (committeeMembers.has(m.user_id)) return false;
         if (!m.roles || !m.roles.length) return false;
-        return m.roles.some(r => r.role_type === type);
+        const hasKey = m.roles.some(r => r.role_type === 'governance' || r.role_type === 'administrative');
+        if (hasKey) keyMemberIds.add(m.user_id);
+        return hasKey;
       });
       if (!users.length) return '';
       const cards = users.map(m => {
         const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-        const roles = m.roles;
-        const rolesHtml = formatRoleBadges(roles);
+        const rolesHtml = formatRoleBadges(m.roles);
         const interests = m.interests ? m.interests.split(',').slice(0, 3) : [];
         const joined = m.joined_date ? new Date(m.joined_date).toLocaleDateString('en', { month: 'short', year: 'numeric' }) : '';
         return `
@@ -356,7 +428,7 @@
       return `
         <div class="role-section">
           <div class="role-section-header">
-            <h3>${label}</h3>
+            <h3>Key Members</h3>
             <span class="role-count">${users.length} member${users.length !== 1 ? 's' : ''}</span>
           </div>
           <div class="member-grid">${cards}</div>
@@ -364,44 +436,8 @@
       `;
     }
 
-    function renderWorkingGroupsSection() {
-      if (!allWgData.length) return '';
-      const groupsHtml = allWgData.map(g => {
-        const members = g.members || [];
-        const membersHtml = members.length ? members.map(m => {
-          const roleClass = (m.role || '').toLowerCase().includes('chair') || (m.role || '').toLowerCase().includes('coordinator') ? 'chair' :
-                            (m.role || '').toLowerCase().includes('lead') ? 'lead' : 'member';
-          return `
-          <div class="wg-member-row">
-            <span style="font-weight:500">${esc(m.user_name)}</span>
-            <span class="wg-member-role ${roleClass}">${esc(m.role)}</span>
-          </div>
-        `;}).join('') : '<div style="padding:0.5rem 0;color:var(--text-dim);font-size:0.85rem">No members</div>';
-        const chairLabel = g.chair_name ? ` &middot; Chair: ${esc(g.chair_name)}` : '';
-        return `
-          <div class="wg-section">
-            <h4>${esc(g.name)}<span style="font-weight:400;color:var(--text-dim);font-size:0.82rem">${chairLabel}</span></h4>
-            ${g.description ? `<p style="font-size:0.85rem;color:var(--text-dim);margin:0 0 0.5rem">${esc(g.description)}</p>` : ''}
-            ${membersHtml}
-          </div>
-        `;
-      }).join('');
-      return `
-        <div class="role-section">
-          <div class="role-section-header">
-            <h3>Working Groups</h3>
-            <span class="role-count">${allWgData.length} group${allWgData.length !== 1 ? 's' : ''}</span>
-          </div>
-          ${groupsHtml}
-        </div>
-      `;
-    }
-
-    function renderGeneralSection(members) {
-      const users = members.filter(m => {
-        if (!m.roles || !m.roles.length) return true;
-        return m.roles.some(r => r.role_type === 'member_class');
-      });
+    function renderOtherSection(members, committeeMembers, keyMemberIds) {
+      const users = members.filter(m => !committeeMembers.has(m.user_id) && !keyMemberIds.has(m.user_id));
       if (!users.length) return '';
       const cards = users.map(m => {
         const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
@@ -432,7 +468,7 @@
       return `
         <div class="role-section">
           <div class="role-section-header">
-            <h3>Members</h3>
+            <h3>Other Members</h3>
             <span class="role-count">${users.length} member${users.length !== 1 ? 's' : ''}</span>
           </div>
           <div class="member-grid">${cards}</div>
