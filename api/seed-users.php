@@ -19,7 +19,7 @@ $users = [
     'role' => 'Programme Lead',
     'role_desc' => 'Oversees programme execution and project delivery',
     'role_scope' => 'programme',
-    'role_type' => 'programme',
+    'role_type' => 'governance',
     'role_target' => 'General Programme',
   ],
   [
@@ -44,7 +44,7 @@ $users = [
     'role' => 'Education WG Lead',
     'role_desc' => 'Leads the Education Working Group',
     'role_scope' => 'working_group',
-    'role_type' => 'working_group',
+    'role_type' => 'governance',
     'role_target' => 'Education Working Group',
   ],
   [

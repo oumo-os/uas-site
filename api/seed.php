@@ -73,7 +73,7 @@ foreach ($boardMembers as $i => $bm) {
     $stmt->execute(['Board Director']);
     $roleRow = $stmt->fetch();
     if (!$roleRow) {
-      $boardRoleId = create_role('Board Director', 'Member of the UAS Board of Directors', [], $adminId, 'board', null, 'governance');
+      $boardRoleId = create_role('Board Director', 'Member of the UAS Board of Directors', [], $adminId, 'committee', null, 'governance', 'Board of Directors');
       // Constitutional bootstrap: board holds the full approval + governance suite
       $boardCaps = [
         'members.view', 'members.approve', 'members.manage',
@@ -114,8 +114,8 @@ foreach ($boardMembers as $i => $bm) {
 // 3. Create sample roles
 $sampleRoles = [
   ['title' => 'PR Director', 'desc' => 'Manages public relations and communications', 'caps' => ['articles.review', 'articles.approve', 'articles.publish', 'events.approve', 'events.publish'], 'scope' => 'committee', 'role_type' => 'administrative'],
-  ['title' => 'Education WG Lead', 'desc' => 'Leads the Education Working Group', 'caps' => ['articles.approve', 'events.approve', 'programmes.create', 'programmes.manage', 'reports.create'], 'scope' => 'working_group', 'role_type' => 'working_group', 'target' => 'Education Working Group'],
-  ['title' => 'Programme Lead', 'desc' => 'Oversees programme execution', 'caps' => ['programmes.manage', 'projects.create', 'projects.manage', 'projects.approve', 'events.approve', 'reports.create', 'reports.approve'], 'scope' => 'programme', 'role_type' => 'programme', 'target' => 'General Programme'],
+  ['title' => 'Education WG Lead', 'desc' => 'Leads the Education Working Group', 'caps' => ['articles.approve', 'events.approve', 'programmes.create', 'programmes.manage', 'reports.create'], 'scope' => 'working_group', 'role_type' => 'governance', 'target' => 'Education Working Group'],
+  ['title' => 'Programme Lead', 'desc' => 'Oversees programme execution', 'caps' => ['programmes.manage', 'projects.create', 'projects.manage', 'projects.approve', 'events.approve', 'reports.create', 'reports.approve'], 'scope' => 'programme', 'role_type' => 'governance', 'target' => 'General Programme'],
 ];
 
 foreach ($sampleRoles as $sr) {

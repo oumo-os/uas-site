@@ -525,7 +525,7 @@ try {
         LEFT JOIN role_assignments ra ON ra.user_id = m.user_id AND ra.status = 'active'
         LEFT JOIN roles r ON r.id = ra.role_id AND r.status = 'active'
         WHERE m.status = 'active' AND u.status = 'active'
-          AND (m.profile_visible = 1 OR r.scope IN ('board','institutional','committee','programme') OR r.scope LIKE 'programme:%' OR r.scope LIKE 'working_group:%')
+          AND (m.profile_visible = 1 OR r.scope IN ('institutional','committee','programme') OR r.scope LIKE 'programme:%' OR r.scope LIKE 'working_group:%')
         ORDER BY u.name
       ");
       $stmt->execute();

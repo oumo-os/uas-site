@@ -70,9 +70,6 @@
     }
     .role-type-badge.governance { background:rgba(30,96,145,0.12); color:var(--info); }
     .role-type-badge.administrative { background:rgba(184,134,11,0.12); color:var(--gold); }
-    .role-type-badge.programme { background:rgba(45,106,79,0.12); color:var(--success); }
-    .role-type-badge.working_group { background:rgba(124,58,237,0.12); color:#7c3aed; }
-    .role-type-badge.cohort { background:rgba(236,72,153,0.12); color:#ec4899; }
     .role-type-badge.general { background:rgba(45,106,79,0.12); color:var(--success); }
     .resolution-card {
       padding: 1.1rem; margin-bottom: 0.75rem; background: var(--bg-card);
@@ -459,12 +456,10 @@
     }
 
     const ROLE_TYPE_LABELS = {
-      governance: 'Governance', administrative: 'Administrative', programme: 'Programme',
-      working_group: 'Working Group', cohort: 'Cohort', member_class: 'Member'
+      governance: 'Governance', administrative: 'Administrative', member_class: 'Member'
     };
     const ROLE_TYPE_CSS = {
-      governance: 'governance', administrative: 'administrative', programme: 'programme',
-      working_group: 'working_group', cohort: 'cohort', member_class: 'general'
+      governance: 'governance', administrative: 'administrative', member_class: 'general'
     };
 
     function renderRoles(roles) {
@@ -637,16 +632,12 @@
           options: [
             { label: 'Governance', value: 'governance' },
             { label: 'Administrative', value: 'administrative' },
-            { label: 'Programme', value: 'programme' },
-            { label: 'Working Group', value: 'working_group' },
-            { label: 'Cohort', value: 'cohort' },
             { label: 'Member Class', value: 'member_class' },
           ]
         },
         { name: 'scope', label: 'Scope', type: 'select', value: role.scope || '',
           options: [
             { label: 'None (global)', value: '' },
-            { label: 'Board', value: 'board' },
             { label: 'Committee', value: 'committee' },
             { label: 'Programme', value: 'programme' },
             { label: 'Project', value: 'project' },
@@ -995,23 +986,19 @@
           options: [
             { label: 'Governance', value: 'governance' },
             { label: 'Administrative', value: 'administrative' },
-            { label: 'Programme', value: 'programme' },
-            { label: 'Working Group', value: 'working_group' },
-            { label: 'Cohort', value: 'cohort' },
             { label: 'Member Class', value: 'member_class' },
           ],
-          help: 'Determines how this role is classified'
+          help: 'Governance = leadership, Administrative = day-to-day operations, Member Class = membership grouping'
         },
         { name: 'scope', label: 'Scope', type: 'select',
           options: [
             { label: 'None (global)', value: '' },
-            { label: 'Board', value: 'board' },
             { label: 'Committee', value: 'committee' },
             { label: 'Programme', value: 'programme' },
             { label: 'Project', value: 'project' },
             { label: 'Working Group', value: 'working_group' },
           ],
-          help: 'General domain this role operates in'
+          help: 'Privilege scope — what this role grants access to'
         },
         { name: 'target', label: 'Target', type: 'select', placeholder: '— Select scope first —', options: [],
           help: 'Specific entity this role applies to'
@@ -1042,7 +1029,7 @@
       if (!scopeEl || !targetEl) return;
       scopeEl.addEventListener('change', async () => {
         const type = scopeEl.value;
-        if (!type || type === 'board' || type === 'committee') {
+        if (!type || type === 'committee') {
           targetEl.innerHTML = '<option value="">—</option>';
           targetEl.disabled = true;
           return;
