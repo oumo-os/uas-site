@@ -1721,7 +1721,7 @@
       const label = newStanding === 'restricted' ? 'RESTRICT' : 'RESTORE to good standing';
       if (!confirm(`Are you sure you want to ${label} this member?`)) return;
       try {
-        await api.request('/members/' + userId + '/standing', { method: 'POST', body: { standing: newStanding, reason: 'Manual toggle from dashboard' } });
+        await api.updateMemberStanding(userId, { standing: newStanding, reason: 'Manual toggle from dashboard' });
         toast('Standing updated', 'success');
         const members = await api.request('/members');
         renderMembersPanel(members);
@@ -1797,7 +1797,7 @@
 
     async function checkStandings() {
       try {
-        const res = await api.request('/members/check-standings', { method: 'POST' });
+        const res = await api.checkStandings();
         toast(`Standings checked. ${res.flagged?.length || 0} members flagged.`, 'success');
         const members = await api.request('/members');
         renderMembersPanel(members);
@@ -1813,7 +1813,7 @@
       const div = document.getElementById('rbacAuditContent');
       div.innerHTML = '<div class="text-dim">Loading audit data...</div>';
       try {
-        const data = await api.request('/admin/rbac-audit');
+        const data = await api.getRbacAudit();
         renderRbacAudit(data);
       } catch (e) { div.innerHTML = '<div class="empty-state"><p>Failed to load RBAC audit. You may lack admin.system permission.</p></div>'; }
     }

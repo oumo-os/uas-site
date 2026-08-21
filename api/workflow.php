@@ -263,8 +263,6 @@ function get_pending_items(?int $userId = null): array {
     $items = array_merge($items, $stmt->fetchAll());
 
     // Open polls the user is eligible for and has not voted in
-    $roleIds = $userRoleIds ?: [-1];
-    $placeholders2 = implode(',', array_fill(0, count($roleIds), '?'));
     $sql = "SELECT p.id, p.title, p.status, p.starts_at AS created_at, u.name AS author_name,
             'poll' AS item_type, p.id AS related_id
             FROM polls p LEFT JOIN users u ON u.id = p.created_by
@@ -273,12 +271,15 @@ function get_pending_items(?int $userId = null): array {
               AND NOT EXISTS (SELECT 1 FROM delegations dg WHERE dg.delegator_id = ? AND dg.status = 'active' AND dg.scope IN ('all','polls'))
               AND NOT EXISTS (SELECT 1 FROM poll_votes pv WHERE pv.poll_id = p.id AND pv.user_id = ?)
               AND (p.eligibility = 'all'
-                OR (p.eligibility = 'directors' AND EXISTS (
-                  SELECT 1 FROM role_capabilities rc2 JOIN capabilities c2 ON c2.id = rc2.capability_id
-                  WHERE rc2.role_id IN ($placeholders2) AND c2.slug = 'resolutions.vote'))
                 OR (p.eligibility = 'members' AND EXISTS (
-                  SELECT 1 FROM members m2 WHERE m2.user_id = ? AND m2.status = 'active')))";
-    $params = array_merge([$userId], [$userId], $roleIds, [$userId]);
+                  SELECT 1 FROM members m2 WHERE m2.user_id = ? AND m2.status = 'active'))
+                OR (p.eligibility = 'group' AND p.eligibility_target IS NOT NULL AND EXISTS (
+                  SELECT 1 FROM working_group_members wgm JOIN working_groups wg ON wg.id = wgm.group_id
+                  WHERE wgm.user_id = ? AND wg.name = p.eligibility_target))
+                OR (p.eligibility = 'role' AND p.eligibility_target IS NOT NULL AND EXISTS (
+                  SELECT 1 FROM role_assignments ra JOIN roles r ON r.id = ra.role_id
+                  WHERE ra.user_id = ? AND r.title = p.eligibility_target AND ra.status = 'active')))";
+    $params = array_merge([$userId], [$userId], [$userId], [$userId], [$userId]);
     $stmt = db()->prepare($sql);
     $stmt->execute($params);
     $items = array_merge($items, $stmt->fetchAll());

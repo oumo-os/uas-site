@@ -125,6 +125,14 @@ const api = {
   async getMembersGrouped() { return this.request('/members/grouped'); },
   async getMember(id) { return this.request('/members/' + id); },
   async approveMember(userId, status) { return this.request('/members', { method: 'POST', body: { user_id: userId, status } }); },
+  async updateMemberStanding(userId, data) { return this.request('/members/' + userId + '/standing', { method: 'POST', body: data }); },
+  async getMemberDues(userId) { return this.request('/members/' + userId + '/dues'); },
+  async addMemberDues(userId, data) { return this.request('/members/' + userId + '/dues', { method: 'POST', body: data }); },
+  async payDues(memberId, duesId, data) { return this.request('/members/' + memberId + '/dues/' + duesId + '/pay', { method: 'POST', body: data }); },
+  async checkStandings() { return this.request('/members/check-standings', { method: 'POST' }); },
+
+  // RBAC Audit
+  async getRbacAudit() { return this.request('/admin/rbac-audit'); },
 
   // Roles
   async getRoles() { return this.request('/roles'); },

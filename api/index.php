@@ -1591,7 +1591,7 @@ try {
     if (isset($data['amount'])) { if (!is_numeric($data['amount'])) json_error('Invalid amount', 400); $fields[] = 'amount = ?'; $params[] = $data['amount']; }
     if (isset($data['category'])) { if (!in_array($data['category'], $validCats)) json_error('Invalid category', 400); $fields[] = 'category = ?'; $params[] = $data['category']; }
     if (isset($data['description'])) { $fields[] = 'description = ?'; $params[] = $data['description']; }
-    if (array_key_exists($data, 'programme_id') || array_key_exists('programme_id', $data)) { $fields[] = 'programme_id = ?'; $params[] = $data['programme_id'] ?: null; }
+    if (array_key_exists('programme_id', $data)) { $fields[] = 'programme_id = ?'; $params[] = $data['programme_id'] ?: null; }
     if (array_key_exists('project_id', $data)) { $fields[] = 'project_id = ?'; $params[] = $data['project_id'] ?: null; }
     if (array_key_exists('event_id', $data)) { $fields[] = 'event_id = ?'; $params[] = $data['event_id'] ?: null; }
     if (array_key_exists('budget_item_id', $data)) { $fields[] = 'budget_item_id = ?'; $params[] = $data['budget_item_id'] ?: null; }

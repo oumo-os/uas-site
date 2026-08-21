@@ -46,7 +46,7 @@ Administration Layer → Backups, config, security, maintenance
 - **Password Reset (admin)**: Generate a one-time temporary password for any member, audit-logged
 - **Hardening**: Login/registration rate limiting, SameSite session cookies, server-side password policy, cross-origin request rejection, MIME-whitelisted uploads
 - **Meetings**: Board/general/committee meetings with agenda, scheduled time, attendance records (attended/absent/excused/apology), posted minutes, and decisions that generate assignments with notifications
-- **Polls**: Governance or consultation polls with eligibility rules (directors / members / all), quorum, deadlines, anonymous voting, one-vote-per-user, tally bars, and close/resolve with tie and quorum handling; open polls surface in Pending Items
+- **Polls**: Governance or consultation polls with eligibility rules (all / members / specific group / specific role), quorum, deadlines, anonymous voting, one-vote-per-user, tally bars, and close/resolve with tie and quorum handling; open polls surface in Pending Items
 - **Programme Teams**: Programme members with roles, plus free-form outputs per programme (member-only visibility, managed by programme leads)
 - **Financial Snapshot**: Dashboard and finance summary show income, expenses, committed funds and available balance
 - **Photo Gallery**: Knowledge Base gallery fed from published articles with images (`/public/gallery`)
