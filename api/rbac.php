@@ -244,3 +244,85 @@ function authority_trace(int $userId): array {
   }
   return $trace;
 }
+
+/**
+ * Full RBAC audit: capability matrix, role utilization, orphaned items, over-privileged users.
+ */
+function rbac_audit(): array {
+  // All capabilities with their roles and user counts
+  $stmt = db()->prepare('SELECT c.id, c.slug, c.name, c.category FROM capabilities c ORDER BY c.category, c.slug');
+  $stmt->execute();
+  $allCaps = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  $capRoles = [];
+  $capUsers = [];
+  foreach ($allCaps as $c) {
+    $stmt = db()->prepare('SELECT r.id, r.title, r.role_type FROM role_capabilities rc JOIN roles r ON r.id = rc.role_id WHERE rc.capability_id = ? AND r.status = "active"');
+    $stmt->execute([$c['id']]);
+    $c[$c['id']] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $capRoles[$c['id']] = $c[$c['id']];
+    $stmt = db()->prepare('SELECT COUNT(DISTINCT ra.user_id) FROM role_assignments ra JOIN role_capabilities rc ON rc.role_id = ra.role_id WHERE rc.capability_id = ? AND ra.status = "active" AND (ra.effective_to IS NULL OR ra.effective_to >= CURDATE()) AND ra.effective_from <= CURDATE()');
+    $stmt->execute([$c['id']]);
+    $capUsers[$c['id']] = (int) $stmt->fetchColumn();
+  }
+
+  // All roles with user and capability counts
+  $stmt = db()->prepare('SELECT r.id, r.title, r.role_type, r.scope, r.target, r.status FROM roles r ORDER BY r.role_type, r.title');
+  $stmt->execute();
+  $allRoles = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  $roleData = [];
+  foreach ($allRoles as $r) {
+    $stmt = db()->prepare('SELECT COUNT(*) FROM role_assignments WHERE role_id = ? AND status = "active"');
+    $stmt->execute([$r['id']]);
+    $userCount = (int) $stmt->fetchColumn();
+    $stmt = db()->prepare('SELECT COUNT(*) FROM role_capabilities WHERE role_id = ?');
+    $stmt->execute([$r['id']]);
+    $capCount = (int) $stmt->fetchColumn();
+    $stmt = db()->prepare('SELECT status, COUNT(*) as cnt FROM role_assignments WHERE role_id = ? GROUP BY status');
+    $stmt->execute([$r['id']]);
+    $assignments = [];
+    foreach ($stmt->fetchAll() as $row) $assignments[$row['status']] = (int) $row['cnt'];
+    $roleData[] = ['id' => $r['id'], 'title' => $r['title'], 'role_type' => $r['role_type'], 'scope' => $r['scope'], 'target' => $r['target'], 'status' => $r['status'], 'user_count' => $userCount, 'capability_count' => $capCount, 'assignments' => $assignments];
+  }
+
+  // Orphaned capabilities (no roles)
+  $orphanedCaps = array_filter($allCaps, fn($c) => empty($capRoles[$c['id']]));
+
+  // Orphaned roles (no users)
+  $orphanedRoles = array_filter($roleData, fn($r) => $r['user_count'] === 0 && $r['status'] === 'active');
+
+  // Over-privileged users (top 15 by capability count)
+  $stmt = db()->prepare('SELECT u.id, u.name, u.email, COUNT(DISTINCT rc.capability_id) as cap_count
+    FROM users u
+    JOIN role_assignments ra ON ra.user_id = u.id AND ra.status = "active" AND (ra.effective_to IS NULL OR ra.effective_to >= CURDATE()) AND ra.effective_from <= CURDATE()
+    JOIN role_capabilities rc ON rc.role_id = ra.role_id
+    WHERE u.status = "active"
+    GROUP BY u.id
+    ORDER BY cap_count DESC
+    LIMIT 15');
+  $stmt->execute();
+  $overprivileged = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  // Total users with at least one role
+  $stmt = db()->prepare('SELECT COUNT(DISTINCT user_id) FROM role_assignments WHERE status = "active" AND (effective_to IS NULL OR effective_to >= CURDATE()) AND effective_from <= CURDATE()');
+  $stmt->execute();
+  $usersWithRoles = (int) $stmt->fetchColumn();
+
+  return [
+    'capabilities' => array_map(fn($c) => [
+      'id' => $c['id'], 'slug' => $c['slug'], 'name' => $c['name'], 'category' => $c['category'],
+      'roles' => $capRoles[$c['id']] ?? [],
+      'user_count' => $capUsers[$c['id']] ?? 0
+    ], $allCaps),
+    'roles' => $roleData,
+    'summary' => [
+      'total_capabilities' => count($allCaps),
+      'total_roles' => count($allRoles),
+      'total_users_with_roles' => $usersWithRoles,
+      'orphaned_capabilities' => array_map(fn($c) => ['slug' => $c['slug'], 'name' => $c['name']], $orphanedCaps),
+      'orphaned_roles' => array_map(fn($r) => ['title' => $r['title'], 'role_type' => $r['role_type']], $orphanedRoles),
+      'overprivileged_users' => $overprivileged,
+    ]
+  ];
+}

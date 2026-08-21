@@ -306,13 +306,19 @@ try {
     $data = input_json();
     $options = $data['options'] ?? [];
     if (empty($data['title']) || count($options) < 2) json_error('Title and at least 2 options are required', 400);
-    db()->prepare('INSERT INTO polls (title, description, poll_type, eligibility, options, quorum, allow_anonymous, starts_at, ends_at, status, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    $eligibility = $data['eligibility'] ?? 'members';
+    $eligTarget = null;
+    if (in_array($eligibility, ['group', 'role']) && !empty($data['eligibility_target'])) {
+      $eligTarget = $data['eligibility_target'];
+    }
+    db()->prepare('INSERT INTO polls (title, description, poll_type, eligibility, eligibility_target, options, quorum, allow_anonymous, starts_at, ends_at, status, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
       ->execute([
         $data['title'],
         $data['description'] ?? null,
         $data['poll_type'] ?? 'consultation',
-        $data['eligibility'] ?? 'directors',
+        $eligibility,
+        $eligTarget,
         json_encode($options),
         (int) ($data['quorum'] ?? 0),
         !empty($data['allow_anonymous']) ? 1 : 0,
@@ -467,7 +473,24 @@ try {
     require_login();
     $stmt = db()->prepare('SELECT m.*, u.name, u.email, u.avatar_url, u.institution, u.location, u.status AS user_status FROM members m JOIN users u ON u.id = m.user_id ORDER BY m.joined_date DESC');
     $stmt->execute();
-    json_response($stmt->fetchAll());
+    $members = $stmt->fetchAll();
+    // Attach roles per member
+    $mIds = array_map(fn($m) => (int)$m['user_id'], $members);
+    $rolesByUser = [];
+    if ($mIds) {
+      $placeholders = implode(',', array_fill(0, count($mIds), '?'));
+      $stmt = db()->prepare("SELECT ra.user_id, r.title, r.role_type, r.scope, r.target
+        FROM role_assignments ra JOIN roles r ON r.id = ra.role_id
+        WHERE ra.user_id IN ($placeholders) AND ra.status = 'active' AND r.status = 'active'");
+      $stmt->execute($mIds);
+      foreach ($stmt->fetchAll() as $row) {
+        $rolesByUser[(int)$row['user_id']][] = ['title' => $row['title'], 'role_type' => $row['role_type'], 'scope' => $row['scope'], 'target' => $row['target']];
+      }
+    }
+    foreach ($members as &$m) {
+      $m['roles'] = $rolesByUser[(int)$m['user_id']] ?? [];
+    }
+    json_response($members);
   }
   elseif ($path === '/members' && $method === 'POST') {
     $user = require_cap('members.approve');
@@ -578,6 +601,37 @@ try {
     $member['roles'] = $stmt->fetchAll();
     json_response($member);
   }
+  elseif (preg_match('#^/members/(\d+)$#', $path, $m) && $method === 'PATCH') {
+    $user = require_cap('members.manage');
+    $userId = (int) $m[1];
+    $data = input_json();
+    $stmt = db()->prepare('SELECT id FROM members WHERE user_id = ?');
+    $stmt->execute([$userId]);
+    if (!$stmt->fetch()) json_error('Member not found', 404);
+    $fields = [];
+    $params = [];
+    if (isset($data['category']) && in_array($data['category'], ['regular','student','honorary','institutional'])) {
+      $fields[] = 'category = ?';
+      $params[] = $data['category'];
+    }
+    if (isset($data['standing']) && in_array($data['standing'], ['good_standing','restricted'])) {
+      $fields[] = 'standing = ?';
+      $params[] = $data['standing'];
+    }
+    if (isset($data['status']) && in_array($data['status'], ['active','inactive','suspended'])) {
+      $fields[] = 'status = ?';
+      $params[] = $data['status'];
+    }
+    if (isset($data['profile_visible'])) {
+      $fields[] = 'profile_visible = ?';
+      $params[] = $data['profile_visible'] ? 1 : 0;
+    }
+    if (!$fields) json_error('No valid fields to update', 400);
+    $params[] = $userId;
+    db()->prepare('UPDATE members SET ' . implode(', ', $fields) . ' WHERE user_id = ?')->execute($params);
+    audit_log('member_update', 'member', $userId, ['by' => $user['id'], 'fields' => array_keys($data)]);
+    json_response(['ok' => true]);
+  }
   elseif (preg_match('#^/members/(\d+)/reset-password$#', $path, $m) && $method === 'POST') {
     $user = require_cap('members.manage');
     $userId = (int) $m[1];
@@ -588,6 +642,112 @@ try {
     db()->prepare('UPDATE users SET password = ? WHERE id = ?')->execute([password_hash($temp, PASSWORD_DEFAULT), $userId]);
     audit_log('member_password_reset', 'user', $userId, ['by' => $user['id']]);
     json_response(['temp_password' => $temp]);
+  }
+
+  // --- MEMBER STANDING ---
+  elseif (preg_match('#^/members/(\d+)/standing$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('members.manage');
+    $memberId = (int) $m[1];
+    $data = input_json();
+    $newStanding = $data['standing'] ?? '';
+    if (!in_array($newStanding, ['good_standing', 'restricted'])) json_error('Invalid standing', 400);
+    $stmt = db()->prepare('SELECT m.id, m.user_id, m.standing, u.name FROM members m JOIN users u ON u.id = m.user_id WHERE m.id = ?');
+    $stmt->execute([$memberId]);
+    $member = $stmt->fetch();
+    if (!$member) json_error('Member not found', 404);
+    db()->prepare('UPDATE members SET standing = ? WHERE id = ?')->execute([$newStanding, $memberId]);
+    // If restricted, revoke baseline Member role; if restored, re-assign
+    if ($newStanding === 'restricted') {
+      $stmt = db()->prepare('SELECT id FROM roles WHERE title = "Member"');
+      $stmt->execute();
+      $memberRoleId = $stmt->fetchColumn();
+      if ($memberRoleId) {
+        db()->prepare("UPDATE role_assignments SET status = 'inactive' WHERE role_id = ? AND user_id = ? AND status = 'active'")->execute([$memberRoleId, $member['user_id']]);
+      }
+    } elseif ($newStanding === 'good_standing') {
+      $stmt = db()->prepare('SELECT id FROM roles WHERE title = "Member"');
+      $stmt->execute();
+      $memberRoleId = $stmt->fetchColumn();
+      if ($memberRoleId) {
+        $stmt = db()->prepare('SELECT id FROM role_assignments WHERE role_id = ? AND user_id = ? AND status = "active"');
+        $stmt->execute([$memberRoleId, $member['user_id']]);
+        if (!$stmt->fetch()) {
+          assign_role($memberRoleId, $member['user_id'], $user['id']);
+        }
+      }
+    }
+    $reason = $data['reason'] ?? '';
+    audit_log('member_standing_change', 'member', $memberId, ['standing' => $newStanding, 'by' => $user['id'], 'reason' => $reason]);
+    notify_user((int) $member['user_id'], 'standing_changed', 'Membership standing changed', "Your membership standing has been changed to: $newStanding" . ($reason ? " Reason: $reason" : ''), '/dashboard');
+    json_response(['ok' => true, 'standing' => $newStanding]);
+  }
+
+  // --- MEMBERSHIP DUES ---
+  elseif (preg_match('#^/members/(\d+)/dues$#', $path, $m) && $method === 'GET') {
+    require_login();
+    $memberId = (int) $m[1];
+    $stmt = db()->prepare('SELECT * FROM membership_dues WHERE member_id = ? ORDER BY period_year DESC');
+    $stmt->execute([$memberId]);
+    json_response($stmt->fetchAll());
+  }
+  elseif (preg_match('#^/members/(\d+)/dues$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('members.manage');
+    $memberId = (int) $m[1];
+    $data = input_json();
+    $stmt = db()->prepare('SELECT id FROM members WHERE id = ?');
+    $stmt->execute([$memberId]);
+    if (!$stmt->fetch()) json_error('Member not found', 404);
+    $year = (int) ($data['period_year'] ?? date('Y'));
+    $amountOwed = (float) ($data['amount_owed'] ?? 0);
+    $dueDate = $data['due_date'] ?? date('Y') . '-12-31';
+    $notes = $data['notes'] ?? null;
+    db()->prepare('INSERT INTO membership_dues (member_id, period_year, amount_owed, due_date, notes, recorded_by, status) VALUES (?, ?, ?, ?, ?, ?, "pending")
+      ON DUPLICATE KEY UPDATE amount_owed = VALUES(amount_owed), due_date = VALUES(due_date), notes = VALUES(notes), recorded_by = VALUES(recorded_by)')
+      ->execute([$memberId, $year, $amountOwed, $dueDate, $notes, $user['id']]);
+    $duesId = (int) db()->lastInsertId();
+    audit_log('dues_create', 'member', $memberId, ['dues_id' => $duesId, 'year' => $year, 'amount' => $amountOwed]);
+    json_response(['id' => $duesId], 201);
+  }
+  elseif (preg_match('#^/members/(\d+)/dues/(\d+)/pay$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('members.manage');
+    $memberId = (int) $m[1];
+    $duesId = (int) $m[2];
+    $data = input_json();
+    $stmt = db()->prepare('SELECT id, member_id, status FROM membership_dues WHERE id = ? AND member_id = ?');
+    $stmt->execute([$duesId, $memberId]);
+    $dues = $stmt->fetch();
+    if (!$dues) json_error('Dues record not found', 404);
+    if ($dues['status'] === 'paid') json_error('Already paid', 400);
+    $amount = (float) ($data['amount'] ?? 0);
+    $notes = $data['notes'] ?? null;
+    db()->prepare('UPDATE membership_dues SET status = "paid", amount_paid = ?, paid_date = CURDATE(), notes = COALESCE(?, notes) WHERE id = ?')
+      ->execute([$amount, $notes, $duesId]);
+    // Check if all dues are now paid → restore good standing
+    $stmt = db()->prepare('SELECT id FROM membership_dues WHERE member_id = ? AND status IN ("pending","overdue")');
+    $stmt->execute([$memberId]);
+    if (!$stmt->fetch()) {
+      db()->prepare('UPDATE members SET standing = "good_standing" WHERE id = ? AND standing = "restricted"')->execute([$memberId]);
+    }
+    audit_log('dues_paid', 'member', $memberId, ['dues_id' => $duesId, 'amount' => $amount]);
+    json_response(['ok' => true]);
+  }
+
+  // --- CHECK ALL MEMBER STANDINGS ---
+  elseif ($path === '/members/check-standings' && $method === 'POST') {
+    $user = require_cap('members.manage');
+    // Mark members with overdue dues as restricted
+    db()->prepare("UPDATE members SET standing = 'restricted' WHERE id IN (
+      SELECT DISTINCT md.member_id FROM membership_dues md WHERE md.status IN ('pending','overdue') AND md.due_date < CURDATE()
+    ) AND standing = 'good_standing'");
+    $restricted = db()->prepare("SELECT m.id, u.name FROM members m JOIN users u ON u.id = m.user_id JOIN membership_dues md ON md.member_id = m.id WHERE md.status IN ('pending','overdue') AND md.due_date < CURDATE() AND m.standing = 'restricted'");
+    $restricted->execute();
+    $flagged = $restricted->fetchAll();
+    // Restore good standing for members with all dues paid
+    db()->prepare("UPDATE members SET standing = 'good_standing' WHERE standing = 'restricted' AND id NOT IN (
+      SELECT DISTINCT md.member_id FROM membership_dues md WHERE md.status IN ('pending','overdue') AND md.due_date < CURDATE()
+    )");
+    audit_log('check_standings', 'member', 0, ['flagged' => count($flagged)]);
+    json_response(['ok' => true, 'flagged' => $flagged]);
   }
 
   // --- MEMBER CSV IMPORT ---
@@ -2034,6 +2194,12 @@ try {
     $stmt = db()->prepare('SELECT c.*, u.name AS owner_name FROM calendar_items c LEFT JOIN users u ON u.id = c.owner_id ORDER BY c.deadline ASC');
     $stmt->execute();
     json_response($stmt->fetchAll());
+  }
+
+  // --- RBAC AUDIT ---
+  elseif ($path === '/admin/rbac-audit' && $method === 'GET') {
+    require_cap('admin.system');
+    json_response(rbac_audit());
   }
 
   // --- 404 ---

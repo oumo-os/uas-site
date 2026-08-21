@@ -436,11 +436,33 @@ function list_resolutions(array $filters = []): array {
  * Whether a user may vote in a poll (eligibility rule).
  */
 function poll_eligible(array $poll, int $userId): bool {
-  if ($poll['eligibility'] === 'all') return true;
-  if ($poll['eligibility'] === 'directors') return user_has_cap($userId, 'resolutions.vote');
+  $elig = $poll['eligibility'] ?? 'members';
+  if ($elig === 'all') return true;
+
+  // Check active membership (required for members, group, role)
   $stmt = db()->prepare('SELECT 1 FROM members WHERE user_id = ? AND status = "active"');
   $stmt->execute([$userId]);
-  return (bool) $stmt->fetch();
+  $isMember = (bool) $stmt->fetch();
+
+  if ($elig === 'members') return $isMember;
+  if (!$isMember) return false;
+
+  $target = $poll['eligibility_target'] ?? null;
+  if (!$target) return true;
+
+  if ($elig === 'group') {
+    $stmt = db()->prepare('SELECT 1 FROM working_group_members wgm JOIN working_groups wg ON wg.id = wgm.group_id WHERE wgm.user_id = ? AND wg.name = ?');
+    $stmt->execute([$userId, $target]);
+    return (bool) $stmt->fetch();
+  }
+
+  if ($elig === 'role') {
+    $stmt = db()->prepare('SELECT 1 FROM role_assignments ra JOIN roles r ON r.id = ra.role_id WHERE ra.user_id = ? AND r.title = ? AND ra.status = "active" AND r.status = "active"');
+    $stmt->execute([$userId, $target]);
+    return (bool) $stmt->fetch();
+  }
+
+  return false;
 }
 
 /**
