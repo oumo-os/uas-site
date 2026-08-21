@@ -278,7 +278,7 @@ const api = {
   async getPublicProgrammes() { return this.request('/public/programmes'); },
   async getPublicProgramme(id) { return this.request('/public/programmes/' + id); },
   async getPublicDocuments() { return this.request('/public/documents'); },
-  async getFinanceSummary(groupBy) { return this.request('/finance/summary' + (groupBy ? '?group_by=' + encodeURIComponent(groupBy) : '')); },
+  async getFinanceSummary(groupBy, dateParams) { const params = {}; if (groupBy) params.group_by = groupBy; if (dateParams?.from) params.date_from = dateParams.from; if (dateParams?.to) params.date_to = dateParams.to; const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''; return this.request('/finance/summary' + qs); },
   async getMemberDocuments() { return this.request('/member/documents'); },
   async getMemberAssignments() { return this.request('/member/assignments'); },
   async getMemberCalendar() { return this.request('/member/calendar'); },

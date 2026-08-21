@@ -1621,23 +1621,30 @@ try {
     $validGroups = ['category', 'programme', 'event', 'project'];
     if (!in_array($groupBy, $validGroups)) $groupBy = 'category';
 
-    $stmt = db()->prepare('SELECT type, SUM(amount) as total FROM financial_records GROUP BY type');
-    $stmt->execute();
+    $dateFrom = $_GET['date_from'] ?? '';
+    $dateTo = $_GET['date_to'] ?? '';
+    $dateFilter = '';
+    $dateParams = [];
+    if ($dateFrom && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateFrom)) { $dateFilter .= ' AND record_date >= ?'; $dateParams[] = $dateFrom; }
+    if ($dateTo && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateTo)) { $dateFilter .= ' AND record_date <= ?'; $dateParams[] = $dateTo; }
+
+    $stmt = db()->prepare('SELECT type, SUM(amount) as total FROM financial_records WHERE status != "cancelled"' . $dateFilter . ' GROUP BY type');
+    $stmt->execute($dateParams);
     $byType = [];
     foreach ($stmt->fetchAll() as $row) $byType[$row['type']] = (float) $row['total'];
 
     $groupQueries = [
-      'category' => 'SELECT category AS group_name, type, SUM(amount) AS total FROM financial_records GROUP BY category, type ORDER BY category',
-      'programme' => 'SELECT COALESCE(p.title, \'Unassigned\') AS group_name, f.type, SUM(f.amount) AS total FROM financial_records f LEFT JOIN programmes p ON p.id = f.programme_id GROUP BY group_name, f.type ORDER BY group_name',
-      'event' => 'SELECT COALESCE(e.title, \'Unassigned\') AS group_name, f.type, SUM(f.amount) AS total FROM financial_records f LEFT JOIN events e ON e.id = f.event_id GROUP BY group_name, f.type ORDER BY group_name',
-      'project' => 'SELECT COALESCE(pr.title, \'Unassigned\') AS group_name, f.type, SUM(f.amount) AS total FROM financial_records f LEFT JOIN projects pr ON pr.id = f.project_id GROUP BY group_name, f.type ORDER BY group_name',
+      'category' => 'SELECT category AS group_name, type, SUM(amount) AS total FROM financial_records WHERE status != "cancelled"' . $dateFilter . ' GROUP BY category, type ORDER BY category',
+      'programme' => 'SELECT COALESCE(p.title, \'Unassigned\') AS group_name, f.type, SUM(f.amount) AS total FROM financial_records f LEFT JOIN programmes p ON p.id = f.programme_id WHERE f.status != "cancelled"' . $dateFilter . ' GROUP BY group_name, f.type ORDER BY group_name',
+      'event' => 'SELECT COALESCE(e.title, \'Unassigned\') AS group_name, f.type, SUM(f.amount) AS total FROM financial_records f LEFT JOIN events e ON e.id = f.event_id WHERE f.status != "cancelled"' . $dateFilter . ' GROUP BY group_name, f.type ORDER BY group_name',
+      'project' => 'SELECT COALESCE(pr.title, \'Unassigned\') AS group_name, f.type, SUM(f.amount) AS total FROM financial_records f LEFT JOIN projects pr ON pr.id = f.project_id WHERE f.status != "cancelled"' . $dateFilter . ' GROUP BY group_name, f.type ORDER BY group_name',
     ];
     $stmt = db()->prepare($groupQueries[$groupBy]);
-    $stmt->execute();
+    $stmt->execute($dateParams);
     $byGroup = $stmt->fetchAll();
 
-    $stmt = db()->prepare('SELECT id, type, amount, category, description, record_date FROM financial_records ORDER BY record_date DESC, id DESC LIMIT 10');
-    $stmt->execute();
+    $stmt = db()->prepare('SELECT id, type, amount, category, description, record_date FROM financial_records WHERE status != "cancelled"' . $dateFilter . ' ORDER BY record_date DESC, id DESC LIMIT 10');
+    $stmt->execute($dateParams);
     $recent = $stmt->fetchAll();
 
     json_response([
@@ -1648,6 +1655,8 @@ try {
       'by_group' => $byGroup,
       'group_by' => $groupBy,
       'recent' => $recent,
+      'date_from' => $dateFrom ?: null,
+      'date_to' => $dateTo ?: null,
     ]);
   }
 
