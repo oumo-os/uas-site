@@ -514,7 +514,7 @@ window.updateNavUser = function () {
   }
 };
 
-window._esc = window._esc || function (s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; };
+window._esc = window._esc || function (s) { return s != null ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; };
 var esc = esc || window._esc;
 
 // --- Brand emblem ---
