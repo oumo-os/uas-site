@@ -728,20 +728,26 @@
           <div class="dash-card">
             <div class="dash-card-header">
               <h4>Breakdown</h4>
-              <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
-                <div class="fin-toggle" id="finGroupToggle">
-                  <button class="fin-toggle-btn active" data-group="category">Category</button>
-                  <button class="fin-toggle-btn" data-group="programme">Programme</button>
-                  <button class="fin-toggle-btn" data-group="event">Event</button>
-                  <button class="fin-toggle-btn" data-group="project">Project</button>
-                </div>
-                <div style="display:flex;align-items:center;gap:0.3rem;font-size:0.82rem">
-                  <input type="date" id="finDateFrom" class="form-input" style="width:130px;padding:0.3rem 0.4rem;font-size:0.82rem" title="From date">
-                  <span class="text-dim">–</span>
-                  <input type="date" id="finDateTo" class="form-input" style="width:130px;padding:0.3rem 0.4rem;font-size:0.82rem" title="To date">
-                  <button class="btn btn-outline btn-xs" onclick="applyFinDateFilter()" title="Apply date filter">Go</button>
-                  <button class="btn btn-outline btn-xs" onclick="clearFinDateFilter()" title="Clear date filter">Clear</button>
-                </div>
+              <div class="fin-toggle" id="finGroupToggle">
+                <button class="fin-toggle-btn active" data-group="category">Category</button>
+                <button class="fin-toggle-btn" data-group="programme">Programme</button>
+                <button class="fin-toggle-btn" data-group="event">Event</button>
+                <button class="fin-toggle-btn" data-group="project">Project</button>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.75rem;padding:0 0.5rem">
+              <div class="fin-toggle" id="finPresetToggle">
+                <button class="fin-toggle-btn active" data-preset="all">All Time</button>
+                <button class="fin-toggle-btn" data-preset="month">This Month</button>
+                <button class="fin-toggle-btn" data-preset="quarter">This Quarter</button>
+                <button class="fin-toggle-btn" data-preset="year">This Year</button>
+                <button class="fin-toggle-btn" data-preset="lastyear">Last Year</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:0.3rem;margin-left:auto;font-size:0.82rem">
+                <input type="date" id="finDateFrom" class="form-input" style="width:130px;padding:0.3rem 0.4rem;font-size:0.82rem" title="From date">
+                <span class="text-dim">–</span>
+                <input type="date" id="finDateTo" class="form-input" style="width:130px;padding:0.3rem 0.4rem;font-size:0.82rem" title="To date">
+                <button class="btn btn-outline btn-xs" onclick="applyFinDateFilter()" title="Apply date filter">Go</button>
               </div>
             </div>
             <div id="financeBreakdown"></div>
@@ -1352,6 +1358,29 @@
     let finDateFrom = '';
     let finDateTo = '';
     function getFinDateParams() { const p = {}; if (finDateFrom) p.from = finDateFrom; if (finDateTo) p.to = finDateTo; return Object.keys(p).length ? p : null; }
+    function getPresetDates(preset) {
+      const now = new Date();
+      const y = now.getFullYear(), m = now.getMonth();
+      if (preset === 'month') return { from: `${y}-${String(m+1).padStart(2,'0')}-01`, to: `${y}-${String(m+1).padStart(2,'0')}-${new Date(y,m+1,0).getDate()}` };
+      if (preset === 'quarter') { const qStart = Math.floor(m/3)*3; return { from: `${y}-${String(qStart+1).padStart(2,'0')}-01`, to: `${y}-${String(qStart+3).padStart(2,'0')}-${new Date(y,qStart+3,0).getDate()}` }; }
+      if (preset === 'year') return { from: `${y}-01-01`, to: `${y}-12-31` };
+      if (preset === 'lastyear') return { from: `${y-1}-01-01`, to: `${y-1}-12-31` };
+      return { from: '', to: '' };
+    }
+    async function applyFinPreset(preset) {
+      document.querySelectorAll('#finPresetToggle .fin-toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === preset));
+      if (preset === 'all') { finDateFrom = ''; finDateTo = ''; }
+      else { const d = getPresetDates(preset); finDateFrom = d.from; finDateTo = d.to; }
+      document.getElementById('finDateFrom').value = finDateFrom;
+      document.getElementById('finDateTo').value = finDateTo;
+      try { const fin = await api.getFinanceSummary(finCurrentGroup, getFinDateParams()); renderFinance(fin); } catch(e) { toast('Failed to load', 'error'); }
+    }
+    async function applyFinDateFilter() {
+      finDateFrom = document.getElementById('finDateFrom').value || '';
+      finDateTo = document.getElementById('finDateTo').value || '';
+      document.querySelectorAll('#finPresetToggle .fin-toggle-btn').forEach(b => b.classList.remove('active'));
+      try { const fin = await api.getFinanceSummary(finCurrentGroup, getFinDateParams()); renderFinance(fin); } catch(e) { toast('Failed to load', 'error'); }
+    }
     function renderFinance(fin) {
       if (!fin || (fin.income === 0 && fin.expense === 0)) {
         document.getElementById('financeStatGrid').innerHTML = '<div class="empty-state"><h4>No financial records</h4><p>Record your first income or expense to start tracking finances.</p>' + (api.hasCap('finance.record') ? '<button class="btn btn-primary btn-sm" onclick="showFinanceForm()">Record Transaction</button>' : '') + '</div>';
@@ -1435,7 +1464,7 @@
 
     async function switchFinGroup(group) {
       if (group === finCurrentGroup) return;
-      document.querySelectorAll('.fin-toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.group === group));
+      document.querySelectorAll('#finGroupToggle .fin-toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.group === group));
       try {
         const fin = await api.getFinanceSummary(group, getFinDateParams());
         finCurrentGroup = group;
@@ -1443,26 +1472,13 @@
       } catch(e) {}
     }
 
-    async function applyFinDateFilter() {
-      finDateFrom = document.getElementById('finDateFrom').value || '';
-      finDateTo = document.getElementById('finDateTo').value || '';
-      try {
-        const fin = await api.getFinanceSummary(finCurrentGroup, getFinDateParams());
-        renderFinance(fin);
-      } catch(e) { toast('Failed to load finance data', 'error'); }
-    }
-
-    function clearFinDateFilter() {
-      finDateFrom = '';
-      finDateTo = '';
-      document.getElementById('finDateFrom').value = '';
-      document.getElementById('finDateTo').value = '';
-      applyFinDateFilter();
-    }
-
     document.getElementById('finGroupToggle')?.addEventListener('click', e => {
       const btn = e.target.closest('.fin-toggle-btn');
       if (btn) switchFinGroup(btn.dataset.group);
+    });
+    document.getElementById('finPresetToggle')?.addEventListener('click', e => {
+      const btn = e.target.closest('.fin-toggle-btn');
+      if (btn) applyFinPreset(btn.dataset.preset);
     });
 
     // ================= MEETINGS =================
