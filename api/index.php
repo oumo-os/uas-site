@@ -428,9 +428,10 @@ try {
 
   elseif ($path === '/profile' && $method === 'GET') {
     $user = require_login();
-    $stmt = db()->prepare('SELECT m.interests, m.contributions, m.profile_visible, m.membership_number, m.category FROM members m WHERE m.user_id = ?');
+    $stmt = db()->prepare('SELECT m.interests, m.contributions, m.profile_visible, m.membership_number FROM members m WHERE m.user_id = ?');
     $stmt->execute([$user['id']]);
     $member = $stmt->fetch() ?: [];
+    $member['class'] = get_member_class($user['id']);
     json_response(['user' => public_user($user), 'member' => $member]);
   }
   elseif ($path === '/profile' && $method === 'PUT') {
@@ -466,17 +467,29 @@ try {
   elseif ($path === '/members' && $method === 'GET') {
     $isPublic = isset($_GET['public']) && $_GET['public'] === '1';
     if ($isPublic) {
-      $stmt = db()->prepare("SELECT m.id, m.user_id, m.category, m.membership_number, m.interests, m.joined_date, u.name, u.institution, u.location, u.avatar_url FROM members m JOIN users u ON u.id = m.user_id WHERE m.profile_visible = 1 AND m.status = 'active' AND u.status = 'active' ORDER BY u.name");
+      $stmt = db()->prepare("SELECT m.id, m.user_id, m.membership_number, m.interests, m.joined_date, u.name, u.institution, u.location, u.avatar_url FROM members m JOIN users u ON u.id = m.user_id WHERE m.profile_visible = 1 AND m.status = 'active' AND u.status = 'active' ORDER BY u.name");
       $stmt->execute();
-      json_response($stmt->fetchAll());
+      $members = $stmt->fetchAll();
+      // Derive class from roles
+      $mIds = array_map(fn($m) => (int)$m['user_id'], $members);
+      $classByUser = [];
+      if ($mIds) {
+        $ph = implode(',', array_fill(0, count($mIds), '?'));
+        $stmt = db()->prepare("SELECT ra.user_id, r.title FROM role_assignments ra JOIN roles r ON r.id = ra.role_id WHERE ra.user_id IN ($ph) AND ra.status = 'active' AND r.role_type = 'member_class' AND r.status = 'active'");
+        $stmt->execute($mIds);
+        while ($row = $stmt->fetch()) $classByUser[(int)$row['user_id']] = $row['title'];
+      }
+      foreach ($members as &$m) $m['class'] = $classByUser[(int)$m['user_id']] ?? 'Regular Member';
+      json_response($members);
     }
     require_login();
     $stmt = db()->prepare('SELECT m.*, u.name, u.email, u.avatar_url, u.institution, u.location, u.status AS user_status FROM members m JOIN users u ON u.id = m.user_id ORDER BY m.joined_date DESC');
     $stmt->execute();
     $members = $stmt->fetchAll();
-    // Attach roles per member
+    // Attach roles and derive class per member
     $mIds = array_map(fn($m) => (int)$m['user_id'], $members);
     $rolesByUser = [];
+    $classByUser = [];
     if ($mIds) {
       $placeholders = implode(',', array_fill(0, count($mIds), '?'));
       $stmt = db()->prepare("SELECT ra.user_id, r.title, r.role_type, r.scope, r.target
@@ -485,10 +498,12 @@ try {
       $stmt->execute($mIds);
       foreach ($stmt->fetchAll() as $row) {
         $rolesByUser[(int)$row['user_id']][] = ['title' => $row['title'], 'role_type' => $row['role_type'], 'scope' => $row['scope'], 'target' => $row['target']];
+        if ($row['role_type'] === 'member_class') $classByUser[(int)$row['user_id']] = $row['title'];
       }
     }
     foreach ($members as &$m) {
       $m['roles'] = $rolesByUser[(int)$m['user_id']] ?? [];
+      $m['class'] = $classByUser[(int)$m['user_id']] ?? 'Regular Member';
     }
     json_response($members);
   }
@@ -501,13 +516,12 @@ try {
     db()->prepare("UPDATE users SET status = ? WHERE id = ?")
       ->execute([$newStatus, $data['user_id']]);
 
-    // On approval, ensure the member holds the baseline Member role
+    // On approval, ensure the member holds the baseline Member role + member_class role
     if ($newStatus === 'active') {
       $stmt = db()->prepare('SELECT id FROM roles WHERE title = ?');
       $stmt->execute(['Member']);
       $memberRoleId = $stmt->fetchColumn();
       if (!$memberRoleId) {
-        // Create baseline Member role with correct capability slugs
         $baselineSlugs = ['articles.submit', 'events.create', 'events.rsvp', 'documents.upload', 'reports.create'];
         $capIds = [];
         foreach ($baselineSlugs as $slug) {
@@ -523,6 +537,22 @@ try {
       if (!$stmt->fetch()) {
         assign_role($memberRoleId, $data['user_id'], $user['id']);
       }
+
+      // Determine class: admin can override via 'class' param, else read from stored interests
+      $classTitle = $data['class'] ?? null;
+      if (!$classTitle) {
+        $stmt = db()->prepare('SELECT interests FROM members WHERE user_id = ?');
+        $stmt->execute([(int)$data['user_id']]);
+        $interests = $stmt->fetchColumn();
+        if ($interests && str_starts_with($interests, 'class:')) {
+          $cat = substr($interests, 6);
+          $catMap = ['regular' => 'Regular Member', 'student' => 'Student Member', 'honorary' => 'Honorary Member', 'institutional' => 'Institutional Member'];
+          $classTitle = $catMap[$cat] ?? 'Regular Member';
+        } else {
+          $classTitle = 'Regular Member';
+        }
+      }
+      set_member_class((int)$data['user_id'], $classTitle, $user['id']);
     }
 
     audit_log('member_' . ($newStatus === 'active' ? 'approve' : 'reject'), 'member', $data['user_id'], [
@@ -541,7 +571,7 @@ try {
     $loggedIn = !empty($_SESSION['user_id']);
     if ($isPublic || !$loggedIn) {
       $stmt = db()->prepare("
-        SELECT DISTINCT m.id, m.user_id, m.category, m.membership_number, m.interests, m.joined_date,
+        SELECT DISTINCT m.id, m.user_id, m.membership_number, m.interests, m.joined_date,
                u.name, u.institution, u.location, u.avatar_url, u.bio
         FROM members m
         JOIN users u ON u.id = m.user_id
@@ -560,6 +590,7 @@ try {
     }
     $memberIds = array_map(fn($m) => (int)($m['user_id'] ?? $m['id']), $members);
     $rolesByUser = [];
+    $classByUser = [];
     if ($memberIds) {
       $placeholders = implode(',', array_fill(0, count($memberIds), '?'));
       $stmt = db()->prepare(
@@ -580,11 +611,13 @@ try {
           'target' => $row['target'],
           'description' => $row['description'],
         ];
+        if ($row['role_type'] === 'member_class') $classByUser[$uid] = $row['title'];
       }
     }
     foreach ($members as &$m) {
       $uid = (int)($m['user_id'] ?? $m['id']);
       $m['roles'] = $rolesByUser[$uid] ?? [];
+      $m['class'] = $classByUser[$uid] ?? 'Regular Member';
     }
     json_response($members);
   }
@@ -595,6 +628,7 @@ try {
     $stmt->execute([$userId]);
     $member = $stmt->fetch();
     if (!$member) json_error('Member not found', 404);
+    $member['class'] = get_member_class($userId);
     $stmt = db()->prepare("SELECT r.id AS role_id, r.title, r.role_type, r.scope, r.target, r.description
       FROM role_assignments ra JOIN roles r ON r.id = ra.role_id WHERE ra.user_id = ? AND ra.status = 'active' AND r.status = 'active'");
     $stmt->execute([$userId]);
@@ -610,9 +644,8 @@ try {
     if (!$stmt->fetch()) json_error('Member not found', 404);
     $fields = [];
     $params = [];
-    if (isset($data['category']) && in_array($data['category'], ['regular','student','honorary','institutional'])) {
-      $fields[] = 'category = ?';
-      $params[] = $data['category'];
+    if (isset($data['class']) && in_array($data['class'], ['Regular Member','Student Member','Honorary Member','Institutional Member'])) {
+      set_member_class($userId, $data['class'], $user['id']);
     }
     if (isset($data['standing']) && in_array($data['standing'], ['good_standing','restricted'])) {
       $fields[] = 'standing = ?';
@@ -626,9 +659,10 @@ try {
       $fields[] = 'profile_visible = ?';
       $params[] = $data['profile_visible'] ? 1 : 0;
     }
-    if (!$fields) json_error('No valid fields to update', 400);
-    $params[] = $userId;
-    db()->prepare('UPDATE members SET ' . implode(', ', $fields) . ' WHERE user_id = ?')->execute($params);
+    if ($fields) {
+      $params[] = $userId;
+      db()->prepare('UPDATE members SET ' . implode(', ', $fields) . ' WHERE user_id = ?')->execute($params);
+    }
     audit_log('member_update', 'member', $userId, ['by' => $user['id'], 'fields' => array_keys($data)]);
     json_response(['ok' => true]);
   }
@@ -686,7 +720,7 @@ try {
   elseif (preg_match('#^/members/(\d+)/dues$#', $path, $m) && $method === 'GET') {
     require_login();
     $memberId = (int) $m[1];
-    $stmt = db()->prepare('SELECT * FROM membership_dues WHERE member_id = ? ORDER BY period_year DESC');
+    $stmt = db()->prepare('SELECT md.*, r.title AS class_title FROM membership_dues md LEFT JOIN roles r ON r.id = md.role_id WHERE md.member_id = ? ORDER BY md.period_year DESC');
     $stmt->execute([$memberId]);
     json_response($stmt->fetchAll());
   }
@@ -701,9 +735,10 @@ try {
     $amountOwed = (float) ($data['amount_owed'] ?? 0);
     $dueDate = $data['due_date'] ?? date('Y') . '-12-31';
     $notes = $data['notes'] ?? null;
-    db()->prepare('INSERT INTO membership_dues (member_id, period_year, amount_owed, due_date, notes, recorded_by, status) VALUES (?, ?, ?, ?, ?, ?, "pending")
-      ON DUPLICATE KEY UPDATE amount_owed = VALUES(amount_owed), due_date = VALUES(due_date), notes = VALUES(notes), recorded_by = VALUES(recorded_by)')
-      ->execute([$memberId, $year, $amountOwed, $dueDate, $notes, $user['id']]);
+    $roleId = !empty($data['role_id']) ? (int)$data['role_id'] : null;
+    db()->prepare('INSERT INTO membership_dues (member_id, role_id, period_year, amount_owed, due_date, notes, recorded_by, status) VALUES (?, ?, ?, ?, ?, ?, ?, "pending")
+      ON DUPLICATE KEY UPDATE amount_owed = VALUES(amount_owed), due_date = VALUES(due_date), notes = VALUES(notes), recorded_by = VALUES(recorded_by), role_id = VALUES(role_id)')
+      ->execute([$memberId, $roleId, $year, $amountOwed, $dueDate, $notes, $user['id']]);
     $duesId = (int) db()->lastInsertId();
     audit_log('dues_create', 'member', $memberId, ['dues_id' => $duesId, 'year' => $year, 'amount' => $amountOwed]);
     json_response(['id' => $duesId], 201);
@@ -761,6 +796,8 @@ try {
 
     $created = 0; $skipped = []; $failed = [];
     $year = date('Y');
+    // Map CSV category values to member_class role titles
+    $catMap = ['regular' => 'Regular Member', 'student' => 'Student Member', 'honorary' => 'Honorary Member', 'institutional' => 'Institutional Member'];
 
     try {
       db()->beginTransaction();
@@ -768,7 +805,7 @@ try {
         $fields = str_getcsv($line);
         $name = trim($fields[0] ?? '');
         $email = strtolower(trim($fields[1] ?? ''));
-        $category = trim($fields[2] ?? '') ?: 'regular';
+        $category = strtolower(trim($fields[2] ?? '')) ?: 'regular';
         $institution = trim($fields[3] ?? '');
 
         if (!$name || !filter_var($email, FILTER_VALIDATE_EMAIL)) { $failed[] = "Row " . ($i + 2) . ": missing name or invalid email"; continue; }
@@ -786,9 +823,10 @@ try {
         $stmt->execute();
         $memberNum = 'UAS-' . $year . '-' . str_pad($stmt->fetchColumn(), 4, '0', STR_PAD_LEFT);
 
-        db()->prepare('INSERT INTO members (user_id, membership_number, category, status, joined_date) VALUES (?, ?, ?, "active", ?)')
-          ->execute([$userId, $memberNum, $category, date('Y-m-d')]);
+        db()->prepare('INSERT INTO members (user_id, membership_number, status, joined_date) VALUES (?, ?, "active", ?)')
+          ->execute([$userId, $memberNum, date('Y-m-d')]);
 
+        // Assign baseline Member role
         $stmt = db()->prepare('SELECT id FROM roles WHERE title = ?');
         $stmt->execute(['Member']);
         $memberRoleId = $stmt->fetchColumn();
@@ -796,6 +834,10 @@ try {
           $memberRoleId = create_role('Member', 'Baseline membership role', [1, 7, 40, 27, 34], $user['id']);
         }
         assign_role($memberRoleId, $userId, $user['id']);
+
+        // Assign member_class role
+        $classTitle = $catMap[$category] ?? 'Regular Member';
+        set_member_class($userId, $classTitle, $user['id']);
         $created++;
       }
       db()->commit();
@@ -1962,12 +2004,22 @@ try {
     $documents = $stmt->fetchAll();
 
     if ($loggedIn) {
-      $stmt = db()->prepare("SELECT m.user_id, u.name, u.institution, m.category, m.membership_number FROM members m JOIN users u ON u.id = m.user_id WHERE m.status = 'active' AND (u.name LIKE ? OR u.institution LIKE ?) LIMIT 10");
+      $stmt = db()->prepare("SELECT m.user_id, u.name, u.institution, m.membership_number FROM members m JOIN users u ON u.id = m.user_id WHERE m.status = 'active' AND (u.name LIKE ? OR u.institution LIKE ?) LIMIT 10");
     } else {
-      $stmt = db()->prepare("SELECT m.user_id, u.name, u.institution, m.category FROM members m JOIN users u ON u.id = m.user_id WHERE m.status = 'active' AND m.profile_visible = 1 AND (u.name LIKE ? OR u.institution LIKE ?) LIMIT 10");
+      $stmt = db()->prepare("SELECT m.user_id, u.name, u.institution FROM members m JOIN users u ON u.id = m.user_id WHERE m.status = 'active' AND m.profile_visible = 1 AND (u.name LIKE ? OR u.institution LIKE ?) LIMIT 10");
     }
     $stmt->execute([$like, $like]);
     $members = $stmt->fetchAll();
+    // Derive class from roles for each member
+    $mIds = array_map(fn($m) => (int)$m['user_id'], $members);
+    $classByUser = [];
+    if ($mIds) {
+      $ph = implode(',', array_fill(0, count($mIds), '?'));
+      $stmt = db()->prepare("SELECT ra.user_id, r.title FROM role_assignments ra JOIN roles r ON r.id = ra.role_id WHERE ra.user_id IN ($ph) AND ra.status = 'active' AND r.role_type = 'member_class' AND r.status = 'active'");
+      $stmt->execute($mIds);
+      while ($row = $stmt->fetch()) $classByUser[(int)$row['user_id']] = $row['title'];
+    }
+    foreach ($members as &$m) $m['class'] = $classByUser[(int)$m['user_id']] ?? 'Regular Member';
 
     json_response(compact('articles', 'events', 'programmes', 'projects', 'documents', 'members'));
   }
@@ -1975,11 +2027,22 @@ try {
   // --- EXPORTS (CSV) ---
   elseif ($path === '/export/members.csv' && $method === 'GET') {
     $user = require_cap('members.view');
-    $stmt = db()->prepare("SELECT m.membership_number, u.name, u.email, m.category, m.status, m.joined_date, u.institution, u.location, m.interests FROM members m JOIN users u ON u.id = m.user_id ORDER BY m.joined_date");
+    $stmt = db()->prepare("SELECT m.user_id, m.membership_number, u.name, u.email, m.status, m.joined_date, u.institution, u.location, m.interests FROM members m JOIN users u ON u.id = m.user_id ORDER BY m.joined_date");
     $stmt->execute();
     $rows = $stmt->fetchAll();
-    $csv = "membership_number,name,email,category,status,joined_date,institution,location,interests\n";
+    // Derive class from roles
+    $mIds = array_map(fn($r) => (int)$r['user_id'], $rows);
+    $classByUser = [];
+    if ($mIds) {
+      $ph = implode(',', array_fill(0, count($mIds), '?'));
+      $stmt = db()->prepare("SELECT ra.user_id, r.title FROM role_assignments ra JOIN roles r ON r.id = ra.role_id WHERE ra.user_id IN ($ph) AND ra.status = 'active' AND r.role_type = 'member_class' AND r.status = 'active'");
+      $stmt->execute($mIds);
+      while ($row = $stmt->fetch()) $classByUser[(int)$row['user_id']] = $row['title'];
+    }
+    $csv = "membership_number,name,email,class,status,joined_date,institution,location,interests\n";
     foreach ($rows as $r) {
+      $r['class'] = $classByUser[(int)$r['user_id']] ?? 'Regular Member';
+      unset($r['user_id']);
       $cols = array_map(fn($v) => '"' . str_replace('"', '""', (string) ($v ?? '')) . '"', array_values($r));
       $csv .= implode(',', $cols) . "\n";
     }

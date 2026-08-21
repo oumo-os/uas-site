@@ -151,7 +151,7 @@
       const m = prof.member || {};
       document.getElementById('pvAvatar').textContent = (p.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
       document.getElementById('pvName').textContent = p.name;
-      document.getElementById('pvMeta').textContent = (m.membership_number || '') + ' · ' + (m.category || 'regular');
+      document.getElementById('pvMeta').textContent = (m.membership_number || '') + ' · ' + (m.class || 'Regular Member');
       document.getElementById('fName').value = p.name || '';
       document.getElementById('fPhone').value = p.phone || '';
       document.getElementById('fInstitution').value = p.institution || '';

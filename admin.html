@@ -388,7 +388,7 @@
             <div class="member-avatar">${initials}</div>
             <div class="member-info">
               <h4>${esc(m.name)} ${roles ? `<span style="font-size:0.75rem;color:var(--text-dim);font-weight:400">&middot; ${esc(roles)}</span>` : ''}</h4>
-              <p>${esc(m.email)} &middot; ${esc(m.membership_number || '—')} &middot; ${esc(m.category)}</p>
+              <p>${esc(m.email)} &middot; ${esc(m.membership_number || '—')} &middot; ${esc((m.class || 'Regular Member').replace(' Member', ''))}</p>
             </div>
             <span class="badge badge-${accountStatus === 'active' ? 'active' : (accountStatus === 'rejected' ? 'inactive' : 'inactive')}">${esc(accountStatus)}</span>
             <div class="member-actions">

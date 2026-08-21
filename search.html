@@ -129,7 +129,7 @@
       if (data.programmes.length) html += group('Programmes', data.programmes.map(p => row(`/programmes/${p.id}`, p.title, p.description || '')));
       if (data.projects.length) html += group('Projects', data.projects.map(p => row(`/programmes/${p.programme_id || ''}`, p.title, p.description || '')));
       if (data.documents.length) html += group('Documents', data.documents.map(d => row('/library', d.title, d.category)));
-      if (data.members.length) html += group('Members', data.members.map(m => row('/members', m.name, `${m.institution || ''} · ${m.category}`)));
+      if (data.members.length) html += group('Members', data.members.map(m => row('/members', m.name, `${m.institution || ''} · ${(m.class || 'Regular Member').replace(' Member', '')}`)));
       div.innerHTML = html;
     }
 

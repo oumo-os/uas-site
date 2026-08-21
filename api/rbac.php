@@ -72,6 +72,31 @@ function user_has_cap_for(int $userId, string $capability, string $resourceType,
 }
 
 /**
+ * Get a user's member class from their active member_class role assignment.
+ * Returns the role title (e.g., 'Regular Member', 'Student Member') or null.
+ */
+function get_member_class(int $userId): ?string {
+  $stmt = db()->prepare('SELECT r.title FROM role_assignments ra JOIN roles r ON r.id = ra.role_id WHERE ra.user_id = ? AND ra.status = "active" AND r.role_type = "member_class" AND r.status = "active" LIMIT 1');
+  $stmt->execute([$userId]);
+  return $stmt->fetchColumn() ?: null;
+}
+
+/**
+ * Set a user's member class by revoking old member_class role and assigning new one.
+ */
+function set_member_class(int $userId, string $classTitle, int $assignedBy): void {
+  // Revoke current member_class role
+  db()->prepare("UPDATE role_assignments ra JOIN roles r ON r.id = ra.role_id SET ra.status = 'inactive' WHERE ra.user_id = ? AND ra.status = 'active' AND r.role_type = 'member_class'")->execute([$userId]);
+  // Assign new one
+  $stmt = db()->prepare('SELECT id FROM roles WHERE title = ? AND role_type = "member_class" AND status = "active"');
+  $stmt->execute([$classTitle]);
+  $roleId = $stmt->fetchColumn();
+  if ($roleId) {
+    assign_role((int)$roleId, $userId, $assignedBy);
+  }
+}
+
+/**
  * Get all active roles for a user.
  */
 function user_roles(int $userId): array {

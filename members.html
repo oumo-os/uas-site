@@ -218,10 +218,6 @@
     const ROLE_TYPE_CSS = {
       governance: 'governance', administrative: 'administrative', member_class: 'general'
     };
-    const MEMBERSHIP_CLASSES = {
-      regular: 'Member', student: 'Student', affiliate: 'Affiliate',
-      honorary: 'Honorary', corporate: 'Corporate'
-    };
 
     async function load() {
       try { await api.me(); } catch(e) {}
@@ -421,7 +417,7 @@
             ${interests.length ? `<div class="member-tags">${interests.map(i => `<span class="member-tag">${esc(i.trim())}</span>`).join('')}</div>` : ''}
             <div class="user-roles-list">${rolesHtml}</div>
             <div class="member-meta">
-              <span>${esc(m.category || 'member')}${m.membership_number ? ' &middot; #' + esc(m.membership_number) : ''}</span>
+              <span>${esc((m.class || 'Regular Member').replace(' Member', ''))}${m.membership_number ? ' &middot; #' + esc(m.membership_number) : ''}</span>
               <span>${joined}</span>
             </div>
           </div>
@@ -443,8 +439,7 @@
       if (!users.length) return '';
       const cards = users.map(m => {
         const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-        const classKey = (m.category || 'regular').toLowerCase();
-        const classLabel = MEMBERSHIP_CLASSES[classKey] || classKey;
+        const classLabel = (m.class || 'Regular Member').replace(' Member', '');
         const rolesHtml = formatRoleBadges(m.roles);
         const interests = m.interests ? m.interests.split(',').slice(0, 3) : [];
         const joined = m.joined_date ? new Date(m.joined_date).toLocaleDateString('en', { month: 'short', year: 'numeric' }) : '';
@@ -504,7 +499,7 @@
           ${m.contributions ? `<div class="field"><div class="field-label">Contributions</div><div style="line-height:1.6">${esc(m.contributions)}</div></div>` : ''}
           <div style="display:flex;gap:1.5rem;margin-top:0.75rem;font-size:0.82rem;color:var(--text-dim);flex-wrap:wrap">
             <span>Member since ${m.joined_date ? new Date(m.joined_date).toLocaleDateString('en', { month: 'long', year: 'numeric' }) : 'N/A'}</span>
-            <span>${esc(m.category || 'regular')}</span>
+            <span>${esc((m.class || 'Regular Member').replace(' Member', ''))}</span>
             ${m.membership_number ? `<span>#${esc(m.membership_number)}</span>` : ''}
           </div>
         `;

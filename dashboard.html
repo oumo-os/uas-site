@@ -760,11 +760,11 @@
       <div class="stat-grid" id="memberStats"></div>
       <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem">
         <select id="mFilterCat" onchange="filterMembers()" style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text);font-size:0.85rem">
-          <option value="">All categories</option>
-          <option value="regular">Regular</option>
-          <option value="student">Student</option>
-          <option value="honorary">Honorary</option>
-          <option value="institutional">Institutional</option>
+          <option value="">All classes</option>
+          <option value="Regular Member">Regular</option>
+          <option value="Student Member">Student</option>
+          <option value="Honorary Member">Honorary</option>
+          <option value="Institutional Member">Institutional</option>
         </select>
         <select id="mFilterStanding" onchange="filterMembers()" style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text);font-size:0.85rem">
           <option value="">All standings</option>
@@ -1628,7 +1628,7 @@
       const status = document.getElementById('mFilterStatus').value;
       const q = (document.getElementById('mSearch').value || '').toLowerCase();
       let list = allMembersData.filter(m => {
-        if (cat && m.category !== cat) return false;
+        if (cat && m.class !== cat) return false;
         if (standing && m.standing !== standing) return false;
         if (status && m.status !== status) return false;
         if (q && !(m.name || '').toLowerCase().includes(q) && !(m.email || '').toLowerCase().includes(q)) return false;
@@ -1640,10 +1640,12 @@
         return;
       }
       const canManage = api.hasCap('members.manage');
-      div.innerHTML = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.88rem"><thead><tr style="border-bottom:1px solid var(--border);text-align:left"><th style="padding:0.5rem">Name</th><th>Email</th><th>Category</th><th>Standing</th><th>Status</th><th>Roles</th><th>Joined</th>' + (canManage ? '<th>Actions</th>' : '') + '</tr></thead><tbody>' + list.map(m => {
-        const standingBadge = m.standing === 'restricted' ? '<span style="color:var(--danger);font-weight:500">Restricted</span>' : '<span style="color:var(--success)">Good</span>';
+      div.innerHTML = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.88rem"><thead><tr style="border-bottom:1px solid var(--border);text-align:left"><th style="padding:0.5rem">Name</th><th>Email</th><th>Class</th><th>Standing</th><th>Status</th><th>Roles</th><th>Joined</th>' + (canManage ? '<th>Actions</th>' : '') + '</tr></thead><tbody>' + list.map(m => {
+        const standingBadge = m.standing === 'restricted'
+          ? `<button class="btn btn-xs" onclick="toggleStanding(${m.user_id},'good_standing')" style="background:rgba(220,38,38,0.1);color:var(--danger);border:1px solid rgba(220,38,38,0.3);cursor:pointer;border-radius:var(--radius);padding:0.2rem 0.5rem;font-size:0.8rem">Restricted — click to restore</button>`
+          : `<button class="btn btn-xs" onclick="toggleStanding(${m.user_id},'restricted')" style="background:rgba(34,197,94,0.1);color:var(--success);border:1px solid rgba(34,197,94,0.3);cursor:pointer;border-radius:var(--radius);padding:0.2rem 0.5rem;font-size:0.8rem">Good Standing — click to restrict</button>`;
         const statusBadge = m.status === 'active' ? '<span style="color:var(--success)">Active</span>' : m.status === 'pending' ? '<span style="color:var(--gold)">Pending</span>' : '<span style="color:var(--text-dim)">' + esc(m.status) + '</span>';
-        const roles = m.roles || [];
+        const roles = (m.roles || []).filter(r => r.role_type !== 'member_class');
         const roleBadges = roles.slice(0, 3).map(r => `<span class="wg-badge" style="font-size:0.75rem;background:rgba(30,96,145,0.1);color:var(--info)">${esc(r.title)}</span>`).join(' ') + (roles.length > 3 ? ` +${roles.length - 3}` : '');
         let actions = '';
         if (canManage) {
@@ -1656,14 +1658,25 @@
         return `<tr style="border-bottom:1px solid var(--border)">
           <td style="padding:0.5rem;font-weight:500">${esc(m.name)}</td>
           <td style="padding:0.5rem;color:var(--text-dim)">${esc(m.email || '')}</td>
-          <td style="padding:0.5rem;text-transform:capitalize">${esc(m.category || 'regular')}</td>
-          <td style="padding:0.5rem">${standingBadge}</td>
+          <td style="padding:0.5rem">${esc((m.class || 'Regular Member').replace(' Member', ''))}</td>
+          <td style="padding:0.5rem">${canManage ? standingBadge : (m.standing === 'restricted' ? '<span style="color:var(--danger)">Restricted</span>' : '<span style="color:var(--success)">Good</span>')}</td>
           <td style="padding:0.5rem">${statusBadge}</td>
           <td style="padding:0.5rem">${roleBadges || '<span style="color:var(--text-dim)">—</span>'}</td>
           <td style="padding:0.5rem;color:var(--text-dim)">${m.joined_date || '—'}</td>
           ${canManage ? '<td style="padding:0.5rem">' + actions + '</td>' : ''}
         </tr>`;
       }).join('') + '</tbody></table></div>';
+    }
+
+    async function toggleStanding(userId, newStanding) {
+      const label = newStanding === 'restricted' ? 'RESTRICT' : 'RESTORE to good standing';
+      if (!confirm(`Are you sure you want to ${label} this member?`)) return;
+      try {
+        await api.request('/members/' + userId + '/standing', { method: 'POST', body: { standing: newStanding, reason: 'Manual toggle from dashboard' } });
+        toast('Standing updated', 'success');
+        const members = await api.request('/members');
+        renderMembersPanel(members);
+      } catch (e) { toast(e.error || 'Failed', 'error'); }
     }
 
     async function approveMember(userId) {
@@ -1688,21 +1701,24 @@
     async function showMemberDetail(userId) {
       try {
         const m = await api.request('/members/' + userId);
-        const roles = (m.roles || []).map(r => `<span class="wg-badge" style="background:rgba(30,96,145,0.1);color:var(--info)">${esc(r.title)} <span style="color:var(--text-dim);font-size:0.75rem">(${esc(r.role_type || 'member_class')})</span></span>`).join(' ');
+        const classRoles = (m.roles || []).filter(r => r.role_type === 'member_class');
+        const otherRoles = (m.roles || []).filter(r => r.role_type !== 'member_class');
+        const currentClass = classRoles.length ? classRoles[0].title : 'Regular Member';
+        const roles = otherRoles.map(r => `<span class="wg-badge" style="background:rgba(30,96,145,0.1);color:var(--info)">${esc(r.title)} <span style="color:var(--text-dim);font-size:0.75rem">(${esc(r.role_type || '')})</span></span>`).join(' ');
         const html = `
           <div style="display:flex;flex-direction:column;gap:0.75rem">
             <div><strong>${esc(m.name)}</strong> <span class="text-dim">${esc(m.email || '')}</span></div>
-            <div>Membership: ${esc(m.membership_number || '—')} · Category: ${esc(m.category || 'regular')} · Standing: <span style="color:${m.standing === 'restricted' ? 'var(--danger)' : 'var(--success)'}">${esc(m.standing || 'good_standing')}</span> · Status: ${esc(m.status)}</div>
+            <div>Membership: ${esc(m.membership_number || '—')} · Class: ${esc(currentClass)} · Standing: <span style="color:${m.standing === 'restricted' ? 'var(--danger)' : 'var(--success)'}">${esc(m.standing || 'good_standing')}</span> · Status: ${esc(m.status)}</div>
             <div>Joined: ${m.joined_date || '—'} · Institution: ${esc(m.institution || '—')}</div>
             <div>Roles: ${roles || '<span class="text-dim">None</span>'}</div>
             ${api.hasCap('members.manage') ? `
             <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem">
-              <label style="font-size:0.85rem">Category
-                <select id="mdCat" style="padding:0.3rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)">
-                  <option value="regular" ${m.category === 'regular' ? 'selected' : ''}>Regular</option>
-                  <option value="student" ${m.category === 'student' ? 'selected' : ''}>Student</option>
-                  <option value="honorary" ${m.category === 'honorary' ? 'selected' : ''}>Honorary</option>
-                  <option value="institutional" ${m.category === 'institutional' ? 'selected' : ''}>Institutional</option>
+              <label style="font-size:0.85rem">Class
+                <select id="mdClass" style="padding:0.3rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)">
+                  <option value="Regular Member" ${currentClass === 'Regular Member' ? 'selected' : ''}>Regular</option>
+                  <option value="Student Member" ${currentClass === 'Student Member' ? 'selected' : ''}>Student</option>
+                  <option value="Honorary Member" ${currentClass === 'Honorary Member' ? 'selected' : ''}>Honorary</option>
+                  <option value="Institutional Member" ${currentClass === 'Institutional Member' ? 'selected' : ''}>Institutional</option>
                 </select>
               </label>
               <label style="font-size:0.85rem">Standing
@@ -1719,10 +1735,10 @@
     }
 
     async function updateMemberDetail(userId) {
-      const category = document.getElementById('mdCat').value;
+      const memberClass = document.getElementById('mdClass').value;
       const standing = document.getElementById('mdStanding').value;
       try {
-        await api.request('/members/' + userId, { method: 'PATCH', body: { category, standing } });
+        await api.request('/members/' + userId, { method: 'PATCH', body: { class: memberClass, standing } });
         toast('Member updated', 'success');
         closeModal();
         const members = await api.request('/members');
@@ -2803,7 +2819,7 @@
         const m = prof.member || {};
         document.getElementById('pvAvatar').textContent = (p.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
         document.getElementById('pvName').textContent = p.name;
-        document.getElementById('pvMeta').textContent = (m.membership_number || '') + ' · ' + (m.category || 'regular');
+        document.getElementById('pvMeta').textContent = (m.membership_number || '') + ' · ' + (m.class || 'Regular Member');
         document.getElementById('fName').value = p.name || '';
         document.getElementById('fPhone').value = p.phone || '';
         document.getElementById('fInstitution').value = p.institution || '';

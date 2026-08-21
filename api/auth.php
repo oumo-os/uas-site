@@ -94,10 +94,12 @@ function register(string $name, string $email, string $password, array $extra = 
     $memberNum = 'UAS-' . $year . '-' . str_pad($stmt->fetchColumn(), 4, '0', STR_PAD_LEFT);
 
     // Auto-create member record (pending until admin approval)
+    // Store chosen class in interests temporarily until approval assigns the role
+    $chosenClass = $extra['category'] ?? 'regular';
     db()->prepare(
-      'INSERT INTO members (user_id, membership_number, category, status, joined_date)
+      'INSERT INTO members (user_id, membership_number, status, joined_date, interests)
        VALUES (?, ?, ?, ?, ?)'
-    )->execute([$userId, $memberNum, $extra['category'] ?? 'regular', 'pending', date('Y-m-d')]);
+    )->execute([$userId, $memberNum, 'pending', date('Y-m-d'), 'class:' . $chosenClass]);
 
     db()->commit();
   } catch (Exception $e) {
