@@ -328,20 +328,26 @@
       if (!committees.length) return '';
       const groupsHtml = committees.map(g => {
         const members = g.members || [];
-        const membersHtml = members.length ? members.map(m => {
-          const roleClass = (m.role || '').toLowerCase().includes('chair') || (m.role || '').toLowerCase().includes('coordinator') ? 'chair' : 'member';
+        const cardsHtml = members.length ? '<div class="member-grid">' + members.map(m => {
+          const initials = (m.user_name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+          const roleBadge = m.role ? `<div class="user-roles-list"><span class="role-badge governance">${esc(m.role)}</span></div>` : '';
           return `
-          <div class="wg-member-row">
-            <span style="font-weight:500">${esc(m.user_name)}</span>
-            <span class="wg-member-role ${roleClass}">${esc(m.role)}</span>
-          </div>
-        `;}).join('') : '<div style="padding:0.5rem 0;color:var(--text-dim);font-size:0.85rem">No members</div>';
-        const chairLabel = g.chair_name ? ` &middot; Chair: ${esc(g.chair_name)}` : '';
+          <div class="member-card" onclick="showMemberDetail(${m.user_id})">
+            <div class="member-header">
+              <div class="member-avatar">${initials}</div>
+              <div>
+                <div class="member-name">${esc(m.user_name)}</div>
+                <div class="member-inst">${esc(m.email || '')}</div>
+              </div>
+            </div>
+            ${roleBadge}
+          </div>`;
+        }).join('') + '</div>' : '<div style="padding:0.5rem 0;color:var(--text-dim);font-size:0.85rem">No members</div>';
         return `
           <div class="wg-section">
-            <h4>${esc(g.name)}<span style="font-weight:400;color:var(--text-dim);font-size:0.82rem">${chairLabel}</span></h4>
+            <h4>${esc(g.name)}</h4>
             ${g.description ? `<p style="font-size:0.85rem;color:var(--text-dim);margin:0 0 0.5rem">${esc(g.description)}</p>` : ''}
-            ${membersHtml}
+            ${cardsHtml}
           </div>
         `;
       }).join('');
@@ -366,13 +372,12 @@
           return `
           <div class="wg-member-row">
             <span style="font-weight:500">${esc(m.user_name)}</span>
-            <span class="wg-member-role ${roleClass}">${esc(m.role)}</span>
+            <span class="wg-member-role ${roleClass}">${esc(m.role || 'Member')}</span>
           </div>
         `;}).join('') : '<div style="padding:0.5rem 0;color:var(--text-dim);font-size:0.85rem">No members</div>';
-        const chairLabel = g.chair_name ? ` &middot; Chair: ${esc(g.chair_name)}` : '';
         return `
           <div class="wg-section">
-            <h4>${esc(g.name)}<span style="font-weight:400;color:var(--text-dim);font-size:0.82rem">${chairLabel}</span></h4>
+            <h4>${esc(g.name)}</h4>
             ${g.description ? `<p style="font-size:0.85rem;color:var(--text-dim);margin:0 0 0.5rem">${esc(g.description)}</p>` : ''}
             ${membersHtml}
           </div>
