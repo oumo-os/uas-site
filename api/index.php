@@ -1140,8 +1140,15 @@ try {
   // --- EVENTS ---
   elseif ($path === '/events' && $method === 'GET') {
     require_login();
-    $stmt = db()->prepare('SELECT e.*, u.name AS organizer_name, pr.title AS programme_title FROM events e LEFT JOIN users u ON u.id = e.organizer_id LEFT JOIN programmes pr ON pr.id = e.programme_id ORDER BY e.date ASC');
-    $stmt->execute();
+    $where = [];
+    $params = [];
+    if (!empty($_GET['programme_id'])) { $where[] = 'e.programme_id = ?'; $params[] = (int) $_GET['programme_id']; }
+    if (!empty($_GET['status'])) { $where[] = 'e.status = ?'; $params[] = $_GET['status']; }
+    $sql = 'SELECT e.*, u.name AS organizer_name, pr.title AS programme_title FROM events e LEFT JOIN users u ON u.id = e.organizer_id LEFT JOIN programmes pr ON pr.id = e.programme_id';
+    if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
+    $sql .= ' ORDER BY e.date ASC';
+    $stmt = db()->prepare($sql);
+    $stmt->execute($params);
     json_response($stmt->fetchAll());
   }
   elseif ($path === '/events' && $method === 'POST') {
@@ -1527,7 +1534,13 @@ try {
   // --- FINANCE ---
   elseif ($path === '/finance' && $method === 'GET') {
     require_cap('finance.view');
-    $stmt = db()->prepare('SELECT f.*, u.name AS recorded_by_name, a.name AS approved_by_name,
+    $where = [];
+    $params = [];
+    if (!empty($_GET['budget_item_id'])) { $where[] = 'f.budget_item_id = ?'; $params[] = (int) $_GET['budget_item_id']; }
+    if (!empty($_GET['programme_id'])) { $where[] = 'f.programme_id = ?'; $params[] = (int) $_GET['programme_id']; }
+    if (!empty($_GET['event_id'])) { $where[] = 'f.event_id = ?'; $params[] = (int) $_GET['event_id']; }
+    if (!empty($_GET['project_id'])) { $where[] = 'f.project_id = ?'; $params[] = (int) $_GET['project_id']; }
+    $sql = 'SELECT f.*, u.name AS recorded_by_name, a.name AS approved_by_name,
       p.title AS programme_name, e.title AS event_name, pr.title AS project_name,
       bi.title AS budget_item_title
       FROM financial_records f
@@ -1536,19 +1549,27 @@ try {
       LEFT JOIN programmes p ON p.id = f.programme_id
       LEFT JOIN events e ON e.id = f.event_id
       LEFT JOIN projects pr ON pr.id = f.project_id
-      LEFT JOIN budget_items bi ON bi.id = f.budget_item_id
-      ORDER BY f.record_date DESC');
-    $stmt->execute();
+      LEFT JOIN budget_items bi ON bi.id = f.budget_item_id';
+    if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
+    $sql .= ' ORDER BY f.record_date DESC';
+    $stmt = db()->prepare($sql);
+    $stmt->execute($params);
     json_response($stmt->fetchAll());
   }
   elseif ($path === '/finance' && $method === 'POST') {
     $user = require_cap('finance.record');
     $data = input_json();
+    $validTypes = ['income','expense','commitment','payable','receivable'];
+    $validCats = ['programme','event','equipment','administration','communications','membership','outreach','donation','grant','sponsorship','training','publication','travel','utilities','other'];
+    if (empty($data['type']) || !in_array($data['type'], $validTypes)) json_error('Invalid type', 400);
+    if (!isset($data['amount']) || !is_numeric($data['amount']) || (float)$data['amount'] < 0) json_error('Amount must be a positive number', 400);
+    if (empty($data['record_date'])) json_error('Date is required', 400);
+    if (!empty($data['category']) && !in_array($data['category'], $validCats)) json_error('Invalid category', 400);
     db()->prepare('INSERT INTO financial_records (type, amount, category, programme_id, project_id, event_id, budget_item_id, description, recorded_by, record_date, due_date, status, attachment_url, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
       ->execute([
         $data['type'], $data['amount'], $data['category'] ?? 'other',
-        $data['programme_id'] ?? null, $data['project_id'] ?? null,
-        $data['event_id'] ?? null, $data['budget_item_id'] ?? null,
+        $data['programme_id'] ?: null, $data['project_id'] ?: null,
+        $data['event_id'] ?: null, $data['budget_item_id'] ?: null,
         $data['description'] ?? null, $user['id'], $data['record_date'],
         $data['due_date'] ?? null, $data['status'] ?? 'approved',
         $data['attachment_url'] ?? null, $data['notes'] ?? null
@@ -1556,6 +1577,40 @@ try {
     $id = (int) db()->lastInsertId();
     audit_log('finance_record', 'financial_record', $id);
     json_response(['id' => $id], 201);
+  }
+  elseif (preg_match('#^/finance/(\d+)$#', $path, $m) && $method === 'PUT') {
+    $user = require_cap('finance.record');
+    $id = (int) $m[1];
+    $data = input_json();
+    $validTypes = ['income','expense','commitment','payable','receivable'];
+    $validCats = ['programme','event','equipment','administration','communications','membership','outreach','donation','grant','sponsorship','training','publication','travel','utilities','other'];
+    $validStatuses = ['draft','pending','approved','paid','cancelled'];
+    $fields = [];
+    $params = [];
+    if (isset($data['type'])) { if (!in_array($data['type'], $validTypes)) json_error('Invalid type', 400); $fields[] = 'type = ?'; $params[] = $data['type']; }
+    if (isset($data['amount'])) { if (!is_numeric($data['amount'])) json_error('Invalid amount', 400); $fields[] = 'amount = ?'; $params[] = $data['amount']; }
+    if (isset($data['category'])) { if (!in_array($data['category'], $validCats)) json_error('Invalid category', 400); $fields[] = 'category = ?'; $params[] = $data['category']; }
+    if (isset($data['description'])) { $fields[] = 'description = ?'; $params[] = $data['description']; }
+    if (array_key_exists($data, 'programme_id') || array_key_exists('programme_id', $data)) { $fields[] = 'programme_id = ?'; $params[] = $data['programme_id'] ?: null; }
+    if (array_key_exists('project_id', $data)) { $fields[] = 'project_id = ?'; $params[] = $data['project_id'] ?: null; }
+    if (array_key_exists('event_id', $data)) { $fields[] = 'event_id = ?'; $params[] = $data['event_id'] ?: null; }
+    if (array_key_exists('budget_item_id', $data)) { $fields[] = 'budget_item_id = ?'; $params[] = $data['budget_item_id'] ?: null; }
+    if (isset($data['record_date'])) { $fields[] = 'record_date = ?'; $params[] = $data['record_date']; }
+    if (array_key_exists('due_date', $data)) { $fields[] = 'due_date = ?'; $params[] = $data['due_date'] ?: null; }
+    if (isset($data['status'])) { if (!in_array($data['status'], $validStatuses)) json_error('Invalid status', 400); $fields[] = 'status = ?'; $params[] = $data['status']; }
+    if (isset($data['notes'])) { $fields[] = 'notes = ?'; $params[] = $data['notes']; }
+    if (!$fields) json_error('No fields to update', 400);
+    $params[] = $id;
+    db()->prepare('UPDATE financial_records SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
+    audit_log('finance_update', 'financial_record', $id, ['by' => $user['id']]);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/finance/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    $user = require_cap('finance.record');
+    $id = (int) $m[1];
+    db()->prepare('UPDATE financial_records SET status = "cancelled" WHERE id = ? AND status != "cancelled"')->execute([$id]);
+    audit_log('finance_cancel', 'financial_record', $id, ['by' => $user['id']]);
+    json_response(['ok' => true]);
   }
 
   // --- FINANCE SUMMARY (authenticated) ---
@@ -1598,7 +1653,7 @@ try {
 
   // --- BUDGET ITEMS ---
   elseif ($path === '/budget-items' && $method === 'GET') {
-    require_login();
+    require_cap('finance.view');
     $stmt = db()->prepare('SELECT bi.*, p.title AS programme_name, e.title AS event_name, pr.title AS project_name,
       u.name AS created_by_name,
       (SELECT COALESCE(SUM(f.amount), 0) FROM financial_records f WHERE f.budget_item_id = bi.id AND f.type = "income" AND f.status != "cancelled") AS spent_income,
@@ -1615,12 +1670,15 @@ try {
   elseif ($path === '/budget-items' && $method === 'POST') {
     $user = require_cap('finance.record');
     $data = input_json();
+    if (empty($data['title'])) json_error('Title is required', 400);
+    if (empty($data['type']) || !in_array($data['type'], ['income','expense'])) json_error('Type must be income or expense', 400);
+    if (!isset($data['amount']) || !is_numeric($data['amount']) || (float)$data['amount'] <= 0) json_error('Amount must be a positive number', 400);
     db()->prepare('INSERT INTO budget_items (title, description, type, amount, category, programme_id, project_id, event_id, fiscal_year, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
       ->execute([
         $data['title'], $data['description'] ?? null, $data['type'],
         $data['amount'], $data['category'] ?? 'other',
-        $data['programme_id'] ?? null, $data['project_id'] ?? null,
-        $data['event_id'] ?? null, $data['fiscal_year'] ?? date('Y'),
+        $data['programme_id'] ?: null, $data['project_id'] ?: null,
+        $data['event_id'] ?: null, $data['fiscal_year'] ?? date('Y'),
         $data['status'] ?? 'draft', $user['id']
       ]);
     $id = (int) db()->lastInsertId();
@@ -1628,12 +1686,55 @@ try {
     json_response(['id' => $id], 201);
   }
   elseif (preg_match('#^/budget-items/(\d+)$#', $path, $m) && $method === 'GET') {
-    require_login();
-    $stmt = db()->prepare('SELECT bi.*, p.title AS programme_name, e.title AS event_name, pr.title AS project_name FROM budget_items bi LEFT JOIN programmes p ON p.id = bi.programme_id LEFT JOIN events e ON e.id = bi.event_id LEFT JOIN projects pr ON pr.id = bi.project_id WHERE bi.id = ?');
-    $stmt->execute([(int) $m[1]]);
+    require_cap('finance.view');
+    $id = (int) $m[1];
+    $stmt = db()->prepare('SELECT bi.*, p.title AS programme_name, e.title AS event_name, pr.title AS project_name,
+      u.name AS created_by_name,
+      (SELECT COALESCE(SUM(f.amount), 0) FROM financial_records f WHERE f.budget_item_id = bi.id AND f.type = "income" AND f.status != "cancelled") AS spent_income,
+      (SELECT COALESCE(SUM(f.amount), 0) FROM financial_records f WHERE f.budget_item_id = bi.id AND f.type = "expense" AND f.status != "cancelled") AS spent_expense
+      FROM budget_items bi
+      LEFT JOIN programmes p ON p.id = bi.programme_id
+      LEFT JOIN events e ON e.id = bi.event_id
+      LEFT JOIN projects pr ON pr.id = bi.project_id
+      LEFT JOIN users u ON u.id = bi.created_by
+      WHERE bi.id = ?');
+    $stmt->execute([$id]);
     $item = $stmt->fetch();
     if (!$item) json_error('Not found', 404);
+    $stmt = db()->prepare('SELECT f.*, u.name AS recorded_by_name FROM financial_records f JOIN users u ON u.id = f.recorded_by WHERE f.budget_item_id = ? ORDER BY f.record_date DESC');
+    $stmt->execute([$id]);
+    $item['transactions'] = $stmt->fetchAll();
     json_response($item);
+  }
+  elseif (preg_match('#^/budget-items/(\d+)$#', $path, $m) && $method === 'PUT') {
+    $user = require_cap('finance.record');
+    $id = (int) $m[1];
+    $data = input_json();
+    $validStatuses = ['draft','active','closed','cancelled'];
+    $fields = [];
+    $params = [];
+    if (isset($data['title'])) { if (empty($data['title'])) json_error('Title cannot be empty', 400); $fields[] = 'title = ?'; $params[] = $data['title']; }
+    if (isset($data['type'])) { if (!in_array($data['type'], ['income','expense'])) json_error('Invalid type', 400); $fields[] = 'type = ?'; $params[] = $data['type']; }
+    if (isset($data['amount'])) { if (!is_numeric($data['amount'])) json_error('Invalid amount', 400); $fields[] = 'amount = ?'; $params[] = $data['amount']; }
+    if (isset($data['category'])) { $fields[] = 'category = ?'; $params[] = $data['category']; }
+    if (isset($data['description'])) { $fields[] = 'description = ?'; $params[] = $data['description']; }
+    if (array_key_exists('programme_id', $data)) { $fields[] = 'programme_id = ?'; $params[] = $data['programme_id'] ?: null; }
+    if (array_key_exists('project_id', $data)) { $fields[] = 'project_id = ?'; $params[] = $data['project_id'] ?: null; }
+    if (array_key_exists('event_id', $data)) { $fields[] = 'event_id = ?'; $params[] = $data['event_id'] ?: null; }
+    if (isset($data['fiscal_year'])) { $fields[] = 'fiscal_year = ?'; $params[] = $data['fiscal_year']; }
+    if (isset($data['status'])) { if (!in_array($data['status'], $validStatuses)) json_error('Invalid status', 400); $fields[] = 'status = ?'; $params[] = $data['status']; }
+    if (!$fields) json_error('No fields to update', 400);
+    $params[] = $id;
+    db()->prepare('UPDATE budget_items SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
+    audit_log('budget_item_update', 'budget_item', $id, ['by' => $user['id']]);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/budget-items/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    $user = require_cap('finance.record');
+    $id = (int) $m[1];
+    db()->prepare('UPDATE budget_items SET status = "cancelled" WHERE id = ? AND status != "cancelled"')->execute([$id]);
+    audit_log('budget_item_cancel', 'budget_item', $id, ['by' => $user['id']]);
+    json_response(['ok' => true]);
   }
 
   // --- WORKING GROUPS ---

@@ -1376,13 +1376,17 @@
 
       const recentDiv = document.getElementById('financeRecent');
       if (fin.recent && fin.recent.length) {
+        const canEdit = api.hasCap('finance.record');
         recentDiv.innerHTML = fin.recent.map(r => `
           <div style="display:flex;justify-content:space-between;align-items:center;padding:0.65rem 0;border-bottom:1px solid var(--border);font-size:0.88rem">
             <div style="flex:1">
               <div style="font-weight:500">${esc(r.description || r.category)}</div>
-              <div class="text-dim text-sm">${r.record_date}</div>
+              <div class="text-dim text-sm">${r.record_date}${r.budget_item_title ? ' · ' + esc(r.budget_item_title) : ''}</div>
             </div>
-            <span style="font-weight:600;color:${r.type === 'income' ? 'var(--success)' : 'var(--danger)'}">${r.type === 'income' ? '+' : '-'}UGX ${Number(r.amount).toLocaleString()}</span>
+            <div style="display:flex;align-items:center;gap:0.5rem">
+              <span style="font-weight:600;color:${r.type === 'income' ? 'var(--success)' : 'var(--danger)'}">${r.type === 'income' ? '+' : '-'}UGX ${Number(r.amount).toLocaleString()}</span>
+              ${canEdit ? '<button class="btn btn-outline btn-xs" onclick="editTransaction(' + r.id + ')">Edit</button><button class="btn btn-outline btn-xs" onclick="deleteTransaction(' + r.id + ')" style="color:var(--danger)">Cancel</button>' : ''}
+            </div>
           </div>
         `).join('');
       } else {
@@ -2615,59 +2619,104 @@
       });
     }
 
-    async function showFinanceForm() {
+    async function showFinanceForm(editData) {
       const formId = 'form-finance';
+      const isEdit = !!editData;
       let progOpts = [{ label: '— None —', value: '' }];
-      let evtOpts = [{ label: '— None —', value: '' }];
+      let allEvts = [];
+      let projOpts = [{ label: '— None —', value: '' }];
+      let biOpts = [{ label: '— None —', value: '' }];
       try {
-        const [progs, evts] = await Promise.all([api.getProgrammes(), api.getEvents()]);
+        const [progs, evts, projs, bis] = await Promise.all([api.getProgrammes(), api.getEvents(), api.getProjects().catch(() => []), api.getBudgetItems().catch(() => [])]);
         progs.forEach(p => progOpts.push({ label: p.title, value: p.id }));
-        evts.forEach(e => evtOpts.push({ label: e.title, value: e.id }));
+        allEvts = evts;
+        projs.forEach(p => projOpts.push({ label: p.title, value: p.id }));
+        bis.forEach(b => biOpts.push({ label: b.title + ' (' + b.type + ')', value: b.id }));
       } catch(e) {}
+      const filterEvts = (progId) => {
+        const filtered = progId ? allEvts.filter(e => String(e.programme_id) === String(progId)) : allEvts;
+        return [{ label: '— None —', value: '' }].concat(filtered.map(e => ({ label: e.title, value: e.id })));
+      };
+      const evtOpts = filterEvts(editData?.programme_id || '');
+      const catOpts = [
+        { label: 'Donation', value: 'donation' },
+        { label: 'Grant', value: 'grant' },
+        { label: 'Membership Dues', value: 'membership' },
+        { label: 'Sponsorship', value: 'sponsorship' },
+        { label: 'Event Revenue', value: 'event' },
+        { label: 'Programme', value: 'programme' },
+        { label: 'Equipment', value: 'equipment' },
+        { label: 'Training', value: 'training' },
+        { label: 'Publication', value: 'publication' },
+        { label: 'Travel', value: 'travel' },
+        { label: 'Communications', value: 'communications' },
+        { label: 'Administration', value: 'administration' },
+        { label: 'Utilities', value: 'utilities' },
+        { label: 'Outreach', value: 'outreach' },
+        { label: 'Other', value: 'other' },
+      ];
       const fields = [
-        { name: 'type', label: 'Type', type: 'select', required: true, options: [
+        { name: 'type', label: 'Type', type: 'select', required: true, value: editData?.type || '', options: [
           { label: 'Income', value: 'income' },
           { label: 'Expense', value: 'expense' },
+          { label: 'Commitment', value: 'commitment' },
           { label: 'Payable (Bill to pay)', value: 'payable' },
           { label: 'Receivable (Expected income)', value: 'receivable' },
         ]},
-        { name: 'amount', label: 'Amount (UGX)', type: 'number', required: true, min: 0 },
-        { name: 'category', label: 'Category', type: 'select', required: true, options: [
-          { label: 'Donation', value: 'donation' },
-          { label: 'Grant', value: 'grant' },
-          { label: 'Membership Dues', value: 'membership' },
-          { label: 'Sponsorship', value: 'sponsorship' },
-          { label: 'Event Revenue', value: 'event' },
-          { label: 'Programme', value: 'programme' },
-          { label: 'Equipment', value: 'equipment' },
-          { label: 'Training', value: 'training' },
-          { label: 'Publication', value: 'publication' },
-          { label: 'Travel', value: 'travel' },
-          { label: 'Communications', value: 'communications' },
-          { label: 'Administration', value: 'administration' },
-          { label: 'Utilities', value: 'utilities' },
-          { label: 'Outreach', value: 'outreach' },
-          { label: 'Other', value: 'other' },
-        ]},
-        { name: 'description', label: 'Description', type: 'text', required: true, placeholder: 'Brief description' },
-        { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts },
-        { name: 'event_id', label: 'Event', type: 'select', options: evtOpts },
-        { name: 'record_date', label: 'Date', type: 'date', value: new Date().toISOString().split('T')[0] },
-        { name: 'due_date', label: 'Due Date', type: 'date', help: 'For payables/receivables' },
-        { name: 'status', label: 'Status', type: 'select', options: [
+        { name: 'amount', label: 'Amount (UGX)', type: 'number', required: true, min: 0, value: editData?.amount || '' },
+        { name: 'category', label: 'Category', type: 'select', required: true, value: editData?.category || 'other', options: catOpts },
+        { name: 'description', label: 'Description', type: 'text', required: true, placeholder: 'Brief description', value: editData?.description || '' },
+        { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts, value: editData?.programme_id || '' },
+        { name: 'event_id', label: 'Event', type: 'select', options: evtOpts, value: editData?.event_id || '' },
+        { name: 'project_id', label: 'Project', type: 'select', options: projOpts, value: editData?.project_id || '' },
+        { name: 'budget_item_id', label: 'Budget Item', type: 'select', options: biOpts, value: editData?.budget_item_id || '' },
+        { name: 'record_date', label: 'Date', type: 'date', value: editData?.record_date || new Date().toISOString().split('T')[0] },
+        { name: 'due_date', label: 'Due Date', type: 'date', help: 'For payables/receivables', value: editData?.due_date || '' },
+        { name: 'status', label: 'Status', type: 'select', value: editData?.status || 'approved', options: [
           { label: 'Approved', value: 'approved' },
           { label: 'Pending Approval', value: 'pending' },
           { label: 'Paid', value: 'paid' },
           { label: 'Draft', value: 'draft' },
         ]},
-        { name: 'notes', label: 'Notes', type: 'textarea', rows: 2 },
+        { name: 'notes', label: 'Notes', type: 'textarea', rows: 2, value: editData?.notes || '' },
       ];
-      openModal('Record Transaction', FormBuilder.render(fields, { id: formId, submitLabel: 'Record' }));
+      openModal(isEdit ? 'Edit Transaction' : 'Record Transaction', FormBuilder.render(fields, { id: formId, submitLabel: isEdit ? 'Save' : 'Record' }));
+      const progSel = document.getElementById(formId + '-programme_id');
+      if (progSel) {
+        progSel.addEventListener('change', () => {
+          const evSel = document.getElementById(formId + '-event_id');
+          if (!evSel) return;
+          const newOpts = filterEvts(progSel.value);
+          evSel.innerHTML = newOpts.map(o => '<option value="' + o.value + '">' + esc(o.label) + '</option>').join('');
+        });
+      }
       FormBuilder.init(formId, fields, async (data) => {
-        await api.recordFinance(data);
-        closeModal(); toast('Transaction recorded', 'success');
+        if (isEdit) {
+          await api.updateFinance(editData.id, data);
+          closeModal(); toast('Transaction updated', 'success');
+        } else {
+          await api.recordFinance(data);
+          closeModal(); toast('Transaction recorded', 'success');
+        }
         load();
       });
+    }
+
+    async function editTransaction(id) {
+      try {
+        const records = await api.getFinance();
+        const r = records.find(x => x.id === id);
+        if (r) showFinanceForm(r);
+      } catch(e) { toast('Failed to load transaction', 'error'); }
+    }
+
+    async function deleteTransaction(id) {
+      if (!confirm('Cancel this transaction?')) return;
+      try {
+        await api.deleteFinance(id);
+        toast('Transaction cancelled', 'success');
+        load();
+      } catch(e) { toast(e.error || 'Failed', 'error'); }
     }
 
     async function showUploadForm() {
@@ -2893,6 +2942,7 @@
             ${data.items.map(b => {
               const pct = b.amount > 0 ? Math.min(((b.type === 'income' ? b.spent_income : b.spent_expense) / b.amount) * 100, 100) : 0;
               const spent = b.type === 'income' ? b.spent_income : b.spent_expense;
+              const canEdit = api.hasCap('finance.record');
               return `
                 <div class="wg-card" style="margin-left:0.5rem;cursor:pointer" onclick="showItemDetail('budget_item',${b.id})">
                   <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -2906,6 +2956,7 @@
                     <div style="text-align:right">
                       <div style="font-weight:600;font-size:0.9rem">UGX ${Number(b.amount).toLocaleString()}</div>
                       <div class="text-sm text-dim">spent: UGX ${Number(spent).toLocaleString()}</div>
+                      ${canEdit ? '<div style="margin-top:0.3rem"><button class="btn btn-outline btn-xs" onclick="event.stopPropagation();editBudgetItem(' + b.id + ')">Edit</button> <button class="btn btn-outline btn-xs" onclick="event.stopPropagation();deleteBudgetItem(' + b.id + ')" style="color:var(--danger)">Cancel</button></div>' : ''}
                     </div>
                   </div>
                   <div class="budget-bar"><div class="budget-bar-fill ${b.type}" style="width:${pct}%"></div></div>
@@ -2944,8 +2995,10 @@
       }).join('');
     }
 
-    function showBudgetItemForm() {
-      openModal('Add Budget Line Item', `
+    function showBudgetItemForm(editData) {
+      const isEdit = !!editData;
+      const parentVal = editData?.programme_id ? 'programme:' + editData.programme_id : editData?.event_id ? 'event:' + editData.event_id : editData?.project_id ? 'project:' + editData.project_id : '';
+      openModal(isEdit ? 'Edit Budget Line Item' : 'Add Budget Line Item', `
         <div class="create-form" style="max-width:100%">
           <p class="text-dim text-sm" style="margin-bottom:1rem">This is a budget line item within a programme, event, or project.</p>
           <div class="form-group"><label class="form-label">Attached To *</label>
@@ -2956,34 +3009,48 @@
               <optgroup label="Project" id="biProjOpts"></optgroup>
             </select>
           </div>
-          <div class="form-group"><label class="form-label">Line Item Title *</label><input class="form-input" id="biTitle" placeholder="e.g. Telescope purchase, Venue hire, Printing"></div>
+          <div class="form-group"><label class="form-label">Line Item Title *</label><input class="form-input" id="biTitle" placeholder="e.g. Telescope purchase" value="${esc(editData?.title || '')}"></div>
           <div class="form-group"><label class="form-label">Type *</label>
-            <select class="form-select" id="biType"><option value="expense">Expense</option><option value="income">Income</option></select>
-          </div>
-          <div class="form-group"><label class="form-label">Amount (UGX) *</label><input type="number" class="form-input" id="biAmount"></div>
-          <div class="form-group"><label class="form-label">Category</label>
-            <select class="form-select" id="biCat">
-              <option value="equipment">Equipment</option>
-              <option value="training">Training</option>
-              <option value="event">Event</option>
-              <option value="travel">Travel</option>
-              <option value="publication">Publication</option>
-              <option value="communications">Communications</option>
-              <option value="administration">Administration</option>
-              <option value="programme">Programme</option>
-              <option value="outreach">Outreach</option>
-              <option value="other">Other</option>
+            <select class="form-select" id="biType">
+              <option value="expense" ${editData?.type === 'expense' ? 'selected' : ''}>Expense</option>
+              <option value="income" ${editData?.type === 'income' ? 'selected' : ''}>Income</option>
             </select>
           </div>
-          <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="biDesc"></div>
-          <div class="form-group"><label class="form-label">Fiscal Year</label><input type="number" class="form-input" id="biYear" value="${new Date().getFullYear()}"></div>
-          <button class="btn btn-primary" onclick="submitBudgetItem()">Add Line Item</button>
+          <div class="form-group"><label class="form-label">Amount (UGX) *</label><input type="number" class="form-input" id="biAmount" value="${editData?.amount || ''}"></div>
+          <div class="form-group"><label class="form-label">Category</label>
+            <select class="form-select" id="biCat">
+              <option value="donation" ${editData?.category === 'donation' ? 'selected' : ''}>Donation</option>
+              <option value="grant" ${editData?.category === 'grant' ? 'selected' : ''}>Grant</option>
+              <option value="membership" ${editData?.category === 'membership' ? 'selected' : ''}>Membership Dues</option>
+              <option value="sponsorship" ${editData?.category === 'sponsorship' ? 'selected' : ''}>Sponsorship</option>
+              <option value="equipment" ${editData?.category === 'equipment' ? 'selected' : ''}>Equipment</option>
+              <option value="training" ${editData?.category === 'training' ? 'selected' : ''}>Training</option>
+              <option value="event" ${editData?.category === 'event' ? 'selected' : ''}>Event</option>
+              <option value="travel" ${editData?.category === 'travel' ? 'selected' : ''}>Travel</option>
+              <option value="publication" ${editData?.category === 'publication' ? 'selected' : ''}>Publication</option>
+              <option value="communications" ${editData?.category === 'communications' ? 'selected' : ''}>Communications</option>
+              <option value="administration" ${editData?.category === 'administration' ? 'selected' : ''}>Administration</option>
+              <option value="programme" ${editData?.category === 'programme' ? 'selected' : ''}>Programme</option>
+              <option value="outreach" ${editData?.category === 'outreach' ? 'selected' : ''}>Outreach</option>
+              <option value="other" ${!editData || editData?.category === 'other' ? 'selected' : ''}>Other</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Status</label>
+            <select class="form-select" id="biStatus">
+              <option value="draft" ${editData?.status === 'draft' ? 'selected' : ''}>Draft</option>
+              <option value="active" ${(!editData || editData?.status === 'active') ? 'selected' : ''}>Active</option>
+              <option value="closed" ${editData?.status === 'closed' ? 'selected' : ''}>Closed</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="biDesc" value="${esc(editData?.description || '')}"></div>
+          <div class="form-group"><label class="form-label">Fiscal Year</label><input type="number" class="form-input" id="biYear" value="${editData?.fiscal_year || new Date().getFullYear()}"></div>
+          <button class="btn btn-primary" onclick="submitBudgetItem(${editData?.id || 'null'})">${isEdit ? 'Save' : 'Add Line Item'}</button>
         </div>
       `);
-      loadBudgetParentOptions();
+      loadBudgetParentOptions(parentVal);
     }
 
-    async function loadBudgetParentOptions() {
+    async function loadBudgetParentOptions(selectVal) {
       try {
         const [progs, evts, projs] = await Promise.all([
           api.getProgrammes().catch(() => []),
@@ -2993,29 +3060,56 @@
         const progOpts = document.getElementById('biProgOpts');
         const evtOpts = document.getElementById('biEvtOpts');
         const projOpts = document.getElementById('biProjOpts');
-        if (progOpts) progOpts.innerHTML = progs.map(p => `<option value="programme:${p.id}">${esc(p.title)}</option>`).join('') || '<option disabled>No programmes</option>';
-        if (evtOpts) evtOpts.innerHTML = evts.map(e => `<option value="event:${e.id}">${esc(e.title)}</option>`).join('') || '<option disabled>No events</option>';
-        if (projOpts) projOpts.innerHTML = projs.map(p => `<option value="project:${p.id}">${esc(p.title)}</option>`).join('') || '<option disabled>No projects</option>';
+        if (progOpts) progOpts.innerHTML = progs.map(p => `<option value="programme:${p.id}" ${selectVal === 'programme:' + p.id ? 'selected' : ''}>${esc(p.title)}</option>`).join('') || '<option disabled>No programmes</option>';
+        if (evtOpts) evtOpts.innerHTML = evts.map(e => `<option value="event:${e.id}" ${selectVal === 'event:' + e.id ? 'selected' : ''}>${esc(e.title)}</option>`).join('') || '<option disabled>No events</option>';
+        if (projOpts) projOpts.innerHTML = projs.map(p => `<option value="project:${p.id}" ${selectVal === 'project:' + p.id ? 'selected' : ''}>${esc(p.title)}</option>`).join('') || '<option disabled>No projects</option>';
       } catch(e) {}
     }
 
-    async function submitBudgetItem() {
+    async function submitBudgetItem(editId) {
       const parentVal = document.getElementById('biParent').value;
       if (!parentVal) return toast('Please select a programme, event, or project', 'warning');
+      const title = document.getElementById('biTitle').value.trim();
+      const amount = parseFloat(document.getElementById('biAmount').value);
+      if (!title) return toast('Title is required', 'warning');
+      if (!amount || amount <= 0) return toast('Amount must be a positive number', 'warning');
       const [parentType, parentId] = parentVal.split(':');
+      const data = {
+        title,
+        type: document.getElementById('biType').value,
+        amount,
+        category: document.getElementById('biCat').value,
+        description: document.getElementById('biDesc').value,
+        fiscal_year: document.getElementById('biYear').value,
+        status: document.getElementById('biStatus').value,
+        programme_id: parentType === 'programme' ? parseInt(parentId) : null,
+        event_id: parentType === 'event' ? parseInt(parentId) : null,
+        project_id: parentType === 'project' ? parseInt(parentId) : null,
+      };
       try {
-        await api.createBudgetItem({
-          title: document.getElementById('biTitle').value,
-          type: document.getElementById('biType').value,
-          amount: parseFloat(document.getElementById('biAmount').value),
-          category: document.getElementById('biCat').value,
-          description: document.getElementById('biDesc').value,
-          fiscal_year: document.getElementById('biYear').value,
-          programme_id: parentType === 'programme' ? parseInt(parentId) : null,
-          event_id: parentType === 'event' ? parseInt(parentId) : null,
-          project_id: parentType === 'project' ? parseInt(parentId) : null,
-        });
-        closeModal(); toast('Budget item created', 'success');
+        if (editId) {
+          await api.updateBudgetItem(editId, data);
+          closeModal(); toast('Budget item updated', 'success');
+        } else {
+          await api.createBudgetItem(data);
+          closeModal(); toast('Budget item created', 'success');
+        }
+        load();
+      } catch(e) { toast(e.error || 'Failed', 'error'); }
+    }
+
+    async function editBudgetItem(id) {
+      try {
+        const item = await api.getBudgetItem(id);
+        showBudgetItemForm(item);
+      } catch(e) { toast('Failed to load budget item', 'error'); }
+    }
+
+    async function deleteBudgetItem(id) {
+      if (!confirm('Cancel this budget item?')) return;
+      try {
+        await api.deleteBudgetItem(id);
+        toast('Budget item cancelled', 'success');
         load();
       } catch(e) { toast(e.error || 'Failed', 'error'); }
     }

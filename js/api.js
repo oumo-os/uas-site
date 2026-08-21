@@ -219,13 +219,17 @@ const api = {
   },
 
   // Finance
-  async getFinance() { return this.request('/finance'); },
+  async getFinance(params) { const qs = params ? '?' + new URLSearchParams(params).toString() : ''; return this.request('/finance' + qs); },
   async recordFinance(data) { return this.request('/finance', { method: 'POST', body: data }); },
+  async updateFinance(id, data) { return this.request('/finance/' + id, { method: 'PUT', body: data }); },
+  async deleteFinance(id) { return this.request('/finance/' + id, { method: 'DELETE' }); },
 
   // Budget Items
   async getBudgetItems() { return this.request('/budget-items'); },
   async getBudgetItem(id) { return this.request('/budget-items/' + id); },
   async createBudgetItem(data) { return this.request('/budget-items', { method: 'POST', body: data }); },
+  async updateBudgetItem(id, data) { return this.request('/budget-items/' + id, { method: 'PUT', body: data }); },
+  async deleteBudgetItem(id) { return this.request('/budget-items/' + id, { method: 'DELETE' }); },
 
   // Working Groups
   async getWorkingGroups() { return this.request('/working-groups'); },
