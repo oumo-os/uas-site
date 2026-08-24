@@ -883,6 +883,24 @@ try {
     json_response(['ok' => true, 'created' => $created, 'skipped' => $skipped]);
   }
 
+  // --- OUTSTANDING RECEIVABLES (for linking transactions) ---
+  elseif ($path === '/receivables/outstanding' && $method === 'GET') {
+    require_cap('finance.record');
+    $stmt = db()->prepare('SELECT f.id AS finance_record_id, f.amount, f.description, f.record_date, f.due_date,
+      f.member_id, m.user_id, u.name AS member_name, u.email AS member_email,
+      md.id AS dues_id, md.period_year, md.amount_owed, md.amount_paid,
+      r.title AS class_title
+      FROM financial_records f
+      JOIN members m ON m.id = f.member_id
+      JOIN users u ON u.id = m.user_id
+      LEFT JOIN membership_dues md ON md.receivable_record_id = f.id
+      LEFT JOIN roles r ON r.id = md.role_id
+      WHERE f.type = "receivable" AND f.status = "pending"
+      ORDER BY f.due_date ASC, u.name ASC');
+    $stmt->execute();
+    json_response($stmt->fetchAll());
+  }
+
   // --- MEMBER STATEMENT ---
   elseif (preg_match('#^/members/(\d+)/statement$#', $path, $m) && $method === 'GET') {
     require_login();

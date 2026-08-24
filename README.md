@@ -110,6 +110,7 @@ All requests go through `api/index.php?route=...` or rewrite to `/api/...`
 - `GET/POST /resolutions/:id/comments` — Resolution discussion threads
 - `GET/POST /budget-items` — Budget items (finance.view); `GET /budget-items/:id`
 - `GET/POST /dues-schedule` — Dues rates per class per year; `POST /dues-schedule/generate` — generate dues records from schedule
+- `GET /receivables/outstanding` — Outstanding receivables for linking income transactions (finance.record)
 - `GET /members/:id/statement` — Member financial statement with running balance
 - `GET/POST /working-groups`, `GET/POST /working-groups/:id/members` — Committees & task forces
 - `GET/POST /backups` — List / create database backups; `GET /backups/:file/download`, `DELETE /backups/:file` (admin.system)

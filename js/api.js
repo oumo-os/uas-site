@@ -136,6 +136,7 @@ const api = {
   async getDuesSchedule(year) { const qs = year ? '?year=' + year : ''; return this.request('/dues-schedule' + qs); },
   async setDuesSchedule(roleId, amount, year, description) { return this.request('/dues-schedule', { method: 'POST', body: { role_id: roleId, amount, period_year: year, description } }); },
   async generateDuesRecords(year) { return this.request('/dues-schedule/generate', { method: 'POST', body: { year } }); },
+  async getOutstandingReceivables() { return this.request('/receivables/outstanding'); },
 
   // RBAC Audit
   async getRbacAudit() { return this.request('/admin/rbac-audit'); },

@@ -2927,6 +2927,44 @@
         { name: 'notes', label: 'Notes', type: 'textarea', rows: 2, value: editData?.notes || '' },
       ];
       openModal(isEdit ? 'Edit Transaction' : 'Record Transaction', FormBuilder.render(fields, { id: formId, submitLabel: isEdit ? 'Save' : 'Record' }));
+      // --- Receivable linking (custom element injected after FormBuilder renders) ---
+      const receivableHtml = '<div id="receivableLinkWrap" style="display:none;margin-top:0.75rem;padding:0.75rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle)"><label class="form-label">Link to Outstanding Receivable</label><select id="form-finance-receivable_link" class="form-select" style="width:100%"><option value="">— None (manual entry) —</option></select><div id="receivableLinkInfo" class="text-dim" style="font-size:0.8rem;margin-top:0.4rem"></div></div>';
+      const formEl = document.getElementById(formId);
+      if (formEl) formEl.insertAdjacentHTML('beforeend', receivableHtml);
+      // Load outstanding receivables
+      let outstandingReceivables = [];
+      api.getOutstandingReceivables().then(list => {
+        outstandingReceivables = list || [];
+        const sel = document.getElementById('form-finance-receivable_link');
+        if (!sel || !outstandingReceivables.length) return;
+        sel.innerHTML = '<option value="">— None (manual entry) —</option>' + outstandingReceivables.map(r => '<option value="' + r.finance_record_id + '">' + esc(r.member_name) + ' — ' + esc(r.class_title || 'Dues') + ' ' + esc(r.period_year || '') + ' (UGX ' + Number(r.amount).toLocaleString() + ')</option>').join('');
+      }).catch(() => {});
+      // Show/hide receivable link based on type
+      const typeSel = document.getElementById(formId + '-type');
+      const wrap = document.getElementById('receivableLinkWrap');
+      function toggleReceivableLink() {
+        if (wrap) wrap.style.display = typeSel && typeSel.value === 'income' ? '' : 'none';
+      }
+      if (typeSel) typeSel.addEventListener('change', toggleReceivableLink);
+      toggleReceivableLink();
+      // Auto-fill when receivable selected
+      const rcvSel = document.getElementById('form-finance-receivable_link');
+      if (rcvSel) rcvSel.addEventListener('change', () => {
+        const id = parseInt(rcvSel.value);
+        const info = document.getElementById('receivableLinkInfo');
+        if (!id) { if (info) info.textContent = ''; return; }
+        const r = outstandingReceivables.find(x => x.finance_record_id === id);
+        if (!r) return;
+        // Auto-fill fields
+        const amtEl = document.getElementById(formId + '-amount');
+        const descEl = document.getElementById(formId + '-description');
+        const catEl = document.getElementById(formId + '-category');
+        if (amtEl) amtEl.value = r.amount;
+        if (descEl) descEl.value = r.member_name + ' — ' + (r.class_title || 'Dues') + ' ' + (r.period_year || '') + ' payment';
+        if (catEl) catEl.value = 'membership';
+        if (info) info.textContent = 'Will mark dues as paid for ' + esc(r.member_name) + ' (UGX ' + Number(r.amount).toLocaleString() + ')';
+      });
+      // --- End receivable linking ---
       const progSel = document.getElementById(formId + '-programme_id');
       if (progSel) {
         progSel.addEventListener('change', () => {
@@ -2937,11 +2975,21 @@
         });
       }
       FormBuilder.init(formId, fields, async (data) => {
+        // If receivable link selected, include it
+        const rcvLink = document.getElementById('form-finance-receivable_link');
+        const receivableId = rcvLink ? parseInt(rcvLink.value) : 0;
         if (isEdit) {
           await api.updateFinance(editData.id, data);
           closeModal(); toast('Transaction updated', 'success');
         } else {
-          await api.recordFinance(data);
+          const result = await api.recordFinance(data);
+          // Link to receivable if selected
+          if (receivableId && result && result.id) {
+            const r = outstandingReceivables.find(x => x.finance_record_id === receivableId);
+            if (r && r.dues_id && r.user_id) {
+              try { await api.payDues(r.user_id, r.dues_id, { amount: data.amount }); } catch(e) {}
+            }
+          }
           closeModal(); toast('Transaction recorded', 'success');
         }
         load();
