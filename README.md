@@ -48,7 +48,9 @@ Administration Layer → Backups, config, security, maintenance
 - **Meetings**: Board/general/committee meetings with agenda, scheduled time, attendance records (attended/absent/excused/apology), posted minutes, and decisions that generate assignments with notifications
 - **Polls**: Governance or consultation polls with eligibility rules (all / members / specific group / specific role), quorum, deadlines, anonymous voting, one-vote-per-user, tally bars, and close/resolve with tie and quorum handling; open polls surface in Pending Items
 - **Programme Teams**: Programme members with roles, plus free-form outputs per programme (member-only visibility, managed by programme leads)
-- **Financial Snapshot**: Dashboard and finance summary show income, expenses, committed funds and available balance
+- **Financial Snapshot**: Dashboard and finance summary show income, expenses, committed funds, receivables, payables, and available balance with per-group breakdown
+- **Dues Schedule**: Configurable per-class annual dues rates; one-click generation of dues records for all active members; auto-creates linked receivable entries in finance; payment auto-creates income entries
+- **Member Statement**: Ledger-style running balance showing all financial activity (dues charges, payments) with running balance per transaction
 - **Photo Gallery**: Knowledge Base gallery fed from published articles with images (`/public/gallery`)
 - **News & External Feeds**: News page combining official UAS announcements (published `announcement` articles) with curated external astronomy resources (`/public/news`)
 - **Delegation / Proxy Voting**: Members delegate their resolution and/or poll votes to a trusted peer (scope: `all` | `resolutions` | `polls`); delegatee votes are cast on the delegator's behalf (`delegated_for`), one-vote-per-user enforced, delegations auto-revoked when either side loses the voting right
@@ -107,6 +109,8 @@ All requests go through `api/index.php?route=...` or rewrite to `/api/...`
 - `GET /notifications` — My notifications (unread first); `POST /notifications/read-all`, `POST /notifications/:id/read`
 - `GET/POST /resolutions/:id/comments` — Resolution discussion threads
 - `GET/POST /budget-items` — Budget items (finance.view); `GET /budget-items/:id`
+- `GET/POST /dues-schedule` — Dues rates per class per year; `POST /dues-schedule/generate` — generate dues records from schedule
+- `GET /members/:id/statement` — Member financial statement with running balance
 - `GET/POST /working-groups`, `GET/POST /working-groups/:id/members` — Committees & task forces
 - `GET/POST /backups` — List / create database backups; `GET /backups/:file/download`, `DELETE /backups/:file` (admin.system)
 - `GET/POST /meetings`, `GET/PUT /meetings/:id` — Meetings list/create/update

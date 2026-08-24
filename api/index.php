@@ -748,23 +748,35 @@ try {
     $memberId = (int) $m[1];
     $duesId = (int) $m[2];
     $data = input_json();
-    $stmt = db()->prepare('SELECT id, member_id, status FROM membership_dues WHERE id = ? AND member_id = ?');
+    $stmt = db()->prepare('SELECT md.*, m.user_id FROM membership_dues md JOIN members m ON m.id = md.member_id WHERE md.id = ? AND md.member_id = ?');
     $stmt->execute([$duesId, $memberId]);
     $dues = $stmt->fetch();
     if (!$dues) json_error('Dues record not found', 404);
     if ($dues['status'] === 'paid') json_error('Already paid', 400);
-    $amount = (float) ($data['amount'] ?? 0);
+    $amount = (float) ($data['amount'] ?? $dues['amount_owed']);
     $notes = $data['notes'] ?? null;
-    db()->prepare('UPDATE membership_dues SET status = "paid", amount_paid = ?, paid_date = CURDATE(), notes = COALESCE(?, notes) WHERE id = ?')
-      ->execute([$amount, $notes, $duesId]);
+    // Create income financial record linked to this member
+    $classTitle = '';
+    if ($dues['role_id']) {
+      $crs = db()->prepare('SELECT title FROM roles WHERE id = ?');
+      $crs->execute([$dues['role_id']]);
+      $classTitle = $crs->fetchColumn() ?: '';
+    }
+    db()->prepare('INSERT INTO financial_records (type, amount, category, description, member_id, record_date, status, recorded_by)
+      VALUES ("income", ?, "membership", ?, ?, ?, "approved", ?)')
+      ->execute([$amount, $classTitle . ' dues payment ' . $dues['period_year'], $memberId, date('Y-m-d'), $user['id']]);
+    $paymentFrId = (int) db()->lastInsertId();
+    // Update dues record
+    db()->prepare('UPDATE membership_dues SET status = "paid", amount_paid = ?, paid_date = CURDATE(), notes = COALESCE(?, notes), payment_record_id = ? WHERE id = ?')
+      ->execute([$amount, $notes, $paymentFrId, $duesId]);
     // Check if all dues are now paid → restore good standing
     $stmt = db()->prepare('SELECT id FROM membership_dues WHERE member_id = ? AND status IN ("pending","overdue")');
     $stmt->execute([$memberId]);
     if (!$stmt->fetch()) {
       db()->prepare('UPDATE members SET standing = "good_standing" WHERE id = ? AND standing = "restricted"')->execute([$memberId]);
     }
-    audit_log('dues_paid', 'member', $memberId, ['dues_id' => $duesId, 'amount' => $amount]);
-    json_response(['ok' => true]);
+    audit_log('dues_paid', 'member', $memberId, ['dues_id' => $duesId, 'amount' => $amount, 'finance_record_id' => $paymentFrId]);
+    json_response(['ok' => true, 'finance_record_id' => $paymentFrId]);
   }
 
   // --- CHECK ALL MEMBER STANDINGS ---
@@ -783,6 +795,123 @@ try {
     )");
     audit_log('check_standings', 'member', 0, ['flagged' => count($flagged)]);
     json_response(['ok' => true, 'flagged' => $flagged]);
+  }
+
+  // --- DUES SCHEDULE ---
+  elseif ($path === '/dues-schedule' && $method === 'GET') {
+    require_cap('members.manage');
+    $year = $_GET['year'] ?? date('Y');
+    try {
+      $stmt = db()->prepare('SELECT ds.*, r.title AS class_title, u.name AS created_by_name
+        FROM dues_schedule ds
+        JOIN roles r ON r.id = ds.role_id
+        LEFT JOIN users u ON u.id = ds.created_by
+        WHERE ds.period_year = ?
+        ORDER BY r.title');
+      $stmt->execute([(int)$year]);
+      json_response($stmt->fetchAll());
+    } catch (Exception $e) {
+      json_response([]);
+    }
+  }
+  elseif ($path === '/dues-schedule' && $method === 'POST') {
+    $user = require_cap('members.manage');
+    $data = input_json();
+    if (empty($data['role_id'])) json_error('role_id is required', 400);
+    if (!isset($data['amount']) || !is_numeric($data['amount']) || (float)$data['amount'] < 0) json_error('Amount must be a positive number', 400);
+    if (empty($data['period_year'])) json_error('period_year is required', 400);
+    $roleId = (int) $data['role_id'];
+    $amount = (float) $data['amount'];
+    $year = (int) $data['period_year'];
+    $desc = $data['description'] ?? null;
+    // Upsert the rate
+    db()->prepare('INSERT INTO dues_schedule (role_id, amount, period_year, description, created_by)
+      VALUES (?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE amount = VALUES(amount), description = VALUES(description)')
+      ->execute([$roleId, $amount, $year, $desc, $user['id']]);
+    $scheduleId = (int) db()->lastInsertId();
+    if (!$scheduleId) {
+      // On duplicate key update, lastInsertId may be 0 — fetch the existing id
+      $stmt = db()->prepare('SELECT id FROM dues_schedule WHERE role_id = ? AND period_year = ?');
+      $stmt->execute([$roleId, $year]);
+      $scheduleId = (int) $stmt->fetchColumn();
+    }
+    audit_log('dues_schedule_set', 'dues_schedule', $scheduleId, ['role_id' => $roleId, 'amount' => $amount, 'year' => $year]);
+    json_response(['id' => $scheduleId, 'ok' => true], 201);
+  }
+  elseif ($path === '/dues-schedule/generate' && $method === 'POST') {
+    $user = require_cap('members.manage');
+    $data = input_json();
+    $year = (int) ($data['year'] ?? date('Y'));
+    // Get all active rates for this year
+    $stmt = db()->prepare('SELECT ds.*, r.title AS class_title FROM dues_schedule ds JOIN roles r ON r.id = ds.role_id WHERE ds.period_year = ?');
+    $stmt->execute([$year]);
+    $rates = $stmt->fetchAll();
+    if (!$rates) json_error('No dues rates defined for ' . $year, 400);
+    $created = 0; $skipped = 0;
+    foreach ($rates as $rate) {
+      // Find all active members with this class role
+      $stmt = db()->prepare('SELECT ra.user_id FROM role_assignments ra WHERE ra.role_id = ? AND ra.status = "active"');
+      $stmt->execute([$rate['role_id']]);
+      $memberUserIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+      foreach ($memberUserIds as $userId) {
+        // Get member id
+        $stmt = db()->prepare('SELECT id FROM members WHERE user_id = ?');
+        $stmt->execute([$userId]);
+        $memberId = (int) $stmt->fetchColumn();
+        if (!$memberId) continue;
+        // Check if dues record already exists
+        $stmt = db()->prepare('SELECT id FROM membership_dues WHERE member_id = ? AND period_year = ?');
+        $stmt->execute([$memberId, $year]);
+        if ($stmt->fetch()) { $skipped++; continue; }
+        // Create dues record
+        db()->prepare('INSERT INTO membership_dues (member_id, role_id, period_year, amount_owed, due_date, recorded_by, status)
+          VALUES (?, ?, ?, ?, ?, ?, "pending")')
+          ->execute([$memberId, $rate['role_id'], $year, $rate['amount'], $year . '-12-31', $user['id']]);
+        $duesId = (int) db()->lastInsertId();
+        // Create receivable financial record
+        db()->prepare('INSERT INTO financial_records (type, amount, category, description, member_id, record_date, due_date, status, recorded_by)
+          VALUES ("receivable", ?, "membership", ?, ?, ?, ?, "pending", ?)')
+          ->execute([$rate['amount'], $rate['class_title'] . ' dues ' . $year, $memberId, date('Y-m-d'), $year . '-12-31', $user['id']]);
+        $frId = (int) db()->lastInsertId();
+        // Link back to dues record
+        db()->prepare('UPDATE membership_dues SET receivable_record_id = ? WHERE id = ?')->execute([$frId, $duesId]);
+        $created++;
+      }
+    }
+    audit_log('dues_generate', 'dues_schedule', 0, ['year' => $year, 'created' => $created, 'skipped' => $skipped]);
+    json_response(['ok' => true, 'created' => $created, 'skipped' => $skipped]);
+  }
+
+  // --- MEMBER STATEMENT ---
+  elseif (preg_match('#^/members/(\d+)/statement$#', $path, $m) && $method === 'GET') {
+    require_login();
+    $memberUserId = (int) $m[1];
+    // Only allow viewing own statement or members.manage
+    $self = current_user_id();
+    if ($self !== $memberUserId && !user_has_cap($self, 'members.manage')) json_error('Forbidden', 403);
+    $stmt = db()->prepare('SELECT id FROM members WHERE user_id = ?');
+    $stmt->execute([$memberUserId]);
+    $memberId = (int) $stmt->fetchColumn();
+    if (!$memberId) json_error('Member not found', 404);
+    // Get all financial records linked to this member
+    $stmt = db()->prepare('SELECT f.*, u.name AS recorded_by_name
+      FROM financial_records f
+      LEFT JOIN users u ON u.id = f.recorded_by
+      WHERE f.member_id = ? AND f.status != "cancelled"
+      ORDER BY f.record_date ASC, f.id ASC');
+    $stmt->execute([$memberId]);
+    $records = $stmt->fetchAll();
+    // Compute running balance
+    $balance = 0;
+    foreach ($records as &$r) {
+      if ($r['type'] === 'income') $balance += (float) $r['amount'];
+      elseif ($r['type'] === 'expense') $balance -= (float) $r['amount'];
+      elseif ($r['type'] === 'receivable') $balance -= (float) $r['amount'];
+      elseif ($r['type'] === 'payable') $balance += (float) $r['amount'];
+      $r['running_balance'] = $balance;
+    }
+    json_response(['records' => $records, 'balance' => $balance]);
   }
 
   // --- MEMBER CSV IMPORT ---
@@ -1633,6 +1762,14 @@ try {
     $byType = [];
     foreach ($stmt->fetchAll() as $row) $byType[$row['type']] = (float) $row['total'];
 
+    $stmt = db()->prepare('SELECT COUNT(*) as cnt, COALESCE(SUM(amount),0) as total FROM financial_records WHERE status != "cancelled" AND type = "receivable"' . $dateFilter);
+    $stmt->execute($dateParams);
+    $receivableInfo = $stmt->fetch();
+
+    $stmt = db()->prepare('SELECT COUNT(*) as cnt, COALESCE(SUM(amount),0) as total FROM financial_records WHERE status != "cancelled" AND type = "payable"' . $dateFilter);
+    $stmt->execute($dateParams);
+    $payableInfo = $stmt->fetch();
+
     $groupQueries = [
       'category' => 'SELECT category AS group_name, type, SUM(amount) AS total FROM financial_records WHERE status != "cancelled"' . $dateFilter . ' GROUP BY category, type ORDER BY category',
       'programme' => 'SELECT COALESCE(p.title, \'Unassigned\') AS group_name, f.type, SUM(f.amount) AS total FROM financial_records f LEFT JOIN programmes p ON p.id = f.programme_id WHERE f.status != "cancelled"' . $dateFilter . ' GROUP BY group_name, f.type ORDER BY group_name',
@@ -1651,6 +1788,10 @@ try {
       'income' => $byType['income'] ?? 0,
       'expense' => $byType['expense'] ?? 0,
       'commitment' => $byType['commitment'] ?? 0,
+      'receivable' => $byType['receivable'] ?? 0,
+      'payable' => $byType['payable'] ?? 0,
+      'receivable_count' => (int) ($receivableInfo['cnt'] ?? 0),
+      'payable_count' => (int) ($payableInfo['cnt'] ?? 0),
       'available' => ($byType['income'] ?? 0) - ($byType['expense'] ?? 0) - ($byType['commitment'] ?? 0),
       'by_group' => $byGroup,
       'group_by' => $groupBy,
@@ -2306,12 +2447,27 @@ try {
   }
   // --- PUBLIC DUES RATES --- for join page to display pricing
   elseif ($path === '/public/dues-rates' && $method === 'GET') {
+    $year = (int) date('Y');
     $stmt = db()->prepare('SELECT r.title AS class_title, r.id AS role_id,
-      (SELECT md.amount_owed FROM membership_dues md WHERE md.role_id = r.id AND md.status != "cancelled" ORDER BY md.period_year DESC LIMIT 1) AS amount,
-      (SELECT md.period_year FROM membership_dues md WHERE md.role_id = r.id AND md.status != "cancelled" ORDER BY md.period_year DESC LIMIT 1) AS period_year
-      FROM roles r WHERE r.role_type = "member_class" AND r.status = "active" ORDER BY r.title');
-    $stmt->execute();
-    json_response($stmt->fetchAll());
+      ds.amount, ds.period_year
+      FROM roles r
+      LEFT JOIN dues_schedule ds ON ds.role_id = r.id AND ds.period_year = ?
+      WHERE r.role_type = "member_class" AND r.status = "active"
+      ORDER BY r.title');
+    $stmt->execute([$year]);
+    $results = $stmt->fetchAll();
+    // If no schedule entries for current year, fall back to latest membership_dues
+    $hasSchedule = false;
+    foreach ($results as $row) { if ($row['amount'] !== null) { $hasSchedule = true; break; } }
+    if (!$hasSchedule) {
+      $stmt = db()->prepare('SELECT r.title AS class_title, r.id AS role_id,
+        (SELECT md.amount_owed FROM membership_dues md WHERE md.role_id = r.id AND md.status != "cancelled" ORDER BY md.period_year DESC LIMIT 1) AS amount,
+        (SELECT md.period_year FROM membership_dues md WHERE md.role_id = r.id AND md.status != "cancelled" ORDER BY md.period_year DESC LIMIT 1) AS period_year
+        FROM roles r WHERE r.role_type = "member_class" AND r.status = "active" ORDER BY r.title');
+      $stmt->execute();
+      $results = $stmt->fetchAll();
+    }
+    json_response($results);
   }
   // --- MEMBER DOCUMENTS (internal + public for logged-in users) ---
   elseif ($path === '/member/documents' && $method === 'GET') {

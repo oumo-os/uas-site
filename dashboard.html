@@ -768,6 +768,7 @@
       <div class="section-header">
         <h3>Members</h3>
         <div style="display:flex;gap:0.4rem">
+          <button class="btn btn-primary btn-sm" onclick="document.querySelector('[data-mtab=dues]').click()" id="duesRatesBtn" style="display:none">Dues Rates</button>
           <button class="btn btn-outline btn-sm" onclick="checkStandings()" id="checkStandingsBtn" style="display:none">Check Standings</button>
           <button class="btn btn-outline btn-sm" onclick="exportMembersCSV()">Export CSV</button>
         </div>
@@ -1391,7 +1392,7 @@
       try { const fin = await api.getFinanceSummary(finCurrentGroup, getFinDateParams()); renderFinance(fin); } catch(e) { toast('Failed to load', 'error'); }
     }
     function renderFinance(fin) {
-      if (!fin || (fin.income === 0 && fin.expense === 0)) {
+      if (!fin || (fin.income === 0 && fin.expense === 0 && fin.receivable === 0 && fin.payable === 0)) {
         document.getElementById('financeStatGrid').innerHTML = '<div class="empty-state"><h4>No financial records</h4><p>Record your first income or expense to start tracking finances.</p>' + (api.hasCap('finance.record') ? '<button class="btn btn-primary btn-sm" onclick="showFinanceForm()">Record Transaction</button>' : '') + '</div>';
         document.getElementById('financeBreakdown').innerHTML = '';
         document.getElementById('financeRecent').innerHTML = '';
@@ -1419,6 +1420,16 @@
           <div class="stat-value">UGX ${(fin.available !== undefined ? fin.available : fin.balance).toLocaleString()}</div>
           <div class="stat-label">Available Balance</div>
         </div>
+        <div class="stat-card pending">
+          <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span></div>
+          <div class="stat-value" style="color:var(--gold)">UGX ${(fin.receivable || 0).toLocaleString()}</div>
+          <div class="stat-label">Receivable (${fin.receivable_count || 0} pending)</div>
+        </div>
+        <div class="stat-card pending">
+          <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span></div>
+          <div class="stat-value" style="color:var(--info)">UGX ${(fin.payable || 0).toLocaleString()}</div>
+          <div class="stat-label">Payable (${fin.payable_count || 0} pending)</div>
+        </div>
       `;
 
       finCurrentGroup = fin.group_by || 'category';
@@ -1427,18 +1438,24 @@
       const recentDiv = document.getElementById('financeRecent');
       if (fin.recent && fin.recent.length) {
         const canEdit = api.hasCap('finance.record');
-        recentDiv.innerHTML = fin.recent.map(r => `
+        const typeColors = { income: 'var(--success)', expense: 'var(--danger)', receivable: 'var(--gold)', payable: 'var(--info)' };
+        recentDiv.innerHTML = fin.recent.map(r => {
+          const color = typeColors[r.type] || 'var(--text)';
+          const prefix = r.type === 'income' || r.type === 'payable' ? '+' : '-';
+          const label = r.type.charAt(0).toUpperCase() + r.type.slice(1);
+          return `
           <div style="display:flex;justify-content:space-between;align-items:center;padding:0.65rem 0;border-bottom:1px solid var(--border);font-size:0.88rem">
             <div style="flex:1">
               <div style="font-weight:500">${esc(r.description || r.category)}</div>
               <div class="text-dim text-sm">${r.record_date}${r.budget_item_title ? ' · ' + esc(r.budget_item_title) : ''}</div>
             </div>
             <div style="display:flex;align-items:center;gap:0.5rem">
-              <span style="font-weight:600;color:${r.type === 'income' ? 'var(--success)' : 'var(--danger)'}">${r.type === 'income' ? '+' : '-'}UGX ${Number(r.amount).toLocaleString()}</span>
+              <span style="color:${color};font-size:0.75rem;text-transform:uppercase;font-weight:500">${label}</span>
+              <span style="font-weight:600;color:${color}">${prefix}UGX ${Number(r.amount).toLocaleString()}</span>
               ${canEdit ? '<button class="btn btn-outline btn-xs" onclick="editTransaction(' + r.id + ')">Edit</button><button class="btn btn-outline btn-xs" onclick="deleteTransaction(' + r.id + ')" style="color:var(--danger)">Cancel</button>' : ''}
             </div>
-          </div>
-        `).join('');
+          </div>`;
+        }).join('');
       } else {
         recentDiv.innerHTML = '<div class="empty-state"><p>No recent transactions</p></div>';
       }
@@ -1449,25 +1466,27 @@
       if (!rows.length) { div.innerHTML = '<div class="empty-state"><p>No data yet</p></div>'; return; }
       const groups = {};
       rows.forEach(r => {
-        if (!groups[r.group_name]) groups[r.group_name] = { income: 0, expense: 0 };
+        if (!groups[r.group_name]) groups[r.group_name] = { income: 0, expense: 0, receivable: 0, payable: 0 };
         groups[r.group_name][r.type] = parseFloat(r.total);
       });
-      let totIncome = 0, totExpense = 0;
+      let totIncome = 0, totExpense = 0, totReceivable = 0, totPayable = 0;
       const rowsHtml = Object.entries(groups).map(([name, v]) => {
-        totIncome += v.income; totExpense += v.expense;
+        totIncome += v.income; totExpense += v.expense; totReceivable += v.receivable; totPayable += v.payable;
         const net = v.income - v.expense;
         return `<tr>
           <td>${esc(name)}</td>
           <td style="color:var(--success)">${v.income ? '+' + v.income.toLocaleString() : '—'}</td>
           <td style="color:var(--danger)">${v.expense ? '-' + v.expense.toLocaleString() : '—'}</td>
+          <td style="color:var(--gold)">${v.receivable ? v.receivable.toLocaleString() : '—'}</td>
+          <td style="color:var(--info)">${v.payable ? v.payable.toLocaleString() : '—'}</td>
           <td style="color:${net >= 0 ? 'var(--success)' : 'var(--danger)'}">${net.toLocaleString()}</td>
         </tr>`;
       }).join('');
       const totNet = totIncome - totExpense;
       div.innerHTML = `<table class="fin-table">
-        <thead><tr><th>Group</th><th>Inflow</th><th>Outflow</th><th>Net</th></tr></thead>
+        <thead><tr><th>Group</th><th>Inflow</th><th>Outflow</th><th>Receivable</th><th>Payable</th><th>Net</th></tr></thead>
         <tbody>${rowsHtml}</tbody>
-        <tfoot><tr><td>Total</td><td style="color:var(--success)">+${totIncome.toLocaleString()}</td><td style="color:var(--danger)">-${totExpense.toLocaleString()}</td><td style="color:${totNet >= 0 ? 'var(--success)' : 'var(--danger)'}">${totNet.toLocaleString()}</td></tr></tfoot>
+        <tfoot><tr><td>Total</td><td style="color:var(--success)">+${totIncome.toLocaleString()}</td><td style="color:var(--danger)">-${totExpense.toLocaleString()}</td><td style="color:var(--gold)">${totReceivable.toLocaleString()}</td><td style="color:var(--info)">${totPayable.toLocaleString()}</td><td style="color:${totNet >= 0 ? 'var(--success)' : 'var(--danger)'}">${totNet.toLocaleString()}</td></tr></tfoot>
       </table>`;
     }
 
@@ -1670,7 +1689,7 @@
       const pending = allMembersData.filter(m => m.status === 'pending');
       const restricted = allMembersData.filter(m => m.standing === 'restricted');
       const canManage = api.hasCap('members.manage');
-      if (canManage) document.getElementById('checkStandingsBtn').style.display = '';
+      if (canManage) { document.getElementById('checkStandingsBtn').style.display = ''; document.getElementById('duesRatesBtn').style.display = ''; }
       document.getElementById('memberStats').innerHTML = `
         <div class="stat-card programmes"><div class="stat-value">${active.length}</div><div class="stat-label">Active Members</div></div>
         <div class="stat-card pending"><div class="stat-value">${pending.length}</div><div class="stat-label">Pending Approval</div></div>
@@ -1758,9 +1777,10 @@
 
     async function showMemberDetail(userId) {
       try {
-        const [m, dues] = await Promise.all([
+        const [m, dues, statement] = await Promise.all([
           api.request('/members/' + userId),
           api.getMemberDues(userId).catch(() => []),
+          api.getMemberStatement(userId).catch(() => ({ records: [], balance: 0 })),
         ]);
         const classRoles = (m.roles || []).filter(r => r.role_type === 'member_class');
         const otherRoles = (m.roles || []).filter(r => r.role_type !== 'member_class');
@@ -1784,6 +1804,20 @@
           }).join('');
           duesHtml += '</div>';
         }
+        let statementHtml = '';
+        if (statement.records && statement.records.length) {
+          const balColor = statement.balance > 0 ? 'var(--success)' : statement.balance < 0 ? 'var(--danger)' : 'var(--text)';
+          statementHtml = '<div style="margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem"><strong style="font-size:0.85rem">Account Statement</strong><span style="font-size:0.85rem">Balance: <strong style="color:' + balColor + '">UGX ' + Number(statement.balance).toLocaleString() + '</strong></span></div>';
+          statementHtml += '<div style="max-height:200px;overflow-y:auto">';
+          const typeColors = { income: 'var(--success)', expense: 'var(--danger)', receivable: 'var(--gold)', payable: 'var(--info)' };
+          statementHtml += statement.records.map(r => {
+            const color = typeColors[r.type] || 'var(--text)';
+            const prefix = r.type === 'income' || r.type === 'payable' ? '+' : '-';
+            const label = r.type.charAt(0).toUpperCase() + r.type.slice(1);
+            return '<div style="display:flex;justify-content:space-between;padding:0.35rem 0;border-bottom:1px solid var(--border);font-size:0.82rem"><div><span style="color:' + color + ';font-size:0.75rem;font-weight:500;text-transform:uppercase">' + label + '</span> ' + esc(r.description || r.category) + '</div><div style="display:flex;gap:0.5rem;align-items:center"><span class="text-dim">' + (r.record_date || '') + '</span><span style="color:' + color + ';font-weight:500">' + prefix + 'UGX ' + Number(r.amount).toLocaleString() + '</span><span class="text-dim">= UGX ' + Number(r.running_balance).toLocaleString() + '</span></div></div>';
+          }).join('');
+          statementHtml += '</div></div>';
+        }
         const html = `
           <div style="display:flex;flex-direction:column;gap:0.75rem">
             <div><strong>${esc(m.name)}</strong> <span class="text-dim">${esc(m.email || '')}</span></div>
@@ -1791,6 +1825,7 @@
             <div>Joined: ${m.joined_date || '—'} · Institution: ${esc(m.institution || '—')}</div>
             <div>Roles: ${roles || '<span class="text-dim">None</span>'}</div>
             ${duesHtml}
+            ${statementHtml}
             ${api.hasCap('members.manage') ? `
             <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem">
               <label style="font-size:0.85rem">Class
@@ -1844,13 +1879,32 @@
       const div = document.getElementById('duesSchedule');
       div.innerHTML = '<div class="text-dim">Loading dues...</div>';
       try {
-        const [roles, members] = await Promise.all([
-          api.getRoles().catch(() => []),
-          api.getMembers().catch(() => []),
-        ]);
-        const classRoles = roles.filter(r => r.role_type === 'member_class' && r.status === 'active');
-        const activeMembers = members.filter(m => m.status === 'active');
-        // Get dues for all active members
+        const roles = await api.request('/roles').catch(() => []);
+        const classRoles = (roles || []).filter(r => r.role_type === 'member_class' && r.status === 'active');
+        const thisYear = new Date().getFullYear();
+        const schedules = await api.request('/dues-schedule?year=' + thisYear).catch(e => { console.error('dues-schedule error:', e); return []; });
+        const members = await api.request('/members').catch(e => { console.error('members error:', e); return []; });
+        const activeMembers = (members || []).filter(m => m.status === 'active');
+        let html = '';
+        // === DUES RATES SECTION ===
+        html += '<div class="dash-card" style="margin-bottom:1rem"><div class="dash-card-header"><h4>Dues Rates (' + thisYear + ')</h4>';
+        if (api.hasCap('members.manage')) {
+          html += '<div style="display:flex;gap:0.5rem"><button class="btn btn-primary btn-sm" onclick="showSetDuesRateForm()">Set Rate</button><button class="btn btn-accent btn-sm" onclick="generateDuesRecords()">Generate Records</button></div>';
+        }
+        html += '</div>';
+        if (!schedules.length) {
+          html += '<div class="empty-state"><p>No dues rates set for ' + thisYear + '. Set a rate per member class to start tracking.</p></div>';
+        } else {
+          html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem">';
+          schedules.forEach(s => {
+            html += '<div style="padding:0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-card)"><div style="font-weight:500;margin-bottom:0.25rem">' + esc(s.class_title) + '</div><div style="font-size:1.2rem;font-weight:600;color:var(--success)">UGX ' + Number(s.amount).toLocaleString() + '</div>';
+            if (s.description) html += '<div class="text-dim" style="font-size:0.8rem;margin-top:0.25rem">' + esc(s.description) + '</div>';
+            html += '</div>';
+          });
+          html += '</div>';
+        }
+        html += '</div>';
+        // === DUES RECORDS SECTION ===
         const allDues = [];
         for (const m of activeMembers.slice(0, 50)) {
           try {
@@ -1858,43 +1912,64 @@
             if (d && d.length) d.forEach(r => { r.user_name = m.name; r.user_email = m.email; r.user_id = m.user_id; allDues.push(r); });
           } catch(e) {}
         }
-        // Build schedule view: show all dues records grouped by class
         const grouped = {};
         allDues.forEach(d => {
           const cls = d.class_title || 'Unclassified';
           if (!grouped[cls]) grouped[cls] = [];
           grouped[cls].push(d);
         });
-        let html = '<div class="dash-card" style="margin-bottom:1rem"><div class="dash-card-header"><h4>Dues Records</h4>';
+        html += '<div class="dash-card" style="margin-bottom:1rem"><div class="dash-card-header"><h4>Dues Records</h4>';
         if (api.hasCap('members.manage')) {
-          html += '<button class="btn btn-primary btn-sm" onclick="showCreateDuesForm()">Create Dues Record</button>';
+          html += '<button class="btn btn-outline btn-sm" onclick="showCreateDuesForm()">Add Manual Record</button>';
         }
         html += '</div>';
         if (!allDues.length) {
-          html += '<div class="empty-state"><p>No dues records yet. Create one to start tracking membership dues.</p></div>';
+          html += '<div class="empty-state"><p>No dues records yet. Set rates above and click Generate, or add manually.</p></div>';
         } else {
           for (const [cls, records] of Object.entries(grouped)) {
-            html += `<div style="margin-bottom:1rem"><h4 style="font-size:0.9rem;margin-bottom:0.5rem;color:var(--info)">${esc(cls)}</h4>`;
+            html += '<div style="margin-bottom:1rem"><h4 style="font-size:0.9rem;margin-bottom:0.5rem;color:var(--info)">' + esc(cls) + '</h4>';
             html += records.map(d => {
               const statusColor = d.status === 'paid' ? 'var(--success)' : d.status === 'overdue' ? 'var(--danger)' : 'var(--gold)';
-              return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0;border-bottom:1px solid var(--border);font-size:0.88rem">
-                <div>
-                  <span style="font-weight:500">${esc(d.user_name || '')}</span>
-                  <span class="text-dim" style="margin-left:0.4rem">${esc(d.period_year || '')}</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:0.5rem">
-                  <span>UGX ${Number(d.amount_owed).toLocaleString()}</span>
-                  <span style="color:${statusColor};font-weight:500;font-size:0.82rem;text-transform:uppercase">${esc(d.status)}</span>
-                  ${d.status !== 'paid' && api.hasCap('members.manage') ? '<button class="btn btn-outline btn-xs" onclick="markDuesPaid(' + d.member_id + ',' + d.id + ',' + d.amount_owed + ')">Mark Paid</button>' : ''}
-                </div>
-              </div>`;
+              return '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0;border-bottom:1px solid var(--border);font-size:0.88rem"><div><span style="font-weight:500">' + esc(d.user_name || '') + '</span><span class="text-dim" style="margin-left:0.4rem">' + esc(d.period_year || '') + '</span></div><div style="display:flex;align-items:center;gap:0.5rem"><span>UGX ' + Number(d.amount_owed).toLocaleString() + '</span><span style="color:' + statusColor + ';font-weight:500;font-size:0.82rem;text-transform:uppercase">' + esc(d.status) + '</span>' + (d.status !== 'paid' && api.hasCap('members.manage') ? '<button class="btn btn-outline btn-xs" onclick="markDuesPaid(' + d.member_id + ',' + d.id + ',' + d.amount_owed + ')">Mark Paid</button>' : '') + '</div></div>';
             }).join('');
             html += '</div>';
           }
         }
         html += '</div>';
         div.innerHTML = html;
-      } catch(e) { div.innerHTML = '<div class="empty-state"><p>Failed to load dues data.</p></div>'; }
+      } catch(e) { console.error('loadDuesSchedule failed:', e); div.innerHTML = '<div class="empty-state"><p>Failed to load dues data.</p><p class="text-dim" style="font-size:0.8rem">' + esc(String(e?.error || e?.message || e)) + '</p></div>'; }
+    }
+
+    async function showSetDuesRateForm() {
+      const roles = await api.getRoles().catch(() => []);
+      const classRoles = roles.filter(r => r.role_type === 'member_class' && r.status === 'active');
+      const thisYear = new Date().getFullYear();
+      let opts = classRoles.map(r => '<option value="' + r.id + '">' + esc(r.title) + '</option>').join('');
+      openModal('Set Dues Rate', '<div class="create-form" style="max-width:100%"><div class="form-group"><label class="form-label">Member Class *</label><select class="form-select" id="rateClass">' + opts + '</select></div><div class="form-group"><label class="form-label">Amount (UGX) *</label><input type="number" class="form-input" id="rateAmount" min="0" placeholder="e.g. 50000"></div><div class="form-group"><label class="form-label">Period Year *</label><input type="number" class="form-input" id="rateYear" value="' + thisYear + '"></div><div class="form-group"><label class="form-label">Description</label><input class="form-input" id="rateDesc" placeholder="e.g. Annual membership fee"></div><button class="btn btn-primary" onclick="submitDuesRate()">Save Rate</button></div>');
+    }
+
+    async function submitDuesRate() {
+      const roleId = document.getElementById('rateClass').value;
+      const amount = parseFloat(document.getElementById('rateAmount').value);
+      const year = document.getElementById('rateYear').value;
+      const desc = document.getElementById('rateDesc').value;
+      if (!roleId) return toast('Select a class', 'warning');
+      if (!amount || amount < 0) return toast('Enter a valid amount', 'warning');
+      try {
+        await api.setDuesSchedule(parseInt(roleId), amount, parseInt(year), desc || null);
+        closeModal(); toast('Dues rate saved', 'success');
+        loadDuesSchedule();
+      } catch(e) { toast(e.error || 'Failed', 'error'); }
+    }
+
+    async function generateDuesRecords() {
+      const thisYear = new Date().getFullYear();
+      if (!confirm('Generate dues records for all active members based on ' + thisYear + ' rates? Existing records will be skipped.')) return;
+      try {
+        const result = await api.generateDuesRecords(thisYear);
+        toast('Created ' + (result.created || 0) + ' records, skipped ' + (result.skipped || 0), 'success');
+        loadDuesSchedule();
+      } catch(e) { toast(e.error || 'Failed', 'error'); }
     }
 
     async function showCreateDuesForm() {
@@ -1905,17 +1980,7 @@
       const activeMembers = members.filter(m => m.status === 'active');
       const memberOpts = activeMembers.map(m => '<option value="' + m.user_id + '">' + esc(m.name) + ' (' + esc(m.email || '') + ')</option>').join('');
       const thisYear = new Date().getFullYear();
-      openModal('Create Dues Record', `
-        <div class="create-form" style="max-width:100%">
-          <div class="form-group"><label class="form-label">Member *</label><select class="form-select" id="duesMember"><option value="">— Select member —</option>${memberOpts}</select></div>
-          <div class="form-group"><label class="form-label">Member Class *</label><select class="form-select" id="duesClass">${roleOpts}</select></div>
-          <div class="form-group"><label class="form-label">Period Year *</label><input type="number" class="form-input" id="duesYear" value="${thisYear}"></div>
-          <div class="form-group"><label class="form-label">Amount (UGX) *</label><input type="number" class="form-input" id="duesAmount" min="0" placeholder="e.g. 50000"></div>
-          <div class="form-group"><label class="form-label">Due Date</label><input type="date" class="form-input" id="duesDueDate" value="${thisYear}-12-31"></div>
-          <div class="form-group"><label class="form-label">Notes</label><input class="form-input" id="duesNotes" placeholder="Optional notes"></div>
-          <button class="btn btn-primary" onclick="submitDuesRecord()">Create</button>
-        </div>
-      `);
+      openModal('Add Manual Dues Record', '<div class="create-form" style="max-width:100%"><div class="form-group"><label class="form-label">Member *</label><select class="form-select" id="duesMember"><option value="">— Select member —</option>' + memberOpts + '</select></div><div class="form-group"><label class="form-label">Member Class *</label><select class="form-select" id="duesClass">' + roleOpts + '</select></div><div class="form-group"><label class="form-label">Period Year *</label><input type="number" class="form-input" id="duesYear" value="' + thisYear + '"></div><div class="form-group"><label class="form-label">Amount (UGX) *</label><input type="number" class="form-input" id="duesAmount" min="0" placeholder="e.g. 50000"></div><div class="form-group"><label class="form-label">Due Date</label><input type="date" class="form-input" id="duesDueDate" value="' + thisYear + '-12-31"></div><div class="form-group"><label class="form-label">Notes</label><input class="form-input" id="duesNotes" placeholder="Optional notes"></div><button class="btn btn-primary" onclick="submitDuesRecord()">Create</button></div>');
     }
 
     async function submitDuesRecord() {
@@ -1938,7 +2003,7 @@
     async function markDuesPaid(memberId, duesId, amount) {
       if (!confirm('Mark this dues record as paid (UGX ' + Number(amount).toLocaleString() + ')?')) return;
       try {
-        await api.payDues(memberId, duesId, { amount_paid: amount });
+        await api.payDues(memberId, duesId, { amount: amount });
         toast('Dues marked as paid', 'success');
         loadDuesSchedule();
       } catch(e) { toast(e.error || 'Failed', 'error'); }

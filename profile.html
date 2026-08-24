@@ -166,28 +166,38 @@
       document.getElementById('fContributions').value = m.contributions || '';
       document.getElementById('fVisible').checked = !!m.profile_visible;
 
-      // Load dues
+      // Load dues and statement
       try {
-        const dues = await api.getMemberDues(api._user.id);
+        const [dues, statement] = await Promise.all([
+          api.getMemberDues(api._user.id).catch(() => []),
+          api.getMemberStatement(api._user.id).catch(() => ({ records: [], balance: 0 })),
+        ]);
         const div = document.getElementById('duesContent');
-        if (!dues || !dues.length) {
-          div.innerHTML = '<p class="text-dim" style="font-size:0.9rem">No dues records yet.</p>';
-          return;
+        let html = '';
+        if (dues && dues.length) {
+          html += '<div style="margin-bottom:1rem"><strong style="font-size:0.9rem">Dues Records</strong>';
+          html += dues.map(d => {
+            const statusColor = d.status === 'paid' ? 'var(--success)' : d.status === 'overdue' ? 'var(--danger)' : 'var(--gold)';
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.6rem 0;border-bottom:1px solid var(--border);font-size:0.9rem"><div><span style="font-weight:500">' + esc(d.class_title || '') + '</span> · ' + esc(d.period_year || '') + (d.due_date ? ' · Due: ' + esc(d.due_date) : '') + '</div><div style="display:flex;align-items:center;gap:0.5rem"><span>UGX ' + Number(d.amount_owed).toLocaleString() + '</span>' + (d.amount_paid > 0 ? '<span class="text-dim">(paid: UGX ' + Number(d.amount_paid).toLocaleString() + ')</span>' : '') + '<span style="color:' + statusColor + ';font-weight:500;font-size:0.8rem;text-transform:uppercase">' + esc(d.status) + '</span></div></div>';
+          }).join('');
+          html += '</div>';
+        } else {
+          html += '<p class="text-dim" style="font-size:0.9rem">No dues records yet.</p>';
         }
-        div.innerHTML = dues.map(d => {
-          const statusColor = d.status === 'paid' ? 'var(--success)' : d.status === 'overdue' ? 'var(--danger)' : 'var(--gold)';
-          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.6rem 0;border-bottom:1px solid var(--border);font-size:0.9rem">
-            <div>
-              <span style="font-weight:500">${esc(d.class_title || '')}</span> · ${esc(d.period_year || '')}
-              ${d.due_date ? ' · Due: ' + esc(d.due_date) : ''}
-            </div>
-            <div style="display:flex;align-items:center;gap:0.5rem">
-              <span>UGX ${Number(d.amount_owed).toLocaleString()}</span>
-              ${d.amount_paid > 0 ? '<span class="text-dim">(paid: UGX ' + Number(d.amount_paid).toLocaleString() + ')</span>' : ''}
-              <span style="color:${statusColor};font-weight:500;font-size:0.8rem;text-transform:uppercase">${esc(d.status)}</span>
-            </div>
-          </div>`;
-        }).join('');
+        if (statement.records && statement.records.length) {
+          const balColor = statement.balance > 0 ? 'var(--success)' : statement.balance < 0 ? 'var(--danger)' : 'var(--text)';
+          html += '<div style="margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem"><strong style="font-size:0.9rem">Account Statement</strong><span style="font-size:0.9rem">Balance: <strong style="color:' + balColor + '">UGX ' + Number(statement.balance).toLocaleString() + '</strong></span></div>';
+          html += '<div style="max-height:250px;overflow-y:auto">';
+          const typeColors = { income: 'var(--success)', expense: 'var(--danger)', receivable: 'var(--gold)', payable: 'var(--info)' };
+          html += statement.records.map(r => {
+            const color = typeColors[r.type] || 'var(--text)';
+            const prefix = r.type === 'income' || r.type === 'payable' ? '+' : '-';
+            const label = r.type.charAt(0).toUpperCase() + r.type.slice(1);
+            return '<div style="display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid var(--border);font-size:0.85rem"><div><span style="color:' + color + ';font-size:0.75rem;font-weight:500;text-transform:uppercase">' + label + '</span> ' + esc(r.description || r.category) + '</div><div style="display:flex;gap:0.5rem;align-items:center"><span class="text-dim">' + (r.record_date || '') + '</span><span style="color:' + color + ';font-weight:500">' + prefix + 'UGX ' + Number(r.amount).toLocaleString() + '</span><span class="text-dim">= UGX ' + Number(r.running_balance).toLocaleString() + '</span></div></div>';
+          }).join('');
+          html += '</div></div>';
+        }
+        div.innerHTML = html || '<p class="text-dim" style="font-size:0.9rem">No financial records yet.</p>';
       } catch(e) {}
     }
 

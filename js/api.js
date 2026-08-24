@@ -130,6 +130,12 @@ const api = {
   async addMemberDues(userId, data) { return this.request('/members/' + userId + '/dues', { method: 'POST', body: data }); },
   async payDues(memberId, duesId, data) { return this.request('/members/' + memberId + '/dues/' + duesId + '/pay', { method: 'POST', body: data }); },
   async checkStandings() { return this.request('/members/check-standings', { method: 'POST' }); },
+  async getMemberStatement(userId) { return this.request('/members/' + userId + '/statement'); },
+
+  // Dues Schedule
+  async getDuesSchedule(year) { const qs = year ? '?year=' + year : ''; return this.request('/dues-schedule' + qs); },
+  async setDuesSchedule(roleId, amount, year, description) { return this.request('/dues-schedule', { method: 'POST', body: { role_id: roleId, amount, period_year: year, description } }); },
+  async generateDuesRecords(year) { return this.request('/dues-schedule/generate', { method: 'POST', body: { year } }); },
 
   // RBAC Audit
   async getRbacAudit() { return this.request('/admin/rbac-audit'); },
