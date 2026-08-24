@@ -204,7 +204,7 @@
       <div class="tiers-grid">
         <div class="tier-card">
           <h3>Student</h3>
-          <div class="price">Free</div>
+          <div class="price" id="price-student">Free</div>
           <div class="price-note">For enrolled students</div>
           <ul>
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> All observing sessions</li>
@@ -217,7 +217,7 @@
         </div>
         <div class="tier-card featured">
           <h3>Regular</h3>
-          <div class="price">Free</div>
+          <div class="price" id="price-regular">Free</div>
           <div class="price-note">For astronomy enthusiasts</div>
           <ul>
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> All observing sessions</li>
@@ -231,7 +231,7 @@
         </div>
         <div class="tier-card">
           <h3>Honorary</h3>
-          <div class="price">By Invitation</div>
+          <div class="price" id="price-honorary">By Invitation</div>
           <div class="price-note">For distinguished contributors</div>
           <ul>
             <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> All Regular benefits</li>
@@ -298,6 +298,20 @@
     async function load() {
       try { await api.me(); } catch(e) {}
       updateNavUser();
+      loadDuesRates();
+    }
+
+    async function loadDuesRates() {
+      try {
+        const classes = await api.request('/public/dues-rates');
+        classes.forEach(c => {
+          const el = document.getElementById('price-' + c.class_title.toLowerCase().replace(' member', ''));
+          if (el && c.amount) {
+            el.textContent = 'UGX ' + Number(c.amount).toLocaleString();
+            el.dataset.period = c.period_year || '';
+          }
+        });
+      } catch(e) {}
     }
 
     load();

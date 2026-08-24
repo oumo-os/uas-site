@@ -2304,6 +2304,15 @@ try {
   elseif ($path === '/public/finance/summary' && $method === 'GET') {
     json_error('Finance data is restricted to members', 403);
   }
+  // --- PUBLIC DUES RATES --- for join page to display pricing
+  elseif ($path === '/public/dues-rates' && $method === 'GET') {
+    $stmt = db()->prepare('SELECT r.title AS class_title, r.id AS role_id,
+      (SELECT md.amount_owed FROM membership_dues md WHERE md.role_id = r.id AND md.status != "cancelled" ORDER BY md.period_year DESC LIMIT 1) AS amount,
+      (SELECT md.period_year FROM membership_dues md WHERE md.role_id = r.id AND md.status != "cancelled" ORDER BY md.period_year DESC LIMIT 1) AS period_year
+      FROM roles r WHERE r.role_type = "member_class" AND r.status = "active" ORDER BY r.title');
+    $stmt->execute();
+    json_response($stmt->fetchAll());
+  }
   // --- MEMBER DOCUMENTS (internal + public for logged-in users) ---
   elseif ($path === '/member/documents' && $method === 'GET') {
     require_login();

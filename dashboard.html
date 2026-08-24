@@ -772,29 +772,38 @@
           <button class="btn btn-outline btn-sm" onclick="exportMembersCSV()">Export CSV</button>
         </div>
       </div>
-      <div class="stat-grid" id="memberStats"></div>
-      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem">
-        <select id="mFilterCat" onchange="filterMembers()" style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text);font-size:0.85rem">
-          <option value="">All classes</option>
-          <option value="Regular Member">Regular</option>
-          <option value="Student Member">Student</option>
-          <option value="Honorary Member">Honorary</option>
-          <option value="Institutional Member">Institutional</option>
-        </select>
-        <select id="mFilterStanding" onchange="filterMembers()" style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text);font-size:0.85rem">
-          <option value="">All standings</option>
-          <option value="good_standing">Good Standing</option>
-          <option value="restricted">Restricted</option>
-        </select>
-        <select id="mFilterStatus" onchange="filterMembers()" style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text);font-size:0.85rem">
-          <option value="">All statuses</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="suspended">Suspended</option>
-        </select>
-        <input id="mSearch" oninput="filterMembers()" placeholder="Search name or email..." style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text);font-size:0.85rem;min-width:180px">
+      <div class="dash-tabs" id="memberTabs" style="margin-bottom:1rem;background:transparent;border:none;border-radius:0">
+        <button class="dash-tab active" data-mtab="list">Members</button>
+        <button class="dash-tab" data-mtab="dues">Dues</button>
       </div>
-      <div id="memberList"></div>
+      <div id="memb-list">
+        <div class="stat-grid" id="memberStats"></div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem">
+          <select id="mFilterCat" onchange="filterMembers()" style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text);font-size:0.85rem">
+            <option value="">All classes</option>
+            <option value="Regular Member">Regular</option>
+            <option value="Student Member">Student</option>
+            <option value="Honorary Member">Honorary</option>
+            <option value="Institutional Member">Institutional</option>
+          </select>
+          <select id="mFilterStanding" onchange="filterMembers()" style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text);font-size:0.85rem">
+            <option value="">All standings</option>
+            <option value="good_standing">Good Standing</option>
+            <option value="restricted">Restricted</option>
+          </select>
+          <select id="mFilterStatus" onchange="filterMembers()" style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text);font-size:0.85rem">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="suspended">Suspended</option>
+          </select>
+          <input id="mSearch" oninput="filterMembers()" placeholder="Search name or email..." style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text);font-size:0.85rem;min-width:180px">
+        </div>
+        <div id="memberList"></div>
+      </div>
+      <div id="memb-dues" style="display:none">
+        <div id="duesSchedule"></div>
+      </div>
     </div>
 
     <!-- Org Panel (Groups + Meetings) -->
@@ -1749,17 +1758,39 @@
 
     async function showMemberDetail(userId) {
       try {
-        const m = await api.request('/members/' + userId);
+        const [m, dues] = await Promise.all([
+          api.request('/members/' + userId),
+          api.getMemberDues(userId).catch(() => []),
+        ]);
         const classRoles = (m.roles || []).filter(r => r.role_type === 'member_class');
         const otherRoles = (m.roles || []).filter(r => r.role_type !== 'member_class');
         const currentClass = classRoles.length ? classRoles[0].title : 'Regular Member';
         const roles = otherRoles.map(r => `<span class="wg-badge" style="background:rgba(30,96,145,0.1);color:var(--info)">${esc(r.title)} <span style="color:var(--text-dim);font-size:0.75rem">(${esc(r.role_type || '')})</span></span>`).join(' ');
+        let duesHtml = '';
+        if (dues && dues.length) {
+          duesHtml = '<div style="margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem"><strong style="font-size:0.85rem">Dues History</strong>';
+          duesHtml += dues.map(d => {
+            const statusColor = d.status === 'paid' ? 'var(--success)' : d.status === 'overdue' ? 'var(--danger)' : 'var(--gold)';
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0;font-size:0.85rem;border-bottom:1px solid var(--border)">
+              <div>
+                <span class="text-dim">${esc(d.class_title || '')}</span> · ${esc(d.period_year || '')} · UGX ${Number(d.amount_owed).toLocaleString()}
+                ${d.amount_paid > 0 ? ' <span class="text-dim">(paid: UGX ' + Number(d.amount_paid).toLocaleString() + ')</span>' : ''}
+              </div>
+              <div style="display:flex;align-items:center;gap:0.4rem">
+                <span style="color:${statusColor};font-weight:500;font-size:0.8rem;text-transform:uppercase">${esc(d.status)}</span>
+                ${d.status !== 'paid' && api.hasCap('members.manage') ? '<button class="btn btn-outline btn-xs" onclick="markDuesPaid(' + d.member_id + ',' + d.id + ',' + d.amount_owed + ')">Pay</button>' : ''}
+              </div>
+            </div>`;
+          }).join('');
+          duesHtml += '</div>';
+        }
         const html = `
           <div style="display:flex;flex-direction:column;gap:0.75rem">
             <div><strong>${esc(m.name)}</strong> <span class="text-dim">${esc(m.email || '')}</span></div>
             <div>Membership: ${esc(m.membership_number || '—')} · Class: ${esc(currentClass)} · Standing: <span style="color:${m.standing === 'restricted' ? 'var(--danger)' : 'var(--success)'}">${esc(m.standing || 'good_standing')}</span> · Status: ${esc(m.status)}</div>
             <div>Joined: ${m.joined_date || '—'} · Institution: ${esc(m.institution || '—')}</div>
             <div>Roles: ${roles || '<span class="text-dim">None</span>'}</div>
+            ${duesHtml}
             ${api.hasCap('members.manage') ? `
             <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem">
               <label style="font-size:0.85rem">Class
@@ -1806,6 +1837,111 @@
 
     function exportMembersCSV() {
       window.location.href = api.base + '/export/members.csv';
+    }
+
+    // ================= DUES MANAGEMENT =================
+    async function loadDuesSchedule() {
+      const div = document.getElementById('duesSchedule');
+      div.innerHTML = '<div class="text-dim">Loading dues...</div>';
+      try {
+        const [roles, members] = await Promise.all([
+          api.getRoles().catch(() => []),
+          api.getMembers().catch(() => []),
+        ]);
+        const classRoles = roles.filter(r => r.role_type === 'member_class' && r.status === 'active');
+        const activeMembers = members.filter(m => m.status === 'active');
+        // Get dues for all active members
+        const allDues = [];
+        for (const m of activeMembers.slice(0, 50)) {
+          try {
+            const d = await api.getMemberDues(m.user_id);
+            if (d && d.length) d.forEach(r => { r.user_name = m.name; r.user_email = m.email; r.user_id = m.user_id; allDues.push(r); });
+          } catch(e) {}
+        }
+        // Build schedule view: show all dues records grouped by class
+        const grouped = {};
+        allDues.forEach(d => {
+          const cls = d.class_title || 'Unclassified';
+          if (!grouped[cls]) grouped[cls] = [];
+          grouped[cls].push(d);
+        });
+        let html = '<div class="dash-card" style="margin-bottom:1rem"><div class="dash-card-header"><h4>Dues Records</h4>';
+        if (api.hasCap('members.manage')) {
+          html += '<button class="btn btn-primary btn-sm" onclick="showCreateDuesForm()">Create Dues Record</button>';
+        }
+        html += '</div>';
+        if (!allDues.length) {
+          html += '<div class="empty-state"><p>No dues records yet. Create one to start tracking membership dues.</p></div>';
+        } else {
+          for (const [cls, records] of Object.entries(grouped)) {
+            html += `<div style="margin-bottom:1rem"><h4 style="font-size:0.9rem;margin-bottom:0.5rem;color:var(--info)">${esc(cls)}</h4>`;
+            html += records.map(d => {
+              const statusColor = d.status === 'paid' ? 'var(--success)' : d.status === 'overdue' ? 'var(--danger)' : 'var(--gold)';
+              return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0;border-bottom:1px solid var(--border);font-size:0.88rem">
+                <div>
+                  <span style="font-weight:500">${esc(d.user_name || '')}</span>
+                  <span class="text-dim" style="margin-left:0.4rem">${esc(d.period_year || '')}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.5rem">
+                  <span>UGX ${Number(d.amount_owed).toLocaleString()}</span>
+                  <span style="color:${statusColor};font-weight:500;font-size:0.82rem;text-transform:uppercase">${esc(d.status)}</span>
+                  ${d.status !== 'paid' && api.hasCap('members.manage') ? '<button class="btn btn-outline btn-xs" onclick="markDuesPaid(' + d.member_id + ',' + d.id + ',' + d.amount_owed + ')">Mark Paid</button>' : ''}
+                </div>
+              </div>`;
+            }).join('');
+            html += '</div>';
+          }
+        }
+        html += '</div>';
+        div.innerHTML = html;
+      } catch(e) { div.innerHTML = '<div class="empty-state"><p>Failed to load dues data.</p></div>'; }
+    }
+
+    async function showCreateDuesForm() {
+      const roles = await api.getRoles().catch(() => []);
+      const classRoles = roles.filter(r => r.role_type === 'member_class' && r.status === 'active');
+      const roleOpts = classRoles.map(r => '<option value="' + r.id + '">' + esc(r.title) + '</option>').join('');
+      const members = await api.getMembers().catch(() => []);
+      const activeMembers = members.filter(m => m.status === 'active');
+      const memberOpts = activeMembers.map(m => '<option value="' + m.user_id + '">' + esc(m.name) + ' (' + esc(m.email || '') + ')</option>').join('');
+      const thisYear = new Date().getFullYear();
+      openModal('Create Dues Record', `
+        <div class="create-form" style="max-width:100%">
+          <div class="form-group"><label class="form-label">Member *</label><select class="form-select" id="duesMember"><option value="">— Select member —</option>${memberOpts}</select></div>
+          <div class="form-group"><label class="form-label">Member Class *</label><select class="form-select" id="duesClass">${roleOpts}</select></div>
+          <div class="form-group"><label class="form-label">Period Year *</label><input type="number" class="form-input" id="duesYear" value="${thisYear}"></div>
+          <div class="form-group"><label class="form-label">Amount (UGX) *</label><input type="number" class="form-input" id="duesAmount" min="0" placeholder="e.g. 50000"></div>
+          <div class="form-group"><label class="form-label">Due Date</label><input type="date" class="form-input" id="duesDueDate" value="${thisYear}-12-31"></div>
+          <div class="form-group"><label class="form-label">Notes</label><input class="form-input" id="duesNotes" placeholder="Optional notes"></div>
+          <button class="btn btn-primary" onclick="submitDuesRecord()">Create</button>
+        </div>
+      `);
+    }
+
+    async function submitDuesRecord() {
+      const memberId = document.getElementById('duesMember').value;
+      const roleId = document.getElementById('duesClass').value;
+      const year = document.getElementById('duesYear').value;
+      const amount = parseFloat(document.getElementById('duesAmount').value);
+      const dueDate = document.getElementById('duesDueDate').value;
+      const notes = document.getElementById('duesNotes').value;
+      if (!memberId) return toast('Select a member', 'warning');
+      if (!roleId) return toast('Select a class', 'warning');
+      if (!amount || amount <= 0) return toast('Enter a valid amount', 'warning');
+      try {
+        await api.addMemberDues(memberId, { role_id: parseInt(roleId), period_year: parseInt(year), amount_owed: amount, due_date: dueDate || null, notes: notes || null });
+        closeModal(); toast('Dues record created', 'success');
+        loadDuesSchedule();
+      } catch(e) { toast(e.error || 'Failed', 'error'); }
+    }
+
+    async function markDuesPaid(memberId, duesId, amount) {
+      if (!confirm('Mark this dues record as paid (UGX ' + Number(amount).toLocaleString() + ')?')) return;
+      try {
+        await api.payDues(memberId, duesId, { amount_paid: amount });
+        toast('Dues marked as paid', 'success');
+        loadDuesSchedule();
+      } catch(e) { toast(e.error || 'Failed', 'error'); }
     }
 
     // ================= RBAC AUDIT =================
@@ -2844,6 +2980,18 @@
           const el = document.getElementById('org-' + s);
           if (el) el.style.display = s === tab.dataset.org ? '' : 'none';
         });
+      });
+      // Member sub-tabs
+      const memberTabs = document.getElementById('memberTabs');
+      if (memberTabs) memberTabs.addEventListener('click', e => {
+        const tab = e.target.closest('.dash-tab');
+        if (!tab || !tab.dataset.mtab) return;
+        memberTabs.querySelectorAll('.dash-tab').forEach(t => t.classList.toggle('active', t.dataset.mtab === tab.dataset.mtab));
+        ['list','dues'].forEach(s => {
+          const el = document.getElementById('memb-' + s);
+          if (el) el.style.display = s === tab.dataset.mtab ? '' : 'none';
+        });
+        if (tab.dataset.mtab === 'dues') loadDuesSchedule();
       });
     }
 
