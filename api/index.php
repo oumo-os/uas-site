@@ -824,20 +824,22 @@ try {
     $amount = (float) $data['amount'];
     $year = (int) $data['period_year'];
     $desc = $data['description'] ?? null;
-    // Upsert the rate
-    db()->prepare('INSERT INTO dues_schedule (role_id, amount, period_year, description, created_by)
-      VALUES (?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE amount = VALUES(amount), description = VALUES(description)')
-      ->execute([$roleId, $amount, $year, $desc, $user['id']]);
-    $scheduleId = (int) db()->lastInsertId();
-    if (!$scheduleId) {
-      // On duplicate key update, lastInsertId may be 0 — fetch the existing id
-      $stmt = db()->prepare('SELECT id FROM dues_schedule WHERE role_id = ? AND period_year = ?');
-      $stmt->execute([$roleId, $year]);
-      $scheduleId = (int) $stmt->fetchColumn();
+    try {
+      db()->prepare('INSERT INTO dues_schedule (role_id, amount, period_year, description, created_by)
+        VALUES (?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE amount = VALUES(amount), description = VALUES(description)')
+        ->execute([$roleId, $amount, $year, $desc, $user['id']]);
+      $scheduleId = (int) db()->lastInsertId();
+      if (!$scheduleId) {
+        $stmt = db()->prepare('SELECT id FROM dues_schedule WHERE role_id = ? AND period_year = ?');
+        $stmt->execute([$roleId, $year]);
+        $scheduleId = (int) $stmt->fetchColumn();
+      }
+      audit_log('dues_schedule_set', 'dues_schedule', $scheduleId, ['role_id' => $roleId, 'amount' => $amount, 'year' => $year]);
+      json_response(['id' => $scheduleId, 'ok' => true], 201);
+    } catch (Exception $e) {
+      json_error('Failed to save dues rate: ' . $e->getMessage(), 500);
     }
-    audit_log('dues_schedule_set', 'dues_schedule', $scheduleId, ['role_id' => $roleId, 'amount' => $amount, 'year' => $year]);
-    json_response(['id' => $scheduleId, 'ok' => true], 201);
   }
   elseif ($path === '/dues-schedule/generate' && $method === 'POST') {
     $user = require_cap('members.manage');
@@ -2466,8 +2468,8 @@ try {
   // --- PUBLIC DUES RATES --- for join page to display pricing
   elseif ($path === '/public/dues-rates' && $method === 'GET') {
     $year = (int) date('Y');
-    $stmt = db()->prepare('SELECT r.title AS class_title, r.id AS role_id,
-      ds.amount, ds.period_year
+    $stmt = db()->prepare('SELECT r.title AS class_title, r.id AS role_id, r.description AS role_description,
+      ds.amount, ds.period_year, ds.description AS schedule_description
       FROM roles r
       LEFT JOIN dues_schedule ds ON ds.role_id = r.id AND ds.period_year = ?
       WHERE r.role_type = "member_class" AND r.status = "active"
@@ -2478,9 +2480,10 @@ try {
     $hasSchedule = false;
     foreach ($results as $row) { if ($row['amount'] !== null) { $hasSchedule = true; break; } }
     if (!$hasSchedule) {
-      $stmt = db()->prepare('SELECT r.title AS class_title, r.id AS role_id,
+      $stmt = db()->prepare('SELECT r.title AS class_title, r.id AS role_id, r.description AS role_description,
         (SELECT md.amount_owed FROM membership_dues md WHERE md.role_id = r.id AND md.status != "cancelled" ORDER BY md.period_year DESC LIMIT 1) AS amount,
-        (SELECT md.period_year FROM membership_dues md WHERE md.role_id = r.id AND md.status != "cancelled" ORDER BY md.period_year DESC LIMIT 1) AS period_year
+        (SELECT md.period_year FROM membership_dues md WHERE md.role_id = r.id AND md.status != "cancelled" ORDER BY md.period_year DESC LIMIT 1) AS period_year,
+        NULL AS schedule_description
         FROM roles r WHERE r.role_type = "member_class" AND r.status = "active" ORDER BY r.title');
       $stmt->execute();
       $results = $stmt->fetchAll();

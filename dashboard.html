@@ -1895,9 +1895,13 @@
         if (!schedules.length) {
           html += '<div class="empty-state"><p>No dues rates set for ' + thisYear + '. Set a rate per member class to start tracking.</p></div>';
         } else {
-          html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem">';
+          html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.75rem">';
           schedules.forEach(s => {
-            html += '<div style="padding:0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-card)"><div style="font-weight:500;margin-bottom:0.25rem">' + esc(s.class_title) + '</div><div style="font-size:1.2rem;font-weight:600;color:var(--success)">UGX ' + Number(s.amount).toLocaleString() + '</div>';
+            const canEdit = api.hasCap('members.manage');
+            html += '<div style="padding:0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);position:relative">';
+            if (canEdit) html += '<button class="btn btn-outline btn-xs" style="position:absolute;top:0.5rem;right:0.5rem" onclick="showSetDuesRateForm(' + s.role_id + ',' + s.amount + ',' + s.period_year + ',\'' + esc(s.description || '').replace(/'/g, "\\'") + '\')">Edit</button>';
+            html += '<div style="font-weight:500;margin-bottom:0.25rem">' + esc(s.class_title) + '</div>';
+            html += '<div style="font-size:1.2rem;font-weight:600;color:var(--success)">UGX ' + Number(s.amount).toLocaleString() + '</div>';
             if (s.description) html += '<div class="text-dim" style="font-size:0.8rem;margin-top:0.25rem">' + esc(s.description) + '</div>';
             html += '</div>';
           });
@@ -1940,26 +1944,31 @@
       } catch(e) { console.error('loadDuesSchedule failed:', e); div.innerHTML = '<div class="empty-state"><p>Failed to load dues data.</p><p class="text-dim" style="font-size:0.8rem">' + esc(String(e?.error || e?.message || e)) + '</p></div>'; }
     }
 
-    async function showSetDuesRateForm() {
+    async function showSetDuesRateForm(editRoleId, editAmount, editYear, editDesc) {
+      const isEdit = !!editRoleId;
       const roles = await api.getRoles().catch(() => []);
       const classRoles = roles.filter(r => r.role_type === 'member_class' && r.status === 'active');
       const thisYear = new Date().getFullYear();
-      let opts = classRoles.map(r => '<option value="' + r.id + '">' + esc(r.title) + '</option>').join('');
-      openModal('Set Dues Rate', '<div class="create-form" style="max-width:100%"><div class="form-group"><label class="form-label">Member Class *</label><select class="form-select" id="rateClass">' + opts + '</select></div><div class="form-group"><label class="form-label">Amount (UGX) *</label><input type="number" class="form-input" id="rateAmount" min="0" placeholder="e.g. 50000"></div><div class="form-group"><label class="form-label">Period Year *</label><input type="number" class="form-input" id="rateYear" value="' + thisYear + '"></div><div class="form-group"><label class="form-label">Description</label><input class="form-input" id="rateDesc" placeholder="e.g. Annual membership fee"></div><button class="btn btn-primary" onclick="submitDuesRate()">Save Rate</button></div>');
+      let opts = classRoles.map(r => '<option value="' + r.id + '"' + (isEdit && String(r.id) === String(editRoleId) ? ' selected' : '') + '>' + esc(r.title) + '</option>').join('');
+      const amtVal = editAmount != null ? editAmount : '';
+      const yearVal = editYear || thisYear;
+      const descVal = editDesc || '';
+      openModal(isEdit ? 'Edit Dues Rate' : 'Set Dues Rate', '<div class="create-form" style="max-width:100%"><div class="form-group"><label class="form-label">Member Class *</label><select class="form-select" id="rateClass"' + (isEdit ? ' disabled' : '') + '>' + opts + '</select>' + (isEdit ? '<input type="hidden" id="rateClassHidden" value="' + editRoleId + '">' : '') + '</div><div class="form-group"><label class="form-label">Amount (UGX) *</label><input type="number" class="form-input" id="rateAmount" min="0" placeholder="e.g. 50000" value="' + amtVal + '"></div><div class="form-group"><label class="form-label">Period Year *</label><input type="number" class="form-input" id="rateYear" value="' + yearVal + '"' + (isEdit ? ' readonly' : '') + '></div><div class="form-group"><label class="form-label">Description</label><input class="form-input" id="rateDesc" placeholder="e.g. Annual membership fee" value="' + esc(descVal) + '"></div><button class="btn btn-primary" onclick="submitDuesRate(' + (isEdit ? 'true' : 'false') + ')">' + (isEdit ? 'Update' : 'Save') + ' Rate</button></div>');
     }
 
-    async function submitDuesRate() {
-      const roleId = document.getElementById('rateClass').value;
+    async function submitDuesRate(isEdit) {
+      const hiddenId = document.getElementById('rateClassHidden');
+      const roleId = hiddenId ? parseInt(hiddenId.value) : parseInt(document.getElementById('rateClass').value);
       const amount = parseFloat(document.getElementById('rateAmount').value);
       const year = document.getElementById('rateYear').value;
       const desc = document.getElementById('rateDesc').value;
       if (!roleId) return toast('Select a class', 'warning');
       if (!amount || amount < 0) return toast('Enter a valid amount', 'warning');
       try {
-        await api.setDuesSchedule(parseInt(roleId), amount, parseInt(year), desc || null);
-        closeModal(); toast('Dues rate saved', 'success');
+        await api.setDuesSchedule(roleId, amount, parseInt(year), desc || null);
+        closeModal(); toast('Dues rate ' + (isEdit ? 'updated' : 'saved'), 'success');
         loadDuesSchedule();
-      } catch(e) { toast(e.error || 'Failed', 'error'); }
+      } catch(e) { console.error('submitDuesRate error:', e); toast(e.error || e.message || 'Failed to save rate', 'error'); }
     }
 
     async function generateDuesRecords() {

@@ -201,46 +201,8 @@
     <div class="container">
       <h2 class="section-title">Membership Categories</h2>
       <p class="section-subtitle">Choose the category that fits you best</p>
-      <div class="tiers-grid">
-        <div class="tier-card">
-          <h3>Student</h3>
-          <div class="price" id="price-student">Free</div>
-          <div class="price-note">For enrolled students</div>
-          <ul>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> All observing sessions</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Knowledge base access</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Community forum</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Mentorship programme</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Workshop discounts</li>
-          </ul>
-          <a href="/login" class="btn btn-outline" style="width:100%">Join as Student</a>
-        </div>
-        <div class="tier-card featured">
-          <h3>Regular</h3>
-          <div class="price" id="price-regular">Free</div>
-          <div class="price-note">For astronomy enthusiasts</div>
-          <ul>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> All observing sessions</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Knowledge base access</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Community forum</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Working group access</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Voting rights</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Research collaboration</li>
-          </ul>
-          <a href="/login" class="btn btn-primary" style="width:100%">Join as Regular</a>
-        </div>
-        <div class="tier-card">
-          <h3>Honorary</h3>
-          <div class="price" id="price-honorary">By Invitation</div>
-          <div class="price-note">For distinguished contributors</div>
-          <ul>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> All Regular benefits</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Board meeting access</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Advisory role</li>
-            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Special recognition</li>
-          </ul>
-          <a href="/contact" class="btn btn-outline" style="width:100%">Contact Us</a>
-        </div>
+      <div class="tiers-grid" id="tiersGrid">
+        <div class="text-dim" style="grid-column:1/-1;text-align:center;padding:2rem">Loading membership categories...</div>
       </div>
     </div>
   </section>
@@ -301,17 +263,58 @@
       loadDuesRates();
     }
 
+    const check = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> ';
+    const tierBenefits = {
+      'Student Member': [check + 'All observing sessions', check + 'Knowledge base access', check + 'Community forum', check + 'Mentorship programme', check + 'Workshop discounts'],
+      'Regular Member': [check + 'All observing sessions', check + 'Knowledge base access', check + 'Community forum', check + 'Working group access', check + 'Voting rights', check + 'Research collaboration'],
+      'Honorary Member': [check + 'All Regular benefits', check + 'Board meeting access', check + 'Advisory role', check + 'Special recognition'],
+      'Institutional Member': [check + 'Institutional recognition', check + 'Bulk membership', check + 'Priority event access', check + 'Research partnership'],
+    };
+    const tierDescriptions = {
+      'Student Member': 'For enrolled students',
+      'Regular Member': 'For astronomy enthusiasts',
+      'Honorary Member': 'For distinguished contributors',
+      'Institutional Member': 'For organisations and institutions',
+    };
+    const tierOrder = ['Student Member', 'Regular Member', 'Institutional Member', 'Honorary Member'];
+    const tierBtnStyle = { 'Student Member': 'btn-outline', 'Regular Member': 'btn-primary', 'Honorary Member': 'btn-outline', 'Institutional Member': 'btn-outline' };
+    const tierAction = { 'Honorary Member': '/contact', 'Institutional Member': '/contact' };
+
     async function loadDuesRates() {
+      const grid = document.getElementById('tiersGrid');
       try {
         const classes = await api.request('/public/dues-rates');
-        classes.forEach(c => {
-          const el = document.getElementById('price-' + c.class_title.toLowerCase().replace(' member', ''));
-          if (el && c.amount) {
-            el.textContent = 'UGX ' + Number(c.amount).toLocaleString();
-            el.dataset.period = c.period_year || '';
-          }
+        if (!classes || !classes.length) {
+          grid.innerHTML = '<div class="text-dim" style="grid-column:1/-1;text-align:center;padding:2rem">Membership categories are being configured. Check back soon.</div>';
+          return;
+        }
+        const sorted = classes.slice().sort((a, b) => {
+          const ai = tierOrder.indexOf(a.class_title), bi = tierOrder.indexOf(b.class_title);
+          return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
         });
-      } catch(e) {}
+        grid.innerHTML = sorted.map((c, i) => {
+          const name = c.class_title || 'Member';
+          const slug = name.toLowerCase().replace(' member', '');
+          const amount = c.amount ? Number(c.amount) : null;
+          const isInvitation = !amount && amount !== 0;
+          const priceText = isInvitation ? 'By Invitation' : (amount === 0 ? 'Free' : 'UGX ' + amount.toLocaleString());
+          const desc = c.schedule_description || c.role_description || tierDescriptions[name] || 'For UAS members';
+          const benefits = tierBenefits[name] || [check + 'All observing sessions', check + 'Knowledge base access', check + 'Community forum'];
+          const isFeatured = name === 'Regular Member';
+          const btnClass = tierBtnStyle[name] || 'btn-outline';
+          const href = tierAction[name] || '/login';
+          const btnLabel = isInvitation ? 'Contact Us' : 'Join as ' + slug.charAt(0).toUpperCase() + slug.slice(1);
+          return '<div class="tier-card' + (isFeatured ? ' featured' : '') + '">' +
+            '<h3>' + esc(name.replace(' Member', '')) + '</h3>' +
+            '<div class="price">' + priceText + '</div>' +
+            '<div class="price-note">' + esc(desc) + '</div>' +
+            '<ul>' + benefits.map(b => '<li>' + b + '</li>').join('') + '</ul>' +
+            '<a href="' + href + '" class="btn ' + btnClass + '" style="width:100%">' + btnLabel + '</a>' +
+            '</div>';
+        }).join('');
+      } catch(e) {
+        grid.innerHTML = '<div class="text-dim" style="grid-column:1/-1;text-align:center;padding:2rem">Membership categories are being configured. Check back soon.</div>';
+      }
     }
 
     load();
