@@ -2,6 +2,7 @@
 // UAS Institutional Platform — RBAC (Role-Based Access Control)
 // Supports global and resource-scoped capabilities
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/auth.php';
 
 /**
  * Get all active capabilities for a user via their active role assignments.
@@ -119,6 +120,34 @@ function user_roles(int $userId): array {
 function require_cap(string $capability, ?string $scopeType = null, ?int $scopeId = null): array {
   $user = require_login();
   if (!user_has_cap($user['id'], $capability, $scopeType, $scopeId)) {
+    json_error("Insufficient permissions: {$capability}", 403);
+  }
+  return $user;
+}
+
+/**
+ * Require a capability scoped to a specific resource.
+ * Resolves scope from the resource type (e.g., event -> programme).
+ * Falls back to global caps for users with system-wide authority.
+ */
+function require_cap_for(string $capability, string $resourceType, int $resourceId): array {
+  $user = require_login();
+  $scopeType = $resourceType;
+  $scopeId = $resourceId;
+
+  if ($resourceType === 'event') {
+    $stmt = db()->prepare('SELECT programme_id FROM events WHERE id = ?');
+    $stmt->execute([$resourceId]);
+    $progId = $stmt->fetchColumn();
+    if ($progId) { $scopeType = 'programme'; $scopeId = (int)$progId; }
+  } elseif ($resourceType === 'working_group') {
+    $stmt = db()->prepare('SELECT programme_id FROM working_groups WHERE id = ?');
+    $stmt->execute([$resourceId]);
+    $progId = $stmt->fetchColumn();
+    if ($progId) { $scopeType = 'programme'; $scopeId = (int)$progId; }
+  }
+
+  if (!user_has_cap_for($user['id'], $capability, $scopeType, $scopeId)) {
     json_error("Insufficient permissions: {$capability}", 403);
   }
   return $user;

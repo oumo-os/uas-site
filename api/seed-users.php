@@ -69,9 +69,18 @@ $users = [
   ],
 ];
 
-// Role capabilities mapping
+// Role capabilities mapping — Programme Lead gets scoped caps
+$eduProgId = (int) db()->query("SELECT id FROM programmes WHERE title = 'Astronomy Education Programme'")->fetchColumn();
 $roleCaps = [
-  'Programme Lead' => ['programmes.manage', 'projects.create', 'projects.manage', 'projects.approve', 'events.approve', 'reports.create', 'reports.approve'],
+  'Programme Lead' => [
+    ['slug' => 'programmes.manage', 'scope_type' => 'programme', 'scope_id' => $eduProgId],
+    ['slug' => 'projects.create', 'scope_type' => 'programme', 'scope_id' => $eduProgId],
+    ['slug' => 'projects.manage', 'scope_type' => 'programme', 'scope_id' => $eduProgId],
+    ['slug' => 'projects.approve', 'scope_type' => 'programme', 'scope_id' => $eduProgId],
+    ['slug' => 'events.approve', 'scope_type' => 'programme', 'scope_id' => $eduProgId],
+    ['slug' => 'reports.create', 'scope_type' => 'programme', 'scope_id' => $eduProgId],
+    ['slug' => 'reports.approve', 'scope_type' => 'programme', 'scope_id' => $eduProgId],
+  ],
   'Communications Officer' => ['articles.submit', 'articles.review', 'events.create', 'events.rsvp', 'documents.upload'],
   'Education WG Lead' => ['articles.approve', 'events.approve', 'programmes.create', 'programmes.manage', 'reports.create'],
 ];
@@ -109,14 +118,8 @@ foreach ($users as $u) {
     $roleRow = $stmt->fetch();
 
     if (!$roleRow) {
-      $capIds = [];
-      foreach (($roleCaps[$u['role']] ?? []) as $slug) {
-        $stmt = db()->prepare('SELECT id FROM capabilities WHERE slug = ?');
-        $stmt->execute([$slug]);
-        $capId = $stmt->fetchColumn();
-        if ($capId) $capIds[] = (int) $capId;
-      }
-      $roleId = create_role($u['role'], $u['role_desc'], $capIds, $adminId, $u['role_scope'] ?? null, null, $u['role_type'] ?? null, $u['role_target'] ?? null);
+      $caps = $roleCaps[$u['role']] ?? [];
+      $roleId = create_role($u['role'], $u['role_desc'], $caps, $adminId, $u['role_scope'] ?? null, null, $u['role_type'] ?? null, $u['role_target'] ?? null);
       echo "  Created role: {$u['role']} (id={$roleId})\n";
     } else {
       $roleId = $roleRow['id'];

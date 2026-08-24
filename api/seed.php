@@ -111,26 +111,43 @@ foreach ($boardMembers as $i => $bm) {
   }
 }
 
-// 3. Create sample roles
+// 3. Create sample programme (before roles so scoped caps can reference it)
+$stmt = db()->prepare('SELECT id FROM programmes WHERE title = ?');
+$stmt->execute(['Astronomy Education Programme']);
+if (!$stmt->fetch()) {
+  db()->prepare("INSERT INTO programmes (title, description, lead_id, status, objectives, created_by) VALUES (?, ?, ?, 'active', ?, ?)")
+    ->execute([
+      'Astronomy Education Programme',
+      'UAS flagship programme for astronomy education across Ugandan schools and universities',
+      null,
+      'Increase astronomy literacy and inspire the next generation of Ugandan astronomers',
+      $adminId
+    ]);
+  echo "Created programme: Astronomy Education Programme\n";
+}
+$eduProgId = (int) db()->query("SELECT id FROM programmes WHERE title = 'Astronomy Education Programme'")->fetchColumn();
+
+// 4. Create sample roles (with scoped capabilities)
 $sampleRoles = [
-  ['title' => 'PR Director', 'desc' => 'Manages public relations and communications', 'caps' => ['articles.review', 'articles.approve', 'articles.publish', 'events.approve', 'events.publish'], 'scope' => 'committee', 'role_type' => 'administrative'],
+  ['title' => 'PR Director', 'desc' => 'Manages public relations and communications', 'caps' => ['articles.review', 'articles.approve', 'articles.publish', 'events.approve', 'events.publish'], 'scope' => 'committee', 'role_type' => 'administrative', 'target' => null],
   ['title' => 'Education WG Lead', 'desc' => 'Leads the Education Working Group', 'caps' => ['articles.approve', 'events.approve', 'programmes.create', 'programmes.manage', 'reports.create'], 'scope' => 'working_group', 'role_type' => 'governance', 'target' => 'Education Working Group'],
-  ['title' => 'Programme Lead', 'desc' => 'Oversees programme execution', 'caps' => ['programmes.manage', 'projects.create', 'projects.manage', 'projects.approve', 'events.approve', 'reports.create', 'reports.approve'], 'scope' => 'programme', 'role_type' => 'governance', 'target' => 'General Programme'],
+  ['title' => 'Programme Lead', 'desc' => 'Oversees programme execution', 'caps' => [
+    ['slug' => 'programmes.manage', 'scope_type' => 'programme', 'scope_id' => $eduProgId],
+    ['slug' => 'projects.create', 'scope_type' => 'programme', 'scope_id' => $eduProgId],
+    ['slug' => 'projects.manage', 'scope_type' => 'programme', 'scope_id' => $eduProgId],
+    ['slug' => 'projects.approve', 'scope_type' => 'programme', 'scope_id' => $eduProgId],
+    ['slug' => 'events.approve', 'scope_type' => 'programme', 'scope_id' => $eduProgId],
+    ['slug' => 'reports.create', 'scope_type' => 'programme', 'scope_id' => $eduProgId],
+    ['slug' => 'reports.approve', 'scope_type' => 'programme', 'scope_id' => $eduProgId],
+  ], 'scope' => 'programme', 'role_type' => 'governance', 'target' => 'Astronomy Education Programme'],
 ];
 
 foreach ($sampleRoles as $sr) {
   $stmt = db()->prepare('SELECT id FROM roles WHERE title = ?');
   $stmt->execute([$sr['title']]);
   if (!$stmt->fetch()) {
-    $capIds = [];
-    foreach ($sr['caps'] as $slug) {
-      $stmt = db()->prepare('SELECT id FROM capabilities WHERE slug = ?');
-      $stmt->execute([$slug]);
-      $capRow = $stmt->fetch();
-      if ($capRow) $capIds[] = $capRow['id'];
-    }
-    $roleId = create_role($sr['title'], $sr['desc'], $capIds, $adminId, $sr['scope'] ?? null, null, $sr['role_type'] ?? null, $sr['target'] ?? null);
-    echo "Created role: {$sr['title']} (id={$roleId}, caps=" . count($capIds) . ")\n";
+    $roleId = create_role($sr['title'], $sr['desc'], $sr['caps'], $adminId, $sr['scope'] ?? null, null, $sr['role_type'] ?? null, $sr['target'] ?? null);
+    echo "Created role: {$sr['title']} (id={$roleId})\n";
   }
 }
 
@@ -148,21 +165,6 @@ if (!$stmt->fetch()) {
   }
   create_role('Member', 'Baseline membership role', $capIds, $adminId);
   echo "Created role: Member (caps=" . count($capIds) . ")\n";
-}
-
-// 5. Create sample programme
-$stmt = db()->prepare('SELECT id FROM programmes WHERE title = ?');
-$stmt->execute(['Astronomy Education Programme']);
-if (!$stmt->fetch()) {
-  db()->prepare("INSERT INTO programmes (title, description, lead_id, status, objectives, created_by) VALUES (?, ?, ?, 'active', ?, ?)")
-    ->execute([
-      'Astronomy Education Programme',
-      'UAS flagship programme for astronomy education across Ugandan schools and universities',
-      null,
-      'Increase astronomy literacy and inspire the next generation of Ugandan astronomers',
-      $adminId
-    ]);
-  echo "Created programme: Astronomy Education Programme\n";
 }
 
 // 5. Create sample partner

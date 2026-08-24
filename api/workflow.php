@@ -68,10 +68,23 @@ function transition(string $objectType, int $objectId, string $newState, int $us
     json_error("Invalid transition: {$current} → {$newState} for {$objectType}");
   }
 
-  // Check capability
+  // Check capability (resolve scope for scoped resources)
   $capRequired = get_required_cap($objectType, $newState);
-  if ($capRequired && !user_has_cap($userId, $capRequired)) {
-    json_error("Insufficient permissions: {$capRequired}", 403);
+  if ($capRequired) {
+    $scopeType = null;
+    $scopeId = null;
+    if ($objectType === 'event') {
+      $stmt = db()->prepare('SELECT programme_id FROM events WHERE id = ?');
+      $stmt->execute([$objectId]);
+      $progId = $stmt->fetchColumn();
+      if ($progId) { $scopeType = 'programme'; $scopeId = (int)$progId; }
+    } elseif ($objectType === 'programme') {
+      $scopeType = 'programme';
+      $scopeId = $objectId;
+    }
+    if (!user_has_cap($userId, $capRequired, $scopeType, $scopeId)) {
+      json_error("Insufficient permissions: {$capRequired}", 403);
+    }
   }
 
   // Record transition

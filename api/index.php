@@ -1183,7 +1183,7 @@ try {
     json_response(['ok' => true]);
   }
   elseif (preg_match('#^/events/(\d+)/publish$#', $path, $m) && $method === 'POST') {
-    $user = require_cap('events.publish');
+    $user = require_cap_for('events.publish', 'event', (int)$m[1]);
     $eid = (int) $m[1];
     transition('event', $eid, 'published', $user['id']);
     $stmt = db()->prepare('SELECT organizer_id, title FROM events WHERE id = ?');
@@ -1193,7 +1193,7 @@ try {
     json_response(['ok' => true]);
   }
   elseif (preg_match('#^/events/(\d+)/cancel$#', $path, $m) && $method === 'POST') {
-    $user = require_cap('events.cancel');
+    $user = require_cap_for('events.cancel', 'event', (int)$m[1]);
     db()->prepare("UPDATE events SET status = 'cancelled' WHERE id = ?")->execute([(int) $m[1]]);
     audit_log('event_cancel', 'event', (int) $m[1]);
     json_response(['ok' => true]);
@@ -1837,7 +1837,7 @@ try {
     json_response($members);
   }
   elseif (preg_match('#^/working-groups/(\d+)/members$#', $path, $m) && $method === 'POST') {
-    $user = require_cap('roles.manage');
+    $user = require_cap_for('roles.manage', 'working_group', (int)$m[1]);
     $groupId = (int) $m[1];
     $data = input_json();
     $userId = (int) $data['user_id'];
@@ -1847,7 +1847,7 @@ try {
     json_response(['ok' => true], 201);
   }
   elseif (preg_match('#^/working-groups/(\d+)$#', $path, $m) && $method === 'PUT') {
-    $user = require_cap('roles.manage');
+    $user = require_cap_for('roles.manage', 'working_group', (int)$m[1]);
     $wgId = (int) $m[1];
     $data = input_json();
     $sets = []; $args = [];
@@ -1861,7 +1861,7 @@ try {
     json_response(['ok' => true]);
   }
   elseif (preg_match('#^/working-groups/(\d+)$#', $path, $m) && $method === 'DELETE') {
-    $user = require_cap('roles.manage');
+    $user = require_cap_for('roles.manage', 'working_group', (int)$m[1]);
     $wgId = (int) $m[1];
     db()->prepare("UPDATE working_groups SET status = 'inactive' WHERE id = ?")->execute([$wgId]);
     db()->prepare("UPDATE working_group_members SET status = 'inactive' WHERE group_id = ?")->execute([$wgId]);
@@ -1869,7 +1869,7 @@ try {
     json_response(['ok' => true]);
   }
   elseif (preg_match('#^/working-groups/(\d+)/members/(\d+)$#', $path, $m) && $method === 'DELETE') {
-    $user = require_cap('roles.manage');
+    $user = require_cap_for('roles.manage', 'working_group', (int)$m[1]);
     $groupId = (int) $m[1];
     $userId = (int) $m[2];
     db()->prepare('UPDATE working_group_members SET status = \'inactive\' WHERE group_id = ? AND user_id = ?')->execute([$groupId, $userId]);
@@ -2320,7 +2320,7 @@ try {
   }
   // --- PROGRAMME MEMBERS & OUTPUTS ---
   elseif (preg_match('#^/programmes/(\d+)$#', $path, $m) && $method === 'PUT') {
-    require_cap('programmes.manage');
+    require_cap_for('programmes.manage', 'programme', (int)$m[1]);
     $data = input_json();
     $id = (int) $m[1];
     $sets = [];
@@ -2344,7 +2344,7 @@ try {
     json_response($stmt->fetchAll());
   }
   elseif (preg_match('#^/programmes/(\d+)/members$#', $path, $m) && $method === 'POST') {
-    require_cap('programmes.manage');
+    require_cap_for('programmes.manage', 'programme', (int)$m[1]);
     $data = input_json();
     $id = (int) $m[1];
     if (empty($data['user_id'])) json_error('user_id is required', 400);
@@ -2356,7 +2356,7 @@ try {
     json_response(['ok' => true]);
   }
   elseif (preg_match('#^/programmes/(\d+)/members/(\d+)$#', $path, $m) && $method === 'DELETE') {
-    require_cap('programmes.manage');
+    require_cap_for('programmes.manage', 'programme', (int)$m[1]);
     db()->prepare('DELETE FROM programme_members WHERE programme_id = ? AND user_id = ?')->execute([(int) $m[1], (int) $m[2]]);
     audit_log('programme_member_remove', 'programme', (int) $m[1], ['user_id' => (int) $m[2]]);
     json_response(['ok' => true]);
