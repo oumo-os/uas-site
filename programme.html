@@ -13,23 +13,6 @@
   <meta property="og:type" content="website">
   <link rel="stylesheet" href="css/base.css">
   <style>
-    .page-hero {
-      position:relative; min-height:40vh; display:flex; flex-direction:column;
-      justify-content:flex-end; padding:6rem 1.5rem 3rem; background:url('img/header-programmes.jpg') center/cover no-repeat; color:#fff;
-    }
-    .page-hero::before { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(15,23,42,0.4) 0%,rgba(15,23,42,0.85) 100%); }
-    .page-hero > * { position:relative; z-index:1; }
-    .page-hero .breadcrumb { font-size:0.85rem; margin-bottom:0.75rem; }
-    .page-hero .breadcrumb a { color:rgba(255,255,255,0.7); text-decoration:none; }
-    .page-hero .breadcrumb a:hover { color:#fff; }
-    .page-hero h1 { font-size:2.2rem; font-weight:700; color:#fff; margin-bottom:0.5rem; }
-    .page-hero p { font-size:1rem; color:rgba(255,255,255,0.8); max-width:640px; line-height:1.6; }
-    .hero-meta { display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; margin-top:0.75rem; }
-
-    .section { padding:3rem 0; }
-    .content-grid { display:grid; grid-template-columns:2fr 1fr; gap:2rem; align-items:start; }
-    .sidebar { position:sticky; top:100px; }
-
     .stat-row { display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom:2rem; }
     .stat-chip {
       display:inline-flex; align-items:center; gap:0.5rem; padding:0.6rem 1rem;
@@ -39,9 +22,6 @@
     .stat-chip:hover { border-color:var(--border-focus); box-shadow:var(--shadow); }
     .stat-chip .label { font-size:0.7rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em; }
     .stat-chip .value { font-weight:600; }
-
-    .card-section { padding:1.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); margin-bottom:1.5rem; }
-    .card-section h3 { font-size:1.1rem; font-weight:700; margin-bottom:1rem; padding-bottom:0.75rem; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:0.5rem; }
 
     .timeline-bar { display:flex; align-items:center; gap:0.75rem; padding:1rem; background:var(--accent-glow); border-radius:var(--radius); margin-bottom:1rem; }
     .timeline-bar .track { flex:1; height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
@@ -79,19 +59,15 @@
     .finance-box.expense .f-value { color:var(--danger); }
     .finance-box.balance .f-value { color:var(--accent); }
 
+    .wg-card { padding:0.75rem 1rem; border:1px solid var(--border); border-radius:var(--radius); margin-bottom:0.5rem; transition:all 0.2s; }
+    .wg-card:hover { border-color:var(--accent); }
+    .wg-card h4 { font-size:0.9rem; margin-bottom:0.15rem; }
+    .wg-card p { font-size:0.78rem; color:var(--text-dim); }
+
     @media (max-width:768px) {
-      .page-hero { min-height:30vh; padding:4rem 1rem 2rem; }
-      .page-hero h1 { font-size:1.5rem; }
-      .content-grid { grid-template-columns:1fr; }
-      .sidebar { position:static; }
       .finance-grid { grid-template-columns:1fr; }
       .stat-row { gap:0.5rem; }
     }
-    .role-badge {
-      display:inline-block; font-size:0.65rem; padding:0.1rem 0.4rem; border-radius:999px;
-      font-weight:600; vertical-align:middle;
-    }
-    .role-badge.programme { background:rgba(45,106,79,0.12); color:var(--success); }
   </style>
 </head>
 <body>
@@ -112,16 +88,17 @@
     </div>
   </nav>
 
-  <section class="page-hero">
+  <section class="detail-hero">
+    <div class="hero-bg" id="pHeroBg" style="background-image:url('img/header-programmes.jpg')"></div>
     <div class="container">
       <div class="breadcrumb"><a href="/programmes">Programmes</a> &rsaquo; <span id="pBreadcrumb"></span></div>
       <h1 id="pTitle"></h1>
-      <p id="pDesc"></p>
+      <div class="description-body" id="pDesc" style="color:rgba(255,255,255,0.85);max-width:640px;margin-top:0.5rem"></div>
       <div class="hero-meta" id="pHeroMeta"></div>
     </div>
   </section>
 
-  <section class="section">
+  <section class="section" style="padding-top:0">
     <div class="container">
       <div class="stat-row" id="pStats"></div>
       <div class="content-grid">
@@ -131,26 +108,47 @@
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg></span> Objectives</h3>
             <ul class="obj-list" id="pObjectives"></ul>
           </div>
+          <div class="card-section" id="pOutputsSection" style="display:none">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span> Expected Outputs</h3>
+            <div class="description-body" id="pOutputs"></div>
+          </div>
+          <div class="card-section" id="pTeamSection" style="display:none">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Team Members</h3>
+            <div id="pTeam"></div>
+          </div>
           <div class="card-section">
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span> Projects</h3>
             <div id="pProjects"></div>
           </div>
           <div class="card-section" id="pEventsSection" style="display:none">
-            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span> Related Events</h3>
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span> Events</h3>
             <div id="pEvents"></div>
           </div>
         </div>
         <div class="sidebar">
+          <div class="card-section" id="pLeadCard" style="display:none">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span> Programme Lead</h3>
+            <div id="pLead"></div>
+          </div>
           <div class="card-section" id="pFinanceCard" style="display:none">
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span> Financial Summary</h3>
             <div class="finance-grid" id="pFinance"></div>
+          </div>
+          <div class="card-section" id="pWgSection" style="display:none">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg></span> Working Groups</h3>
+            <div id="pWorkingGroups"></div>
           </div>
           <div class="card-section">
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span> Quick Facts</h3>
             <div id="pFacts"></div>
           </div>
+          <div class="card-section" id="pRelatedSection" style="display:none">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span> Related Programmes</h3>
+            <div id="pRelated"></div>
+          </div>
         </div>
       </div>
+      <div class="share-row" id="pShare" style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border)"></div>
     </div>
   </section>
 
@@ -175,21 +173,36 @@
       if (!id) { document.getElementById('pTitle').textContent = 'Programme not found'; return; }
       var p = await api.getPublicProgramme(id).catch(function(){ return null; });
       if (!p) { document.getElementById('pTitle').textContent = 'Programme not found'; return; }
+      render(p);
+    }
+
+    function render(p) {
       document.title = p.title + ' — Uganda Astronomical Society';
       document.getElementById('pBreadcrumb').textContent = p.title;
       document.getElementById('pTitle').textContent = p.title;
-      document.getElementById('pDesc').textContent = p.description || '';
+
+      // Dynamic hero image
+      if (p.image_url) {
+        document.getElementById('pHeroBg').style.backgroundImage = 'url(' + esc(p.image_url) + ')';
+      }
+
+      // Rich description
+      document.getElementById('pDesc').innerHTML = p.description ? p.description : '';
 
       var statusClass = p.status === 'active' ? 'active' : p.status === 'completed' ? 'dim' : 'pending';
       document.getElementById('pHeroMeta').innerHTML =
+        (p.category ? '<span class="badge badge-active">' + esc(p.category) + '</span>' : '') +
         '<span class="badge badge-' + statusClass + '">' + esc(p.status) + '</span>' +
         (p.start_date ? '<span style="color:rgba(255,255,255,0.8)"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span> ' + fmtDate(p.start_date) + (p.end_date ? ' — ' + fmtDate(p.end_date) : '') + '</span>' : '');
 
+      // Stats
       document.getElementById('pStats').innerHTML =
         '<div class="stat-chip"><div><div class="label">Projects</div><div class="value">' + p.projects.length + '</div></div></div>' +
         (p.events && p.events.length ? '<div class="stat-chip"><div><div class="label">Events</div><div class="value">' + p.events.length + '</div></div></div>' : '') +
+        (p.members && p.members.length ? '<div class="stat-chip"><div><div class="label">Team</div><div class="value">' + p.members.length + '</div></div></div>' : '') +
         (Number(p.budget) > 0 ? '<div class="stat-chip"><div><div class="label">Budget</div><div class="value">UGX ' + Number(p.budget).toLocaleString() + '</div></div></div>' : '');
 
+      // Timeline
       if (p.start_date || p.end_date) {
         var now = new Date();
         var start = p.start_date ? new Date(p.start_date) : null;
@@ -207,11 +220,33 @@
           '</div></div>';
       }
 
+      // Objectives
       var objs = document.getElementById('pObjectives');
       objs.innerHTML = p.objectives
         ? p.objectives.split(/\r?\n/).filter(Boolean).map(function(o){ return '<li>' + esc(o.trim()) + '</li>'; }).join('')
         : '<p class="text-dim" style="font-size:0.9rem">No objectives listed.</p>';
 
+      // Outputs
+      if (p.outputs) {
+        document.getElementById('pOutputsSection').style.display = 'block';
+        document.getElementById('pOutputs').innerHTML = p.outputs;
+      }
+
+      // Team members
+      if (p.members && p.members.length) {
+        document.getElementById('pTeamSection').style.display = 'block';
+        document.getElementById('pTeam').innerHTML = p.members.map(function(m) {
+          var initials = (m.user_name || '?').split(' ').map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
+          return '<div class="team-card">' +
+            '<div class="avatar">' + initials + '</div>' +
+            '<div class="team-info">' +
+            '<div class="team-name">' + esc(m.user_name) + '</div>' +
+            '<div class="team-role">' + esc(m.role_in_programme || 'Member') + '</div>' +
+            '</div></div>';
+        }).join('');
+      }
+
+      // Projects
       var projDiv = document.getElementById('pProjects');
       if (!p.projects.length) {
         projDiv.innerHTML = '<p class="text-dim" style="font-size:0.9rem">No projects yet.</p>';
@@ -234,6 +269,7 @@
         }).join('');
       }
 
+      // Events
       if (p.events && p.events.length) {
         document.getElementById('pEventsSection').style.display = 'block';
         document.getElementById('pEvents').innerHTML = p.events.map(function(ev) {
@@ -244,6 +280,20 @@
         }).join('');
       }
 
+      // Lead card
+      if (p.lead_name) {
+        document.getElementById('pLeadCard').style.display = 'block';
+        var initials = p.lead_name.split(' ').map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
+        document.getElementById('pLead').innerHTML =
+          '<div class="profile-card">' +
+          '<div class="avatar">' + initials + '</div>' +
+          '<div class="profile-info">' +
+          '<div class="profile-name">' + esc(p.lead_name) + '</div>' +
+          '<div class="profile-role">Programme Lead' + (p.lead_institution ? ' &middot; ' + esc(p.lead_institution) : '') + '</div>' +
+          '</div></div>';
+      }
+
+      // Finance
       if (p.finance && (p.finance.income > 0 || p.finance.expense > 0)) {
         document.getElementById('pFinanceCard').style.display = 'block';
         document.getElementById('pFinance').innerHTML =
@@ -258,6 +308,18 @@
           'Financial data is available to members. <a href="/login" style="color:var(--accent)">Login</a> to view.</div>';
       }
 
+      // Working groups
+      if (p.working_groups && p.working_groups.length) {
+        document.getElementById('pWgSection').style.display = 'block';
+        document.getElementById('pWorkingGroups').innerHTML = p.working_groups.map(function(wg) {
+          return '<div class="wg-card">' +
+            '<h4>' + esc(wg.title) + '</h4>' +
+            (wg.description ? '<p>' + esc(wg.description).slice(0, 120) + (wg.description.length > 120 ? '...' : '') + '</p>' : '') +
+            '</div>';
+        }).join('');
+      }
+
+      // Quick facts
       document.getElementById('pFacts').innerHTML =
         '<div style="font-size:0.88rem;line-height:2">' +
         '<div><span class="text-dim">Status:</span> <strong>' + esc(p.status) + '</strong></div>' +
@@ -265,10 +327,39 @@
         (p.end_date ? '<div><span class="text-dim">Ends:</span> ' + fmtDate(p.end_date) + '</div>' : '') +
         '<div><span class="text-dim">Projects:</span> ' + p.projects.length + '</div>' +
         (p.events ? '<div><span class="text-dim">Events:</span> ' + p.events.length + '</div>' : '') +
+        (p.members ? '<div><span class="text-dim">Team:</span> ' + p.members.length + '</div>' : '') +
         '</div>';
+
+      // Related programmes
+      if (p.related && p.related.length) {
+        document.getElementById('pRelatedSection').style.display = 'block';
+        document.getElementById('pRelated').innerHTML = p.related.map(function(r) {
+          return '<a href="/programme/' + r.id + '" class="related-card">' +
+            '<h4>' + esc(r.title) + '</h4>' +
+            '<p>' + esc((r.category || r.status || '').replace(/_/g,' ')) + '</p></a>';
+        }).join('');
+      }
+
+      // Social share
+      var pageUrl = encodeURIComponent(window.location.href);
+      var shareText = encodeURIComponent(p.title + ' — Uganda Astronomical Society');
+      document.getElementById('pShare').innerHTML =
+        '<span style="font-size:0.82rem;color:var(--text-dim);align-self:center">Share:</span>' +
+        '<a class="share-btn" href="https://twitter.com/intent/tweet?url=' + pageUrl + '&text=' + shareText + '" target="_blank">Twitter</a>' +
+        '<a class="share-btn" href="https://www.facebook.com/sharer/sharer.php?u=' + pageUrl + '" target="_blank">Facebook</a>' +
+        '<a class="share-btn" href="https://wa.me/?text=' + shareText + '%20' + pageUrl + '" target="_blank">WhatsApp</a>' +
+        '<a class="share-btn" href="https://www.linkedin.com/sharing/share-offsite/?url=' + pageUrl + '" target="_blank">LinkedIn</a>' +
+        '<button class="share-btn" onclick="navigator.clipboard.writeText(window.location.href).then(function(){this.textContent=\'Copied!\'}.bind(this));setTimeout(function(){this.textContent=\'Copy URL\'}.bind(this),2000)" type="button">Copy URL</button>';
     }
 
     function fmtDate(d) { if (!d) return ''; var dt = new Date(d); return dt.toLocaleDateString('en',{year:'numeric',month:'short',day:'numeric'}); }
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+    function updateNavUser() {
+      var el = document.getElementById('navUser');
+      el.innerHTML = api._user
+        ? '<a href="/dashboard" class="btn btn-outline btn-sm">' + esc(api._user.name) + '</a>'
+        : '<a href="/login" class="btn btn-primary btn-sm">Login</a>';
+    }
     load();
   </script>
 </body>

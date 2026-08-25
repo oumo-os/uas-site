@@ -580,3 +580,180 @@ tr:hover td { background: var(--accent-glow); }
 .rte-editor ul, .rte-editor ol { margin:0.5rem 0; padding-left:1.5rem; }
 .rte-editor a { color:var(--accent); text-decoration:underline; }
 @media (max-width:480px) { .rte-toolbar { gap:0; } .rte-btn { min-width:1.5rem; height:1.5rem; font-size:0.75rem; } }
+
+/* ============ Detail Page Shared Styles ============ */
+
+/* Hero with dynamic background image */
+.detail-hero {
+  position: relative;
+  min-height: 35vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 6rem 1.5rem 3rem;
+  color: #fff;
+  overflow: hidden;
+}
+.detail-hero .hero-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+}
+.detail-hero .hero-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15,23,42,0.35) 0%, rgba(15,23,42,0.88) 100%);
+}
+.detail-hero > * { position: relative; z-index: 1; }
+.detail-hero .breadcrumb { font-size: 0.85rem; margin-bottom: 0.75rem; }
+.detail-hero .breadcrumb a { color: rgba(255,255,255,0.7); text-decoration: none; }
+.detail-hero .breadcrumb a:hover { color: #fff; }
+.detail-hero h1 { font-size: 2.2rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem; line-height: 1.25; }
+.detail-hero .hero-meta { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-top: 0.5rem; font-size: 0.9rem; }
+.detail-hero .hero-meta span { color: rgba(255,255,255,0.8); display: flex; align-items: center; gap: 0.3rem; }
+
+/* Content grid: 2-column layout */
+.content-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; align-items: start; }
+.content-main { min-width: 0; }
+.sidebar { position: sticky; top: 100px; }
+
+/* Card section: used for about, team, outputs, etc. */
+.card-section {
+  padding: 1.5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 1.5rem;
+}
+.card-section h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Info grid: 4-column detail boxes */
+.info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+.info-box { padding: 1rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); }
+.info-box .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 0.25rem; }
+.info-box .value { font-size: 0.95rem; font-weight: 600; }
+
+/* Rich description body */
+.description-body { font-size: 1.02rem; line-height: 1.85; color: var(--text); }
+.description-body p { margin-bottom: 1.1rem; }
+.description-body h2, .description-body h3 { color: var(--text); margin: 1.5rem 0 0.75rem; }
+.description-body img { max-width: 100%; border-radius: var(--radius-lg); margin: 1rem 0; }
+.description-body blockquote { border-left: 3px solid var(--accent); margin: 1rem 0; padding: 0.5rem 1rem; background: var(--bg-card); border-radius: 0 var(--radius) var(--radius) 0; }
+.description-body a { color: var(--accent); }
+.description-body ul, .description-body ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.description-body li { margin-bottom: 0.3rem; }
+
+/* Social share row */
+.share-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
+.share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.share-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Profile card (author, organizer, lead) */
+.profile-card { display: flex; align-items: center; gap: 0.75rem; }
+.profile-card .avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--accent-glow);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+.profile-card .profile-info { min-width: 0; }
+.profile-card .profile-name { font-weight: 600; }
+.profile-card .profile-role { font-size: 0.8rem; color: var(--text-dim); }
+
+/* Tag pills */
+.tags-row { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.5rem; }
+.tag-pill {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--accent-glow);
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+.tag-pill:hover { background: var(--accent); color: #fff; }
+
+/* Related content cards */
+.related-card {
+  display: block;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 0.75rem;
+  text-decoration: none;
+  color: var(--text);
+  transition: all 0.2s;
+}
+.related-card:hover { border-color: var(--border-focus); box-shadow: var(--shadow); }
+.related-card h4 { font-size: 0.9rem; margin-bottom: 0.2rem; }
+.related-card p { font-size: 0.78rem; color: var(--text-dim); }
+
+/* Team member card */
+.team-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 0.5rem;
+  transition: all 0.2s;
+}
+.team-card:hover { border-color: var(--accent); }
+.team-card .avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent-glow);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.team-card .team-info { min-width: 0; }
+.team-card .team-name { font-weight: 600; font-size: 0.9rem; }
+.team-card .team-role { font-size: 0.78rem; color: var(--text-dim); }
+
+/* Responsive: detail pages */
+@media (max-width: 768px) {
+  .detail-hero { min-height: 25vh; padding: 4rem 1rem 2rem; }
+  .detail-hero h1 { font-size: 1.5rem; }
+  .content-grid { grid-template-columns: 1fr; }
+  .sidebar { position: static; }
+  .info-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 480px) {
+  .info-grid { grid-template-columns: 1fr; }
+}

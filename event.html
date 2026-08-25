@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <script>(function(){var s=location.pathname.replace(/\/+$/,'').split('/').filter(Boolean);var P=/^(index\.html|index|about|programmes|programme|events|event|news|knowledge|article|library|search|ecosystem|members|join|login|dashboard|profile|admin|member|404\.html|gallery|contact)$/;while(s.length>=2&&/^(article|articles|event|events|programme|programmes|poll|polls|resolution|resolutions)$/.test(s[s.length-2])&&/^\d+$/.test(s[s.length-1])){s.pop();s.pop();}while(s.length&&(P.test(s[s.length-1])||/\.[a-z0-9]+$/i.test(s[s.length-1]))){s.pop();}var base=s.length?'/'+s.join('/'):'';var b=document.createElement('base');b.href=base+'/';document.head.appendChild(b);if(!window.UAS_BASE)window.UAS_BASE=base;})();</script>
+  <script>(function(){var s=location.pathname.replace(/\/+$/,'').split('/').filter(Boolean);var P=/^(index\.html|index|about|programmes|programme|events|event|news|knowledge|article|articles|library|search|ecosystem|members|join|login|dashboard|profile|admin|member|404\.html|gallery|contact)$/;while(s.length>=2&&/^(article|articles|event|events|programme|programmes|poll|polls|resolution|resolutions)$/.test(s[s.length-2])&&/^\d+$/.test(s[s.length-1])){s.pop();s.pop();}while(s.length&&(P.test(s[s.length-1])||/\.[a-z0-9]+$/i.test(s[s.length-1]))){s.pop();}var base=s.length?'/'+s.join('/'):'';var b=document.createElement('base');b.href=base+'/';document.head.appendChild(b);if(!window.UAS_BASE)window.UAS_BASE=base;})();</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/png" href="img/uas-emblem.png">
   <title>Event — Uganda Astronomical Society</title>
@@ -13,33 +13,11 @@
   <meta property="og:type" content="website">
   <link rel="stylesheet" href="css/base.css">
   <style>
-    .page-hero {
-      position:relative; min-height:40vh; display:flex; flex-direction:column;
-      justify-content:flex-end; padding:6rem 1.5rem 3rem; background:url('img/header-events.jpg') center/cover no-repeat; color:#fff;
-    }
-    .page-hero::before { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(15,23,42,0.4) 0%,rgba(15,23,42,0.85) 100%); }
-    .page-hero > * { position:relative; z-index:1; }
-    .page-hero .breadcrumb { font-size:0.85rem; margin-bottom:0.75rem; }
-    .page-hero .breadcrumb a { color:rgba(255,255,255,0.7); text-decoration:none; }
-    .page-hero .breadcrumb a:hover { color:#fff; }
-    .page-hero h1 { font-size:2.2rem; font-weight:700; color:#fff; margin-bottom:0.5rem; }
-    .hero-meta { display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; margin-top:0.5rem; }
-    .hero-meta span { font-size:0.9rem; color:rgba(255,255,255,0.8); display:flex; align-items:center; gap:0.3rem; }
-
-    .section { padding:3rem 0; }
-    .content-grid { display:grid; grid-template-columns:2fr 1fr; gap:2rem; align-items:start; }
-    .sidebar { position:sticky; top:100px; }
-
     .info-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:0.75rem; margin-bottom:2rem; }
     .info-box { padding:1rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); transition:all 0.2s; }
     .info-box:hover { border-color:var(--border-focus); box-shadow:var(--shadow); }
     .info-box .label { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-dim); margin-bottom:0.25rem; }
     .info-box .value { font-weight:600; font-size:0.95rem; }
-
-    .card-section { padding:1.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); margin-bottom:1.5rem; }
-    .card-section h3 { font-size:1.1rem; font-weight:700; margin-bottom:1rem; padding-bottom:0.75rem; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:0.5rem; }
-    .description-body { font-size:0.92rem; line-height:1.7; color:var(--text-dim); }
-    .description-body p { margin-bottom:0.75rem; }
 
     .action-card { padding:1.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); margin-bottom:1.5rem; text-align:center; }
     .action-card h3 { font-size:1rem; margin-bottom:0.75rem; }
@@ -51,19 +29,12 @@
 
     .btn-calendar { display:inline-flex; align-items:center; gap:0.5rem; padding:0.6rem 1rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-card); color:var(--text); font-size:0.88rem; cursor:pointer; transition:all 0.2s; text-decoration:none; }
     .btn-calendar:hover { border-color:var(--accent); color:var(--accent); }
-    .share-row { display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.75rem; }
-    .share-btn { display:inline-flex; align-items:center; gap:0.3rem; padding:0.4rem 0.75rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-card); color:var(--text-dim); font-size:0.78rem; text-decoration:none; transition:all 0.2s; }
-    .share-btn:hover { border-color:var(--accent); color:var(--accent); }
 
     .stat-mini { display:flex; gap:1.5rem; font-size:0.85rem; color:var(--text-dim); margin-top:0.75rem; }
     .stat-mini span { display:flex; align-items:center; gap:0.3rem; }
 
     @media (max-width:768px) {
-      .page-hero { min-height:30vh; padding:4rem 1rem 2rem; }
-      .page-hero h1 { font-size:1.5rem; }
-      .content-grid { grid-template-columns:1fr; }
       .info-grid { grid-template-columns:1fr; }
-      .sidebar { position:static; }
     }
   </style>
 </head>
@@ -85,7 +56,8 @@
     </div>
   </nav>
 
-  <section class="page-hero">
+  <section class="detail-hero">
+    <div class="hero-bg" id="eHeroBg" style="background-image:url('img/header-events.jpg')"></div>
     <div class="container" style="max-width:900px">
       <div class="breadcrumb"><a href="/events">Events</a> &rsaquo; <span id="eBreadcrumb"></span></div>
       <h1 id="eTitle"></h1>
@@ -93,7 +65,7 @@
     </div>
   </section>
 
-  <section class="section">
+  <section class="section" style="padding-top:0">
     <div class="container" style="max-width:900px">
       <div class="content-grid">
         <div class="content-main">
@@ -102,13 +74,22 @@
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span> About This Event</h3>
             <div class="description-body" id="eBody"></div>
           </div>
+          <div id="eTags" class="tags-row" style="margin-bottom:1.5rem"></div>
           <div id="eAttendeesSection"></div>
+          <div class="card-section" id="eRelatedSection" style="display:none">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span> Related Events</h3>
+            <div id="eRelated"></div>
+          </div>
         </div>
         <div class="sidebar">
           <div class="action-card">
             <h3>Registration</h3>
             <div id="eActions"></div>
             <div id="eMsg" style="font-size:0.88rem;margin-top:0.75rem"></div>
+          </div>
+          <div class="card-section" id="eOrganizerCard" style="display:none">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span> Organizer</h3>
+            <div id="eOrganizer"></div>
           </div>
           <div class="card-section" id="eProgrammeCard" style="display:none">
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span> Programme</h3>
@@ -141,7 +122,9 @@
 
   <script src="js/api.js"></script>
   <script>
+    var eventImgs = {'lecture':ua('/img/event-lecture.jpg'),'workshop':ua('/img/event-workshop.jpg'),'observing':ua('/img/event-observing.jpg'),'conference':ua('/img/event-conference.jpg'),'outreach':ua('/img/event-outreach.jpg')};
     var eventId = null;
+
     async function load() {
       try { await api.me(); } catch(e) {}
       updateNavUser();
@@ -159,9 +142,14 @@
       document.getElementById('eBreadcrumb').textContent = e.title;
       document.getElementById('eTitle').textContent = e.title;
 
+      // Dynamic hero image
+      var coverImg = e.image_url || eventImgs[e.category] || ua('/img/header-events.jpg');
+      document.getElementById('eHeroBg').style.backgroundImage = 'url(' + esc(coverImg) + ')';
+
       var d2 = new Date(e.date);
       var statusClass = e.status === 'published' ? 'active' : e.status === 'cancelled' ? 'inactive' : 'pending';
       document.getElementById('eMeta').innerHTML =
+        (e.category ? '<span class="badge badge-active">' + esc(e.category) + '</span>' : '') +
         '<span class="badge badge-' + statusClass + '">' + esc(e.status) + '</span>' +
         '<span><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>' + esc(e.organiser_name) + '</span>' +
         (e.programme_title ? '<span><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span>' + esc(e.programme_title) + '</span>' : '');
@@ -180,18 +168,39 @@
         '<div class="info-box"><div class="label">Location</div><div class="value">' + (e.location ? '<a href="https://maps.google.com/?q=' + encodeURIComponent(e.location) + '" target="_blank" style="color:inherit;text-decoration:none">' + esc(e.location) + ' <span class="icon-inline icon-sm" style="display:inline"><svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></span></a>' : 'TBD') + '</div></div>' +
         '<div class="info-box"><div class="label">Capacity</div><div class="value">' + (e.capacity ? d.stats.total + ' / ' + e.capacity : d.stats.total + ' registered') + '</div></div>';
 
-      document.getElementById('eBody').innerHTML = e.description
-        ? e.description.split(/\n/).map(function(p){ return '<p>' + esc(p) + '</p>'; }).join('')
-        : '<p class="text-dim">No description provided.</p>';
+      // Rich HTML description
+      document.getElementById('eBody').innerHTML = e.description || '<p class="text-dim">No description provided.</p>';
 
+      // Tags
+      var tags = parseTags(e.tags);
+      if (tags.length) {
+        document.getElementById('eTags').innerHTML = tags.map(function(t){
+          return '<span class="tag-pill">' + esc(t) + '</span>';
+        }).join('');
+      }
+
+      // Programme card
       if (e.programme_title && e.programme_id) {
         document.getElementById('eProgrammeCard').style.display = 'block';
         document.getElementById('eProgramme').innerHTML =
-          '<a href="/programmes/' + e.programme_id + '" style="display:block;padding:0.75rem;border:1px solid var(--border);border-radius:var(--radius);text-decoration:none;color:var(--text);transition:all 0.2s" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\'">' +
+          '<a href="/programme/' + e.programme_id + '" style="display:block;padding:0.75rem;border:1px solid var(--border);border-radius:var(--radius);text-decoration:none;color:var(--text);transition:all 0.2s" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\'">' +
           '<div style="font-weight:600;font-size:0.92rem">' + esc(e.programme_title) + '</div>' +
           '<div style="font-size:0.8rem;color:var(--text-dim);margin-top:0.2rem">View programme &rarr;</div></a>';
       }
 
+      // Organizer card
+      document.getElementById('eOrganizerCard').style.display = 'block';
+      var initials = (e.organiser_name || '?').split(' ').map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
+      document.getElementById('eOrganizer').innerHTML =
+        '<div class="profile-card">' +
+        '<div class="avatar">' + initials + '</div>' +
+        '<div class="profile-info">' +
+        '<div class="profile-name">' + esc(e.organiser_name) + '</div>' +
+        '<div class="profile-role">' + (e.organiser_institution ? esc(e.organiser_institution) : 'Event Organizer') + '</div>' +
+        '</div></div>' +
+        (e.organiser_bio ? '<p style="margin-top:0.75rem;font-size:0.85rem;color:var(--text-dim);line-height:1.5">' + esc(e.organiser_bio).slice(0, 200) + (e.organiser_bio.length > 200 ? '...' : '') + '</p>' : '');
+
+      // Quick actions + share
       var icsUrl = generateICS(e);
       var pageUrl = encodeURIComponent(window.location.href);
       var shareText = encodeURIComponent(e.title + ' — Uganda Astronomical Society');
@@ -213,6 +222,17 @@
           '<div class="stat-mini" style="margin-top:1rem;border-top:1px solid var(--border);padding-top:0.75rem">' +
           '<span><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span> ' + d.stats.attended + ' attended</span>' +
           '<span>' + d.stats.total + ' registered</span></div>';
+      }
+
+      // Related events
+      if (d.related && d.related.length) {
+        document.getElementById('eRelatedSection').style.display = 'block';
+        document.getElementById('eRelated').innerHTML = d.related.map(function(r) {
+          var rd = new Date(r.date);
+          return '<a href="/event/' + r.id + '" class="related-card">' +
+            '<h4>' + esc(r.title) + '</h4>' +
+            '<p>' + rd.toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'}) + ' &middot; ' + esc(r.location || 'TBD') + '</p></a>';
+        }).join('');
       }
 
       renderActions(d);
@@ -277,39 +297,31 @@
       } catch(e) { el.innerHTML = '<p class="text-dim">Could not load attendees.</p>'; }
     }
 
+    function parseTags(t) {
+      if (!t) return [];
+      if (Array.isArray(t)) return t;
+      if (typeof t === 'string') {
+        try { var v = JSON.parse(t); return Array.isArray(v) ? v : []; }
+        catch(e) { return t.split(',').map(function(s){ return s.trim(); }).filter(Boolean); }
+      }
+      return [];
+    }
+
     function generateICS(e) {
       var dt = new Date(e.date);
       var dtEnd = e.end_date ? new Date(e.end_date) : new Date(dt.getTime() + 3600000);
       function pad(n) { return n < 10 ? '0' + n : '' + n; }
       function fmt(d) { return d.getUTCFullYear() + pad(d.getUTCMonth()+1) + pad(d.getUTCDate()) + 'T' + pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + pad(d.getUTCSeconds()); }
-      var ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:' + fmt(dt) + '\nDTEND:' + fmt(dtEnd) +
-        '\nSUMMARY:' + (e.title || '').replace(/,/g,'\\,') +
-        '\nLOCATION:' + (e.location || '').replace(/,/g,'\\,') +
-        '\nDESCRIPTION:' + (e.description || '').replace(/[\n\r]/g,'\\n').replace(/,/g,'\\,').substring(0,500) +
-        '\nEND:VEVENT\nEND:VCALENDAR';
+      var ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//UAS//Events//EN\nBEGIN:VEVENT\nDTSTART:' + fmt(dt) + '\nDTEND:' + fmt(dtEnd) + '\nSUMMARY:' + (e.title||'').replace(/\n/g,'\\n') + '\nLOCATION:' + (e.location||'').replace(/\n/g,'\\n') + '\nDESCRIPTION:' + (e.description||'').replace(/<[^>]*>/g,'').replace(/\n/g,'\\n').slice(0,500) + '\nEND:VEVENT\nEND:VCALENDAR';
       return 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
     }
 
-    async function rsvp() {
-      try { await api.rsvpEvent(eventId); document.getElementById('eMsg').innerHTML = '<span class="text-success">Registered!</span>'; load(); }
-      catch(e) { document.getElementById('eMsg').innerHTML = '<span class="text-danger">' + esc(e.error || 'RSVP failed') + '</span>'; }
-    }
-    async function cancelRsvp() {
-      try { await api.cancelRsvp(eventId); document.getElementById('eMsg').innerHTML = '<span class="text-dim">Cancelled.</span>'; load(); }
-      catch(e) { document.getElementById('eMsg').innerHTML = '<span class="text-danger">' + esc(e.error || 'Failed') + '</span>'; }
-    }
-    async function joinWaitlist() {
-      try { await api.request('/events/' + eventId + '/waitlist', {method:'POST'}); load(); }
-      catch(e) { document.getElementById('eMsg').innerHTML = '<span class="text-danger">' + esc(e.error || 'Failed') + '</span>'; }
-    }
-    async function leaveWaitlist() {
-      try { await api.request('/events/' + eventId + '/waitlist', {method:'DELETE'}); load(); }
-      catch(e) { document.getElementById('eMsg').innerHTML = '<span class="text-danger">' + esc(e.error || 'Failed') + '</span>'; }
-    }
-    async function promoteUser(wlId) {
-      if (!confirm('Promote from waitlist?')) return;
-      try { await api.request('/events/' + eventId + '/waitlist/' + wlId + '/promote', {method:'POST'}); load(); }
-      catch(e) { alert(e.error || 'Failed'); }
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+    function updateNavUser() {
+      var el = document.getElementById('navUser');
+      el.innerHTML = api._user
+        ? '<a href="/dashboard" class="btn btn-outline btn-sm">' + esc(api._user.name) + '</a>'
+        : '<a href="/login" class="btn btn-primary btn-sm">Login</a>';
     }
     load();
   </script>

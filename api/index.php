@@ -1365,7 +1365,7 @@ try {
   // --- PUBLIC EVENT DETAIL ---
   elseif (preg_match('#^/events/(\d+)$#', $path, $m) && $method === 'GET') {
     $eventId = (int) $m[1];
-    $stmt = db()->prepare('SELECT e.*, u.name AS organiser_name, pr.title AS programme_title FROM events e JOIN users u ON u.id = e.organizer_id LEFT JOIN programmes pr ON pr.id = e.programme_id WHERE e.id = ? AND e.status IN ("published", "cancelled", "completed")');
+    $stmt = db()->prepare('SELECT e.*, u.name AS organiser_name, u.avatar_url AS organiser_avatar, u.institution AS organiser_institution, u.bio AS organiser_bio, pr.title AS programme_title FROM events e JOIN users u ON u.id = e.organizer_id LEFT JOIN programmes pr ON pr.id = e.programme_id WHERE e.id = ? AND e.status IN ("published", "cancelled", "completed")');
     $stmt->execute([$eventId]);
     $event = $stmt->fetch();
     if (!$event) json_error('Event not found', 404);
@@ -1404,6 +1404,24 @@ try {
     $stmt->execute([$eventId]);
     $waitlist_count = (int) $stmt->fetchColumn();
 
+    // Related events: same programme or same category, limit 3
+    $related = [];
+    $relSql = 'SELECT e.id, e.title, e.date, e.location, e.image_url, e.category, e.status FROM events e WHERE e.id != ? AND e.status = "published"';
+    $relParams = [$eventId];
+    if ($event['programme_id']) {
+      $relSql .= ' AND e.programme_id = ?';
+      $relParams[] = $event['programme_id'];
+    } elseif ($event['category']) {
+      $relSql .= ' AND e.category = ?';
+      $relParams[] = $event['category'];
+    } else {
+      $relSql .= ' AND e.date >= NOW()';
+    }
+    $relSql .= ' ORDER BY e.date ASC LIMIT 3';
+    $stmt = db()->prepare($relSql);
+    $stmt->execute($relParams);
+    $related = $stmt->fetchAll();
+
     json_response([
       'event' => $event,
       'stats' => ['total' => (int)$regs['total'], 'attended' => (int)$regs['attended']],
@@ -1413,6 +1431,7 @@ try {
       'waitlist_count' => $waitlist_count,
       'my_waitlist' => $my_waitlist ? ['id' => $my_waitlist['id'], 'created_at' => $my_waitlist['created_at']] : null,
       'waitlist' => $waitlist ?? [],
+      'related' => $related,
     ]);
   }
 
@@ -2407,7 +2426,7 @@ try {
   }
   elseif (preg_match('#^/public/programmes/(\d+)$#', $path, $m) && $method === 'GET') {
     $pid = (int) $m[1];
-    $stmt = db()->prepare('SELECT p.* FROM programmes p WHERE p.id = ?');
+    $stmt = db()->prepare('SELECT p.*, lu.name AS lead_name, lu.avatar_url AS lead_avatar, lu.institution AS lead_institution FROM programmes p LEFT JOIN users lu ON lu.id = p.lead_id WHERE p.id = ?');
     $stmt->execute([$pid]);
     $programme = $stmt->fetch();
     if (!$programme) json_error('Programme not found', 404);
@@ -2427,15 +2446,24 @@ try {
     $stmt->execute([$pid]);
     $programme['events'] = $stmt->fetchAll();
 
-    // Members and outputs are member-only
+    // Team members: basic info public, full info for members
     if ($requester) {
       $stmt = db()->prepare('SELECT pm.*, u.name AS user_name, u.email AS user_email FROM programme_members pm JOIN users u ON u.id = pm.user_id WHERE pm.programme_id = ? AND pm.status = "active" ORDER BY u.name');
-      $stmt->execute([$pid]);
-      $programme['members'] = $stmt->fetchAll();
     } else {
-      $programme['members'] = [];
+      $stmt = db()->prepare('SELECT pm.programme_id, pm.user_id, pm.role_in_programme, pm.status, u.name AS user_name FROM programme_members pm JOIN users u ON u.id = pm.user_id WHERE pm.programme_id = ? AND pm.status = "active" ORDER BY u.name');
+    }
+    $stmt->execute([$pid]);
+    $programme['members'] = $stmt->fetchAll();
+
+    // Outputs are member-only
+    if (!$requester) {
       unset($programme['outputs']);
     }
+
+    // Working groups for this programme
+    $stmt = db()->prepare('SELECT id, title, description, status FROM working_groups WHERE programme_id = ? ORDER BY title');
+    $stmt->execute([$pid]);
+    $programme['working_groups'] = $stmt->fetchAll();
 
     // Finance and programme budget are member-only
     if ($requester) {
@@ -2452,6 +2480,15 @@ try {
       $programme['finance'] = null;
       unset($programme['budget'], $programme['spent']);
     }
+
+    // Related programmes: same category, limit 2
+    $related = [];
+    if ($programme['category']) {
+      $stmt = db()->prepare('SELECT id, title, description, status, image_url, category FROM programmes WHERE id != ? AND category = ? AND status IN ("active","completed") ORDER BY RAND() LIMIT 2');
+      $stmt->execute([$pid, $programme['category']]);
+      $related = $stmt->fetchAll();
+    }
+    $programme['related'] = $related;
 
     json_response($programme);
   }
