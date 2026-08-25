@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <script>(function(){var s=location.pathname.replace(/\/+$/,'').split('/').filter(Boolean);var P=/^(index\.html|index|about|programmes|programme|events|event|news|knowledge|article|library|search|ecosystem|members|join|login|dashboard|profile|admin|member|404\.html|gallery|contact)$/;while(s.length>=2&&/^(article|event|programme|poll|resolution)$/.test(s[s.length-2])&&/^\d+$/.test(s[s.length-1])){s.pop();s.pop();}while(s.length&&(P.test(s[s.length-1])||/\.[a-z0-9]+$/i.test(s[s.length-1]))){s.pop();}var base=s.length?'/'+s.join('/'):'';var b=document.createElement('base');b.href=base+'/';document.head.appendChild(b);if(!window.UAS_BASE)window.UAS_BASE=base;})();</script>
+  <script>(function(){var s=location.pathname.replace(/\/+$/,'').split('/').filter(Boolean);var P=/^(index\.html|index|about|programmes|programme|events|event|news|knowledge|article|library|search|ecosystem|members|join|login|dashboard|profile|admin|member|404\.html|gallery|contact)$/;while(s.length>=2&&/^(article|articles|event|events|programme|programmes|poll|polls|resolution|resolutions)$/.test(s[s.length-2])&&/^\d+$/.test(s[s.length-1])){s.pop();s.pop();}while(s.length&&(P.test(s[s.length-1])||/\.[a-z0-9]+$/i.test(s[s.length-1]))){s.pop();}var base=s.length?'/'+s.join('/'):'';var b=document.createElement('base');b.href=base+'/';document.head.appendChild(b);if(!window.UAS_BASE)window.UAS_BASE=base;})();</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Resolution Builder — Uganda Astronomical Society</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -52,6 +52,9 @@
               <option value="cap_revoke">Revoke Capability</option>
               <option value="programme_create">Create Programme</option>
               <option value="policy_adopt">Adopt Policy</option>
+              <option value="budget_approve">Approve Budget</option>
+              <option value="financial_auth">Financial Authorization</option>
+              <option value="constitution_update">Constitutional Amendment</option>
             </select>
           </div>
           <div>
@@ -191,6 +194,34 @@
             <div class="change-row">
               ${field('Policy Title', '<input class="form-input" id="chgTitle">')}
               ${field('Policy Text', '<textarea class="form-textarea" id="chgDesc" rows="3"></textarea>')}
+              ${field('Effective Date (YYYY-MM-DD, optional)', '<input type="date" class="form-input" id="chgEffDate">')}
+            </div>`;
+          break;
+        case 'budget_approve':
+          div.innerHTML = `
+            <div class="change-row">
+              ${field('Budget Item IDs (comma-separated)', '<input class="form-input" id="chgBudgetItems" placeholder="1, 2, 3">')}
+              ${field('Programme ID (optional)', '<input type="number" class="form-input" id="chgProgrammeId" min="1">')}
+              ${field('Total Budget (optional)', '<input type="number" class="form-input" id="chgTotalBudget" min="0" step="0.01">')}
+            </div>`;
+          break;
+        case 'financial_auth':
+          div.innerHTML = `
+            <div class="change-row">
+              ${field('Financial Record ID (to approve existing)', '<input type="number" class="form-input" id="chgFinRecordId" min="1">')}
+              <p class="text-sm text-dim">— OR create new authorized expenditure —</p>
+              ${field('Amount', '<input type="number" class="form-input" id="chgAmount" min="0" step="0.01">')}
+              ${field('Category', '<input class="form-input" id="chgCategory" placeholder="e.g. operations, travel">')}
+              ${field('Description', '<textarea class="form-textarea" id="chgFinDesc" rows="2"></textarea>')}
+              ${field('Programme ID (optional)', '<input type="number" class="form-input" id="chgFinProgrammeId" min="1">')}
+            </div>`;
+          break;
+        case 'constitution_update':
+          div.innerHTML = `
+            <div class="change-row">
+              ${field('Amendment Title', '<input class="form-input" id="chgTitle" placeholder="e.g. Article 5 Amendment">')}
+              ${field('Amendment Text', '<textarea class="form-textarea" id="chgDesc" rows="5"></textarea>')}
+              ${field('Effective Date (YYYY-MM-DD, optional)', '<input type="date" class="form-input" id="chgEffDate">')}
             </div>`;
           break;
       }
@@ -244,6 +275,40 @@
           changes.push({ change_type: 'policy_adopt', payload: {
             title: document.getElementById('chgTitle').value,
             description: document.getElementById('chgDesc').value,
+            effective_date: document.getElementById('chgEffDate')?.value || null,
+          }});
+          break;
+        case 'budget_approve': {
+          const biIds = (document.getElementById('chgBudgetItems').value || '').split(',').map(s => parseInt(s.trim(), 10)).filter(Boolean);
+          const payload = { budget_item_ids: biIds };
+          const progId = document.getElementById('chgProgrammeId')?.value;
+          const total = document.getElementById('chgTotalBudget')?.value;
+          if (progId) payload.programme_id = parseInt(progId, 10);
+          if (total) payload.total_budget = parseFloat(total);
+          changes.push({ change_type: 'budget_approve', payload });
+          break;
+        }
+        case 'financial_auth': {
+          const recId = document.getElementById('chgFinRecordId')?.value;
+          if (recId) {
+            changes.push({ change_type: 'financial_auth', payload: { financial_record_id: parseInt(recId, 10) }});
+          } else {
+            const payload = {
+              amount: parseFloat(document.getElementById('chgAmount').value),
+              category: document.getElementById('chgCategory').value || 'other',
+              description: document.getElementById('chgFinDesc').value || null,
+            };
+            const pId = document.getElementById('chgFinProgrammeId')?.value;
+            if (pId) payload.programme_id = parseInt(pId, 10);
+            changes.push({ change_type: 'financial_auth', payload });
+          }
+          break;
+        }
+        case 'constitution_update':
+          changes.push({ change_type: 'constitution_update', payload: {
+            title: document.getElementById('chgTitle').value,
+            text: document.getElementById('chgDesc').value,
+            effective_date: document.getElementById('chgEffDate')?.value || null,
           }});
           break;
       }

@@ -386,6 +386,7 @@ function get_pending_items(?int $userId = null): array {
  */
 function institutional_health(): array {
   close_expired_voting();
+  expire_role_assignments();
   $health = [];
 
   // Members

@@ -258,8 +258,25 @@ function revoke_role(int $roleId, int $userId): void {
     "UPDATE role_assignments SET status = 'revoked' WHERE role_id = ? AND user_id = ? AND status = 'active'"
   )->execute([$roleId, $userId]);
   user_capabilities_invalidate($userId);
-  audit_log('role_revoke', 'role', $roleId, ['user_id' => $userId]);
+
+  // Fetch role title for notification context
+  $roleTitle = db()->prepare('SELECT title FROM roles WHERE id = ?');
+  $roleTitle->execute([$roleId]);
+  $roleTitle = $roleTitle->fetchColumn() ?: 'Unknown Role';
+
+  audit_log('role_revoke', 'role', $roleId, ['user_id' => $userId, 'role_title' => $roleTitle]);
   if (function_exists('auto_revoke_delegations')) auto_revoke_delegations($userId);
+
+  // Notify the affected user
+  if (function_exists('notify_user')) {
+    notify_user($userId, 'role_revoked', 'Role removed: ' . $roleTitle,
+      'Your role "' . $roleTitle . '" has been removed. If you believe this is an error, please contact an administrator.', '/dashboard');
+  }
+  // Notify admins of the change
+  if (function_exists('notify_capability')) {
+    notify_capability('admin.system', 'role_revoked_by_admin', 'Role revoked: ' . $roleTitle,
+      'A role assignment was revoked by an administrator. User ID: ' . $userId, '/admin?tab=roles');
+  }
 }
 
 /**
@@ -379,4 +396,20 @@ function rbac_audit(): array {
       'overprivileged_users' => $overprivileged,
     ]
   ];
+}
+
+/**
+ * Expire role assignments past their effective_to date.
+ * Sets status='expired' for clean record-keeping. Called from institutional_health().
+ */
+function expire_role_assignments(): array {
+  $stmt = db()->prepare(
+    "UPDATE role_assignments SET status = 'expired' WHERE status = 'active' AND effective_to IS NOT NULL AND effective_to < CURDATE()"
+  );
+  $stmt->execute();
+  $count = $stmt->rowCount();
+  if ($count > 0) {
+    audit_log('role_assignments_expired', 'system', 0, ['expired_count' => $count]);
+  }
+  return ['expired' => $count];
 }

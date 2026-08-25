@@ -334,6 +334,66 @@ function apply_resolution(int $resolutionId): void {
           ]);
           break;
 
+        case 'policy_adopt':
+          db()->prepare(
+            'INSERT INTO policies (title, body, status, effective_date, resolution_id, created_by) VALUES (?, ?, ?, ?, ?, ?)'
+          )->execute([
+            $payload['title'],
+            $payload['description'] ?? $payload['body'] ?? null,
+            'active',
+            $payload['effective_date'] ?? null,
+            $resolutionId,
+            $res['proposed_by']
+          ]);
+          break;
+
+        case 'budget_approve':
+          if (!empty($payload['budget_item_ids'])) {
+            foreach ($payload['budget_item_ids'] as $biId) {
+              db()->prepare("UPDATE budget_items SET status = 'active' WHERE id = ? AND status = 'draft'")->execute([(int)$biId]);
+            }
+          }
+          if (!empty($payload['programme_id']) && !empty($payload['total_budget'])) {
+            db()->prepare('UPDATE programmes SET budget = ? WHERE id = ?')->execute([(float)$payload['total_budget'], (int)$payload['programme_id']]);
+          }
+          break;
+
+        case 'financial_auth':
+          if (!empty($payload['financial_record_id'])) {
+            db()->prepare(
+              "UPDATE financial_records SET status = 'approved', approved_by = ?, approved_at = NOW() WHERE id = ? AND status = 'pending'"
+            )->execute([$res['proposed_by'], (int)$payload['financial_record_id']]);
+          } elseif (!empty($payload['amount'])) {
+            db()->prepare(
+              'INSERT INTO financial_records (type, amount, category, description, programme_id, project_id, budget_item_id, recorded_by, approved_by, approved_at, record_date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), CURDATE(), ?)'
+            )->execute([
+              $payload['record_type'] ?? 'expense',
+              (float)$payload['amount'],
+              $payload['category'] ?? 'other',
+              $payload['description'] ?? null,
+              $payload['programme_id'] ?? null,
+              $payload['project_id'] ?? null,
+              $payload['budget_item_id'] ?? null,
+              $res['proposed_by'],
+              $res['proposed_by'],
+              'approved'
+            ]);
+          }
+          break;
+
+        case 'constitution_update':
+          db()->prepare(
+            'INSERT INTO constitutional_amendments (title, text, status, effective_date, resolution_id, created_by) VALUES (?, ?, ?, ?, ?, ?)'
+          )->execute([
+            $payload['title'],
+            $payload['text'] ?? $payload['description'] ?? '',
+            'active',
+            $payload['effective_date'] ?? null,
+            $resolutionId,
+            $res['proposed_by']
+          ]);
+          break;
+
         default:
           audit_log('resolution_change_unknown', 'resolution_change', $change['id'], [
             'change_type' => $changeType
