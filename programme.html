@@ -126,10 +126,6 @@
           </div>
         </div>
         <div class="sidebar">
-          <div class="card-section" id="pLeadCard" style="display:none">
-            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span> Programme Lead</h3>
-            <div id="pLead"></div>
-          </div>
           <div class="card-section" id="pFinanceCard" style="display:none">
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span> Financial Summary</h3>
             <div class="finance-grid" id="pFinance"></div>
@@ -280,19 +276,6 @@
         }).join('');
       }
 
-      // Lead card
-      if (p.lead_name) {
-        document.getElementById('pLeadCard').style.display = 'block';
-        var initials = p.lead_name.split(' ').map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
-        document.getElementById('pLead').innerHTML =
-          '<div class="profile-card">' +
-          '<div class="avatar">' + initials + '</div>' +
-          '<div class="profile-info">' +
-          '<div class="profile-name">' + esc(p.lead_name) + '</div>' +
-          '<div class="profile-role">Programme Lead' + (p.lead_institution ? ' &middot; ' + esc(p.lead_institution) : '') + '</div>' +
-          '</div></div>';
-      }
-
       // Finance
       if (p.finance && (p.finance.income > 0 || p.finance.expense > 0)) {
         document.getElementById('pFinanceCard').style.display = 'block';
@@ -313,7 +296,7 @@
         document.getElementById('pWgSection').style.display = 'block';
         document.getElementById('pWorkingGroups').innerHTML = p.working_groups.map(function(wg) {
           return '<div class="wg-card">' +
-            '<h4>' + esc(wg.title) + '</h4>' +
+            '<h4>' + esc(wg.name) + '</h4>' +
             (wg.description ? '<p>' + esc(wg.description).slice(0, 120) + (wg.description.length > 120 ? '...' : '') + '</p>' : '') +
             '</div>';
         }).join('');

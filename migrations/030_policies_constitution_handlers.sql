@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS policies (
 -- 2. Constitutional amendments table — stores approved amendments
 CREATE TABLE IF NOT EXISTS constitutional_amendments (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  amendment_number INT AUTO_INCREMENT,
+  amendment_number INT NOT NULL,
   title VARCHAR(255) NOT NULL,
   text TEXT NOT NULL,
   status ENUM('proposed','active','superseded') DEFAULT 'proposed',
@@ -27,8 +27,7 @@ CREATE TABLE IF NOT EXISTS constitutional_amendments (
   created_by INT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (resolution_id) REFERENCES resolutions(id) ON DELETE SET NULL,
-  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
-  UNIQUE KEY uq_amendment_number (amendment_number)
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 3. Add constitution_update to resolution_changes.change_type ENUM

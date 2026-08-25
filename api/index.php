@@ -1406,14 +1406,11 @@ try {
 
     // Related events: same programme or same category, limit 3
     $related = [];
-    $relSql = 'SELECT e.id, e.title, e.date, e.location, e.image_url, e.category, e.status FROM events e WHERE e.id != ? AND e.status = "published"';
+    $relSql = 'SELECT e.id, e.title, e.date, e.location, e.status FROM events e WHERE e.id != ? AND e.status = "published"';
     $relParams = [$eventId];
     if ($event['programme_id']) {
       $relSql .= ' AND e.programme_id = ?';
       $relParams[] = $event['programme_id'];
-    } elseif ($event['category']) {
-      $relSql .= ' AND e.category = ?';
-      $relParams[] = $event['category'];
     } else {
       $relSql .= ' AND e.date >= NOW()';
     }
@@ -2426,7 +2423,7 @@ try {
   }
   elseif (preg_match('#^/public/programmes/(\d+)$#', $path, $m) && $method === 'GET') {
     $pid = (int) $m[1];
-    $stmt = db()->prepare('SELECT p.*, lu.name AS lead_name, lu.avatar_url AS lead_avatar, lu.institution AS lead_institution FROM programmes p LEFT JOIN users lu ON lu.id = p.lead_id WHERE p.id = ?');
+    $stmt = db()->prepare('SELECT p.* FROM programmes p WHERE p.id = ?');
     $stmt->execute([$pid]);
     $programme = $stmt->fetch();
     if (!$programme) json_error('Programme not found', 404);
@@ -2461,7 +2458,7 @@ try {
     }
 
     // Working groups for this programme
-    $stmt = db()->prepare('SELECT id, title, description, status FROM working_groups WHERE programme_id = ? ORDER BY title');
+    $stmt = db()->prepare('SELECT id, name, description, status FROM working_groups WHERE programme_id = ? ORDER BY name');
     $stmt->execute([$pid]);
     $programme['working_groups'] = $stmt->fetchAll();
 
@@ -2483,11 +2480,6 @@ try {
 
     // Related programmes: same category, limit 2
     $related = [];
-    if ($programme['category']) {
-      $stmt = db()->prepare('SELECT id, title, description, status, image_url, category FROM programmes WHERE id != ? AND category = ? AND status IN ("active","completed") ORDER BY RAND() LIMIT 2');
-      $stmt->execute([$pid, $programme['category']]);
-      $related = $stmt->fetchAll();
-    }
     $programme['related'] = $related;
 
     json_response($programme);
