@@ -2742,13 +2742,13 @@
           { name: 'end_date', label: 'End Date & Time', type: 'datetime-local' },
           { name: 'location', label: 'Location', type: 'text', placeholder: 'e.g. Kololo Airstrip, Kampala' },
           { name: 'capacity', label: 'Capacity', type: 'number', min: 0, placeholder: 'Max attendees (0 = unlimited)' },
-          { name: 'description', label: 'Description', type: 'textarea', rows: 4, required: true },
+          { name: 'description', label: 'Description', type: 'rich-text', rows: 4, required: true },
         ];
       } else if (type === 'programme') {
         title = 'Propose Programme';
         fields = [
           { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Programme title' },
-          { name: 'description', label: 'Description', type: 'textarea', rows: 4, required: true },
+          { name: 'description', label: 'Description', type: 'rich-text', rows: 4, required: true },
           { name: 'objectives', label: 'Objectives', type: 'textarea', rows: 3, placeholder: 'Key objectives and goals' },
         ];
       } else if (type === 'project') {

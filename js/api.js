@@ -536,6 +536,9 @@ window.updateNavUser = function () {
 window._esc = window._esc || function (s) { return s != null ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; };
 var esc = esc || window._esc;
 
+window._stripHtml = window._stripHtml || function (s) { return s ? s.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim() : ''; };
+var stripHtml = stripHtml || window._stripHtml;
+
 // --- Brand emblem ---
 // Adds the UAS emblem to every .nav-brand (favicon is declared statically per page).
 (function () {

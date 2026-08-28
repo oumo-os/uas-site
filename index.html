@@ -297,7 +297,7 @@
               <img src="${progImgs[i % progImgs.length]}" alt="" class="card-thumb" loading="lazy">
               <div class="card-body">
                 <h3>${esc(p.title)}</h3>
-                <p>${esc(p.description || '').slice(0, 140)}</p>
+                <p>${esc(stripHtml(p.description || '').slice(0, 140))}</p>
               </div>
             </div>
           `).join('');
