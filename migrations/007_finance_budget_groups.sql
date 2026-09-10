@@ -13,14 +13,17 @@ ALTER TABLE financial_records
   ) DEFAULT 'other';
 
 -- 3. Add event_id and budget_item_id to financial_records
+-- NOTE: the FK is a separate, explicitly-named statement (not bundled with
+-- the ADD COLUMNs) for maximum server compatibility.
 ALTER TABLE financial_records
   ADD COLUMN event_id INT NULL AFTER project_id,
   ADD COLUMN budget_item_id INT NULL AFTER event_id,
   ADD COLUMN due_date DATE NULL AFTER record_date,
   ADD COLUMN status ENUM('draft','pending','approved','paid','cancelled') DEFAULT 'approved' AFTER due_date,
   ADD COLUMN attachment_url VARCHAR(500) NULL AFTER status,
-  ADD COLUMN notes TEXT NULL AFTER attachment_url,
-  ADD FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL;
+  ADD COLUMN notes TEXT NULL AFTER attachment_url;
+ALTER TABLE financial_records
+  ADD CONSTRAINT fk_financial_records_event FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL;
 
 -- 4. Create budget_items table
 CREATE TABLE IF NOT EXISTS budget_items (
