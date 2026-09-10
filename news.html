@@ -91,7 +91,18 @@
     </div>
   </section>
 
-  <section class="section section-alt">
+  <section class="section section-alt" id="spaceSection" style="display:none">
+    <div class="container">
+      <div class="section-header">
+        <h2>Around the World in Space</h2>
+        <p>Fresh space and astronomy headlines from around the globe</p>
+      </div>
+      <div class="news-grid" id="spaceGrid"></div>
+      <p class="text-dim" style="font-size:0.8rem;margin-top:1.5rem;text-align:center">Headlines via the Spaceflight News API &middot; refreshed every few hours</p>
+    </div>
+  </section>
+
+  <section class="section">
     <div class="container">
       <div class="section-header">
         <h2>External News &amp; Resources</h2>
@@ -193,6 +204,54 @@
       } else {
         linkDiv.innerHTML = '<div class="empty-state"><p>No external resources linked yet.</p></div>';
       }
+
+      loadSpaceNews();
+    }
+
+    // External headlines: Spaceflight News API (free, no key), cached 6h.
+    // Any failure hides the section silently — local news always works.
+    async function loadSpaceNews() {
+      const section = document.getElementById('spaceSection');
+      const grid = document.getElementById('spaceGrid');
+      const CACHE_KEY = 'uas_spacenews_v1';
+      const MAX_AGE = 6 * 3600 * 1000;
+      let items = null;
+      try {
+        const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+        if (cached && cached.ts && (Date.now() - cached.ts) < MAX_AGE && Array.isArray(cached.items) && cached.items.length) {
+          items = cached.items;
+        }
+      } catch(e) {}
+      if (!items) {
+        try {
+          const res = await fetch('https://api.spaceflightnewsapi.net/v4/articles/?limit=6&ordering=-published_at');
+          if (!res.ok) throw new Error('feed unavailable');
+          const data = await res.json();
+          items = (data.results || []).map(a => ({
+            title: a.title, url: a.url, image_url: a.image_url,
+            summary: a.summary, news_site: a.news_site, published_at: a.published_at,
+          })).filter(a => a.title && a.url);
+          try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), items })); } catch(e) {}
+        } catch(e) { return; }
+      }
+      if (!items || !items.length) return;
+      section.style.display = '';
+      grid.innerHTML = items.map(a => {
+        const d = a.published_at ? new Date(a.published_at) : null;
+        return `
+          <a class="news-card" href="${esc(a.url)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;color:inherit">
+            ${a.image_url ? `<img src="${esc(a.image_url)}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}
+            <div class="card-body">
+              <span class="badge badge-active" style="font-size:0.68rem">External</span>
+              <h3 style="margin-top:0.4rem">${esc(a.title)}</h3>
+              ${a.summary ? `<p style="font-size:0.85rem;color:var(--text-dim);line-height:1.5;margin:0.35rem 0 0">${esc(a.summary.slice(0, 140))}${a.summary.length > 140 ? '&hellip;' : ''}</p>` : ''}
+              <div class="news-meta">
+                ${a.news_site ? `<span>${esc(a.news_site)}</span>` : ''}
+                ${d ? `<span>${d.toLocaleDateString('en',{year:'numeric',month:'short',day:'numeric'})}</span>` : ''}
+              </div>
+            </div>
+          </a>`;
+      }).join('');
     }
 
     load();
