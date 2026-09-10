@@ -207,6 +207,39 @@
     </div>
   </section>
 
+  <section class="section section-alt">
+    <div class="container" style="max-width:800px">
+      <h2 class="section-title">Open Roles</h2>
+      <p class="section-subtitle">UAS is member-run. These seats are currently open — members may express interest through the dashboard or by emailing <a href="mailto:secretary@astronomy.ug">secretary@astronomy.ug</a>.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div style="padding:1rem 1.25rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg)">
+          <h4 style="font-size:0.92rem;margin-bottom:0.35rem">Vice President</h4>
+          <p style="font-size:0.85rem;color:var(--text-dim);line-height:1.5;margin:0">Board office. Deputises for the President with a distinct delegated portfolio.</p>
+        </div>
+        <div style="padding:1rem 1.25rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg)">
+          <h4 style="font-size:0.92rem;margin-bottom:0.35rem">ICT & Internal Communications Officer</h4>
+          <p style="font-size:0.85rem;color:var(--text-dim);line-height:1.5;margin:0">Executive office. Runs Society systems and internal communication.</p>
+        </div>
+        <div style="padding:1rem 1.25rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg)">
+          <h4 style="font-size:0.92rem;margin-bottom:0.35rem">Finance, Accountability & Resource Mobilisation Officer</h4>
+          <p style="font-size:0.85rem;color:var(--text-dim);line-height:1.5;margin:0">Executive office. Owns budgeting discipline, reporting and fundraising.</p>
+        </div>
+        <div style="padding:1rem 1.25rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg)">
+          <h4 style="font-size:0.92rem;margin-bottom:0.35rem">Inventory, Assets & Procurement Officer</h4>
+          <p style="font-size:0.85rem;color:var(--text-dim);line-height:1.5;margin:0">Executive office. Tracks equipment, assets and procurement.</p>
+        </div>
+        <div style="padding:1rem 1.25rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg)">
+          <h4 style="font-size:0.92rem;margin-bottom:0.35rem">Programme Leads (5 seats)</h4>
+          <p style="font-size:0.85rem;color:var(--text-dim);line-height:1.5;margin:0">Astronomy & Observation · Education & STEM · African & Ugandan Astronomy · Public Science & Space Culture · Space Ecosystem Engagement.</p>
+        </div>
+        <div style="padding:1rem 1.25rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg)">
+          <h4 style="font-size:0.92rem;margin-bottom:0.35rem">Volunteers & Coordinators</h4>
+          <p style="font-size:0.85rem;color:var(--text-dim);line-height:1.5;margin:0">Programme assistants and activity coordinators — the entry path into greater responsibility.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="cta-section">
     <div class="container">
       <h2>Ready to Look Up?</h2>
@@ -269,16 +302,20 @@
       'Regular Member': [check + 'All observing sessions', check + 'Knowledge base access', check + 'Community forum', check + 'Working group access', check + 'Voting rights', check + 'Research collaboration'],
       'Honorary Member': [check + 'All Regular benefits', check + 'Board meeting access', check + 'Advisory role', check + 'Special recognition'],
       'Institutional Member': [check + 'Institutional recognition', check + 'Bulk membership', check + 'Priority event access', check + 'Research partnership'],
+      'Affiliate Member': [check + 'All observing sessions', check + 'Knowledge base access', check + 'Community forum', check + 'Workshop discounts'],
+      'Corporate Member': [check + 'Brand visibility at events', check + 'Bulk membership', check + 'Priority event access', check + 'Research partnership', check + 'Annual impact report'],
     };
     const tierDescriptions = {
       'Student Member': 'For enrolled students',
       'Regular Member': 'For astronomy enthusiasts',
       'Honorary Member': 'For distinguished contributors',
       'Institutional Member': 'For organisations and institutions',
+      'Affiliate Member': 'For individual supporters',
+      'Corporate Member': 'For corporate partners',
     };
-    const tierOrder = ['Student Member', 'Regular Member', 'Institutional Member', 'Honorary Member'];
-    const tierBtnStyle = { 'Student Member': 'btn-outline', 'Regular Member': 'btn-primary', 'Honorary Member': 'btn-outline', 'Institutional Member': 'btn-outline' };
-    const tierAction = { 'Honorary Member': '/contact', 'Institutional Member': '/contact' };
+    const tierOrder = ['Student Member', 'Affiliate Member', 'Regular Member', 'Institutional Member', 'Corporate Member', 'Honorary Member'];
+    const tierBtnStyle = { 'Student Member': 'btn-outline', 'Regular Member': 'btn-primary', 'Honorary Member': 'btn-outline', 'Institutional Member': 'btn-outline', 'Affiliate Member': 'btn-outline', 'Corporate Member': 'btn-outline' };
+    const tierAction = { 'Honorary Member': '/contact', 'Institutional Member': '/contact', 'Corporate Member': '/contact' };
 
     async function loadDuesRates() {
       const grid = document.getElementById('tiersGrid');

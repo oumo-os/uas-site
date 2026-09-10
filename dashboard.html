@@ -786,6 +786,8 @@
             <option value="Student Member">Student</option>
             <option value="Honorary Member">Honorary</option>
             <option value="Institutional Member">Institutional</option>
+            <option value="Affiliate Member">Affiliate</option>
+            <option value="Corporate Member">Corporate</option>
           </select>
           <select id="mFilterStanding" onchange="filterMembers()" style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text);font-size:0.85rem">
             <option value="">All standings</option>
@@ -1834,6 +1836,8 @@
                   <option value="Student Member" ${currentClass === 'Student Member' ? 'selected' : ''}>Student</option>
                   <option value="Honorary Member" ${currentClass === 'Honorary Member' ? 'selected' : ''}>Honorary</option>
                   <option value="Institutional Member" ${currentClass === 'Institutional Member' ? 'selected' : ''}>Institutional</option>
+                  <option value="Affiliate Member" ${currentClass === 'Affiliate Member' ? 'selected' : ''}>Affiliate</option>
+                  <option value="Corporate Member" ${currentClass === 'Corporate Member' ? 'selected' : ''}>Corporate</option>
                 </select>
               </label>
               <label style="font-size:0.85rem">Standing

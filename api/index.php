@@ -646,8 +646,16 @@ try {
     if (!$stmt->fetch()) json_error('Member not found', 404);
     $fields = [];
     $params = [];
-    if (isset($data['class']) && in_array($data['class'], ['Regular Member','Student Member','Honorary Member','Institutional Member'])) {
+    if (isset($data['class']) && in_array($data['class'], ['Regular Member','Student Member','Honorary Member','Institutional Member','Affiliate Member','Corporate Member'])) {
       set_member_class($userId, $data['class'], $user['id']);
+    }
+    if (isset($data['email'])) {
+      $email = trim((string)$data['email']);
+      if (!filter_var($email, FILTER_VALIDATE_EMAIL)) json_error('Invalid email address', 400);
+      $stmt = db()->prepare('SELECT id FROM users WHERE email = ? AND id != ?');
+      $stmt->execute([$email, $userId]);
+      if ($stmt->fetch()) json_error('Email address is already in use', 409);
+      db()->prepare('UPDATE users SET email = ? WHERE id = ?')->execute([$email, $userId]);
     }
     if (isset($data['standing']) && in_array($data['standing'], ['good_standing','restricted'])) {
       $fields[] = 'standing = ?';
@@ -1950,8 +1958,11 @@ try {
     $membersByGroup = [];
     if ($groupIds) {
       $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
-      // Fetch members
-      $stmt = db()->prepare("SELECT wgm.*, u.name AS user_name, u.email FROM working_group_members wgm JOIN users u ON u.id = wgm.user_id WHERE wgm.group_id IN ($placeholders) AND wgm.status = 'active' ORDER BY u.name");
+      // Fetch members (emails only for logged-in users — this endpoint is public)
+      $memberCols = !empty($_SESSION['user_id'])
+        ? 'wgm.*, u.name AS user_name, u.email, u.institution'
+        : 'wgm.*, u.name AS user_name, u.institution';
+      $stmt = db()->prepare("SELECT $memberCols FROM working_group_members wgm JOIN users u ON u.id = wgm.user_id WHERE wgm.group_id IN ($placeholders) AND wgm.status = 'active' ORDER BY u.name");
       $stmt->execute($groupIds);
       $allMembers = $stmt->fetchAll();
       // Build group name lookup

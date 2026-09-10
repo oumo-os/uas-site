@@ -401,6 +401,7 @@
               ` : ''}
               ${api.hasCap('members.manage') ? `
                 <button class="btn btn-outline btn-xs" onclick="resetPassword(${m.user_id}, '${esc(m.name)}')">Reset PW</button>
+                <button class="btn btn-outline btn-xs" onclick="editEmail(${m.user_id}, '${esc(m.name)}', '${esc(m.email || '')}')">Email</button>
               ` : ''}
             </div>
           </div>
@@ -434,6 +435,16 @@
       try {
         const r = await api.request('/members/' + userId + '/reset-password', { method: 'POST' });
         alert('Temporary password for ' + name + ': ' + r.temp_password + '\nShare it securely — they should change it after logging in.');
+      } catch(e) { alert(e.error || 'Failed'); }
+    }
+
+    async function editEmail(userId, name, current) {
+      const email = prompt('Email address for ' + name + ':', current || '');
+      if (email === null) return;
+      try {
+        await api.request('/members/' + userId, { method: 'PATCH', body: { email: email.trim() } });
+        const members = await api.getMembers();
+        renderMembers(members);
       } catch(e) { alert(e.error || 'Failed'); }
     }
 

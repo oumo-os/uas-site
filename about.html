@@ -359,7 +359,7 @@
               <div class="leader-avatar">${initials}</div>
               <h4>${esc(m.user_name)}</h4>
               ${roleHtml}
-              <div class="institution">${esc(m.email || '')}</div>
+              ${m.institution ? `<div class="institution">${esc(m.institution)}</div>` : ''}
             </div>
           `;
         }).join('') + '</div>' : '<p class="text-dim text-sm">No members assigned yet</p>';
