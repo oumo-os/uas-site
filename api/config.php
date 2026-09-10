@@ -1,11 +1,14 @@
 <?php
 // UAS Institutional Platform — Configuration
+// Server-only secret overrides (never committed to git). Needed because
+// LiteSpeed/cPanel SetEnv cannot reliably carry values containing '#'.
+if (is_file(__DIR__ . '/prod-env.php')) require __DIR__ . '/prod-env.php';
 // environment: production, development
-define('ENV', getenv('UAS_ENV') ?: 'development');
-define('DB_HOST', getenv('UAS_DB_HOST') ?: 'localhost');
-define('DB_NAME', getenv('UAS_DB_NAME') ?: 'uas_platform');
-define('DB_USER', getenv('UAS_DB_USER') ?: 'root');
-define('DB_PASS', getenv('UAS_DB_PASS') ?: '');
+if (!defined('ENV')) define('ENV', getenv('UAS_ENV') ?: 'development');
+if (!defined('DB_HOST')) define('DB_HOST', getenv('UAS_DB_HOST') ?: 'localhost');
+if (!defined('DB_NAME')) define('DB_NAME', getenv('UAS_DB_NAME') ?: 'uas_platform');
+if (!defined('DB_USER')) define('DB_USER', getenv('UAS_DB_USER') ?: 'root');
+if (!defined('DB_PASS')) define('DB_PASS', getenv('UAS_DB_PASS') ?: '');
 define('DB_CHARSET', 'utf8mb4');
 
 define('SITE_NAME', 'Uganda Astronomical Society');
