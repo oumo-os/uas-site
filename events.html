@@ -48,6 +48,10 @@
     .spotlight-body p { font-size:0.92rem; color:rgba(255,255,255,0.85); margin-bottom:0.8rem; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
     .spotlight-meta { display:flex; gap:1rem; flex-wrap:wrap; font-size:0.85rem; color:rgba(255,255,255,0.85); margin-bottom:1rem; }
     .spotlight-meta span { display:flex; align-items:center; gap:0.3rem; }
+    /* Light-theme buttons are unreadable on the dark spotlight — restyle */
+    .spotlight .btn-outline { border-color:rgba(255,255,255,0.65); color:#fff; background:rgba(255,255,255,0.1); }
+    .spotlight .btn-outline:hover { border-color:#fff; color:#fff; background:rgba(255,255,255,0.22); }
+    .spotlight .btn:not(.btn-outline):not(.btn-primary) { border-color:rgba(255,255,255,0.4); color:#fff; }
     .event-card {
       display:flex; gap:1.25rem; padding:1.5rem; background:var(--bg-card); border:1px solid var(--border);
       border-radius:var(--radius-lg); margin-bottom:1rem; transition:all 0.3s; cursor:pointer;
@@ -248,7 +252,7 @@
             </div>
             <div onclick="event.stopPropagation()" style="display:flex;gap:0.5rem;flex-wrap:wrap">
               ${renderRsvpButton(feat, full, false, false)}
-              <a class="btn btn-outline btn-sm" style="border-color:rgba(255,255,255,0.5);color:#fff" href="/event/${feat.id}">Details</a>
+              <a class="btn btn-outline btn-sm" href="/event/${feat.id}">Details</a>
             </div>
           </div>
         </div>`;
