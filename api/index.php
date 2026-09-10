@@ -2423,7 +2423,7 @@ try {
     json_response($article);
   }
   elseif ($path === '/public/events' && $method === 'GET') {
-    $stmt = db()->prepare("SELECT e.id, e.title, e.description, e.date, e.end_date, e.location, e.status, e.capacity,
+    $stmt = db()->prepare("SELECT e.id, e.title, e.description, e.date, e.end_date, e.location, e.status, e.capacity, e.image_url, e.category, e.organizer_id,
       (SELECT COUNT(*) FROM event_registrations r WHERE r.event_id = e.id AND r.status = 'registered') AS rsvp_count
       FROM events e WHERE (e.status = 'published' AND e.date >= NOW()) OR e.status = 'cancelled' ORDER BY e.date ASC");
     $stmt->execute();

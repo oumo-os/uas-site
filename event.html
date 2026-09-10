@@ -13,28 +13,68 @@
   <meta property="og:type" content="website">
   <link rel="stylesheet" href="css/base.css">
   <style>
+    /* Taller, anchored hero: title block always clears the sticky nav */
+    .detail-hero { min-height: 52vh; padding: 7rem 1.5rem 3.5rem; }
+    .detail-hero h1 { font-size: 2.6rem; max-width: 20ch; }
+    .detail-hero .breadcrumb {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+      padding: 0.3rem 0.8rem; border-radius: 999px; font-size: 0.8rem; margin-bottom: 1rem;
+      backdrop-filter: blur(4px);
+    }
+    .detail-hero .breadcrumb a { color: #fff; font-weight: 600; }
+    .hero-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.9rem; }
+    .date-chip {
+      display: inline-flex; align-items: center; gap: 0.6rem;
+      background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+      border-radius: var(--radius-lg); padding: 0.5rem 0.9rem 0.5rem 0.5rem;
+      font-size: 0.88rem; backdrop-filter: blur(4px);
+    }
+    .date-chip .cal {
+      background: var(--accent); color: #fff; border-radius: var(--radius);
+      text-align: center; padding: 0.3rem 0.55rem; line-height: 1.1; min-width: 3rem;
+    }
+    .date-chip .cal b { display: block; font-size: 1.15rem; }
+    .date-chip .cal span { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .status-banner {
+      display: flex; align-items: center; gap: 0.6rem;
+      padding: 0.8rem 1.1rem; border-radius: var(--radius-lg); margin-bottom: 1.25rem;
+      font-size: 0.9rem; font-weight: 600;
+    }
+    .status-banner.ended { background: rgba(120,120,120,0.12); border: 1px solid var(--border); color: var(--text-dim); }
+    .status-banner.cancelled { background: rgba(220,53,69,0.08); border: 1px solid rgba(220,53,69,0.35); color: var(--danger); }
+    .status-banner.live { background: rgba(45,106,79,0.1); border: 1px solid rgba(45,106,79,0.4); color: var(--success); }
+
     .info-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:0.75rem; margin-bottom:2rem; }
-    .info-box { padding:1rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); transition:all 0.2s; }
-    .info-box:hover { border-color:var(--border-focus); box-shadow:var(--shadow); }
-    .info-box .label { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-dim); margin-bottom:0.25rem; }
-    .info-box .value { font-weight:600; font-size:0.95rem; }
+    .info-box { padding:1.1rem 1.2rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); transition:all 0.2s; }
+    .info-box:hover { border-color:var(--border-focus); box-shadow:var(--shadow); transform:translateY(-2px); }
+    .info-box .label { display:flex; align-items:center; gap:0.4rem; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-dim); margin-bottom:0.35rem; font-weight:600; }
+    .info-box .value { font-weight:600; font-size:0.98rem; line-height:1.5; }
+    .info-box .sub { font-size:0.8rem; color:var(--text-dim); font-weight:400; }
+    .map-link { display:inline-flex; align-items:center; gap:0.25rem; font-size:0.8rem; color:var(--accent); font-weight:600; text-decoration:none; margin-top:0.3rem; }
+    .map-link:hover { text-decoration:underline; }
 
     .action-card { padding:1.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); margin-bottom:1.5rem; text-align:center; }
     .action-card h3 { font-size:1rem; margin-bottom:0.75rem; }
-    .capacity-bar { height:6px; background:var(--border); border-radius:3px; overflow:hidden; margin:0.75rem 0; }
-    .capacity-fill { height:100%; background:var(--success); border-radius:3px; transition:width 0.3s; }
+    .capacity-bar { height:8px; background:var(--border); border-radius:4px; overflow:hidden; margin:0.75rem 0; }
+    .capacity-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--success)); border-radius:4px; transition:width 0.3s; }
 
     .attendee-item { display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid var(--border); font-size:0.85rem; }
     .attendee-item:last-child { border-bottom:none; }
 
-    .btn-calendar { display:inline-flex; align-items:center; gap:0.5rem; padding:0.6rem 1rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-card); color:var(--text); font-size:0.88rem; cursor:pointer; transition:all 0.2s; text-decoration:none; }
-    .btn-calendar:hover { border-color:var(--accent); color:var(--accent); }
+    .btn-calendar { display:flex; align-items:center; justify-content:center; gap:0.5rem; width:100%; padding:0.6rem 1rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-card); color:var(--text); font-size:0.88rem; cursor:pointer; transition:all 0.2s; text-decoration:none; margin-bottom:0.5rem; }
+    .btn-calendar:hover { border-color:var(--accent); color:var(--accent); transform:translateY(-1px); }
 
     .stat-mini { display:flex; gap:1.5rem; font-size:0.85rem; color:var(--text-dim); margin-top:0.75rem; }
     .stat-mini span { display:flex; align-items:center; gap:0.3rem; }
 
     @media (max-width:768px) {
+      .detail-hero { min-height:44vh; padding:5.5rem 1rem 2.5rem; }
+      .detail-hero h1 { font-size:1.8rem; }
       .info-grid { grid-template-columns:1fr; }
+      .content-grid { grid-template-columns:1fr; }
+      .sidebar { position:static; }
     }
   </style>
 </head>
@@ -59,14 +99,16 @@
   <section class="detail-hero">
     <div class="hero-bg" id="eHeroBg" style="background-image:url('img/header-events.jpg')"></div>
     <div class="container" style="max-width:900px">
-      <div class="breadcrumb"><a href="/events">Events</a> &rsaquo; <span id="eBreadcrumb"></span></div>
+      <div class="breadcrumb"><a href="/events">Events</a> <span aria-hidden="true">&rsaquo;</span> <span id="eBreadcrumb"></span></div>
       <h1 id="eTitle"></h1>
       <div class="hero-meta" id="eMeta"></div>
+      <div class="hero-chips" id="eChips"></div>
     </div>
   </section>
 
   <section class="section" style="padding-top:0">
     <div class="container" style="max-width:900px">
+      <div id="eBanner"></div>
       <div class="content-grid">
         <div class="content-main">
           <div class="info-grid" id="eDetails"></div>
@@ -147,26 +189,51 @@
       document.getElementById('eHeroBg').style.backgroundImage = 'url(' + esc(coverImg) + ')';
 
       var d2 = new Date(e.date);
-      var statusClass = e.status === 'published' ? 'active' : e.status === 'cancelled' ? 'inactive' : 'pending';
+      var dEnd = e.end_date ? new Date(e.end_date) : null;
+      var past = d2 < new Date();
+      var cancelled = e.status === 'cancelled';
+      var statusClass = e.status === 'published' ? 'active' : cancelled ? 'inactive' : 'pending';
+
+      // Status banner above the content
+      var banner = '';
+      if (cancelled) {
+        banner = '<div class="status-banner cancelled">This event has been cancelled.</div>';
+      } else if (past) {
+        banner = '<div class="status-banner ended">This event has ended.' + (d.stats.attended > 0 ? ' ' + d.stats.attended + ' attended.' : '') + '</div>';
+      } else if (e.capacity && d.stats.total >= e.capacity) {
+        banner = '<div class="status-banner live">Fully booked — you can still join the waitlist below.</div>';
+      }
+      document.getElementById('eBanner').innerHTML = banner;
+
       document.getElementById('eMeta').innerHTML =
         (e.category ? '<span class="badge badge-active">' + esc(e.category) + '</span>' : '') +
         '<span class="badge badge-' + statusClass + '">' + esc(e.status) + '</span>' +
-        '<span><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>' + esc(e.organiser_name) + '</span>' +
+        (e.organiser_name ? '<span><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>' + esc(e.organiser_name) + '</span>' : '') +
         (e.programme_title ? '<span><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span>' + esc(e.programme_title) + '</span>' : '');
 
+      // Date chip in the hero
+      document.getElementById('eChips').innerHTML =
+        '<span class="date-chip"><span class="cal"><b>' + d2.getDate() + '</b><span>' + d2.toLocaleString('en',{month:'short'}) + '</span></span>' +
+        esc(d2.toLocaleDateString('en',{weekday:'long', year:'numeric', month:'long', day:'numeric'})) + '</span>';
+
       var duration = '';
-      if (e.end_date) {
-        var diff = new Date(e.end_date) - d2;
-        var hrs = Math.floor(diff / 3600000);
-        var mins = Math.floor((diff % 3600000) / 60000);
-        duration = hrs + 'h' + (mins > 0 ? ' ' + mins + 'm' : '');
+      if (dEnd) {
+        var diffMs = dEnd - d2;
+        var days = Math.floor(diffMs / 86400000);
+        if (days >= 1) {
+          duration = days + (days === 1 ? ' day' : ' days');
+        } else {
+          var hrs = Math.floor(diffMs / 3600000);
+          var mins = Math.floor((diffMs % 3600000) / 60000);
+          duration = hrs + 'h' + (mins > 0 ? ' ' + mins + 'm' : '');
+        }
       }
 
       document.getElementById('eDetails').innerHTML =
-        '<div class="info-box"><div class="label">Date</div><div class="value">' + d2.toLocaleDateString('en',{weekday:'long',year:'numeric',month:'long',day:'numeric'}) + '</div></div>' +
-        '<div class="info-box"><div class="label">Time</div><div class="value">' + d2.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}) + (e.end_date ? ' — ' + new Date(e.end_date).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}) : '') + (duration ? ' <span style="font-size:0.78rem;color:var(--text-dim);font-weight:400">(' + duration + ')</span>' : '') + '</div></div>' +
-        '<div class="info-box"><div class="label">Location</div><div class="value">' + (e.location ? '<a href="https://maps.google.com/?q=' + encodeURIComponent(e.location) + '" target="_blank" style="color:inherit;text-decoration:none">' + esc(e.location) + ' <span class="icon-inline icon-sm" style="display:inline"><svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></span></a>' : 'TBD') + '</div></div>' +
-        '<div class="info-box"><div class="label">Capacity</div><div class="value">' + (e.capacity ? d.stats.total + ' / ' + e.capacity : d.stats.total + ' registered') + '</div></div>';
+        '<div class="info-box"><div class="label"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span> Date</div><div class="value">' + d2.toLocaleDateString('en',{weekday:'long',year:'numeric',month:'long',day:'numeric'}) + '</div></div>' +
+        '<div class="info-box"><div class="label"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span> Time</div><div class="value">' + d2.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}) + (dEnd ? ' — ' + dEnd.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}) : '') + (duration ? ' <span class="sub">(' + duration + ')</span>' : '') + '</div></div>' +
+        '<div class="info-box"><div class="label"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> Location</div><div class="value">' + (e.location ? esc(e.location) : 'To be confirmed') + '</div>' + (e.location ? '<a class="map-link" href="https://maps.google.com/?q=' + encodeURIComponent(e.location) + '" target="_blank" rel="noopener">View on map <span aria-hidden="true">&rarr;</span></a>' : '') + '</div>' +
+        '<div class="info-box"><div class="label"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Capacity</div><div class="value">' + (e.capacity ? d.stats.total + ' / ' + e.capacity : d.stats.total + ' registered') + '</div>' + (e.capacity ? '<div class="sub">' + Math.min(100, Math.round(d.stats.total / e.capacity * 100)) + '% filled</div>' : '') + '</div>';
 
       // Rich HTML description
       document.getElementById('eBody').innerHTML = e.description || '<p class="text-dim">No description provided.</p>';
@@ -216,7 +283,6 @@
           '<button class="share-btn" onclick="navigator.clipboard.writeText(window.location.href).then(function(){this.textContent=\'Copied!\'}.bind(this));setTimeout(function(){this.textContent=\'Copy URL\'}.bind(this),2000)" type="button">Copy URL</button>' +
         '</div>';
 
-      var past = new Date(e.date) < new Date();
       if (past && d.stats.attended > 0) {
         document.getElementById('eQuickActions').innerHTML +=
           '<div class="stat-mini" style="margin-top:1rem;border-top:1px solid var(--border);padding-top:0.75rem">' +

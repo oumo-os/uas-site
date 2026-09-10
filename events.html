@@ -34,12 +34,26 @@
     .filter-chip:hover, .filter-chip.active { border-color:var(--accent); color:var(--accent); background:var(--accent-glow); }
 
     .event-list { max-width:900px; margin:0 auto; }
+    .spotlight {
+      position:relative; overflow:hidden; border-radius:var(--radius-lg);
+      border:1px solid var(--border); margin-bottom:2rem; color:#fff;
+      background-size:cover; background-position:center; min-height:300px;
+      display:flex; align-items:flex-end; cursor:pointer; transition:all 0.3s;
+    }
+    .spotlight:hover { border-color:var(--border-focus); box-shadow:var(--shadow-md); transform:translateY(-2px); }
+    .spotlight::after { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(15,23,42,0.15) 0%,rgba(15,23,42,0.9) 100%); }
+    .spotlight-body { position:relative; z-index:1; padding:1.75rem; width:100%; }
+    .spotlight-kicker { display:inline-block; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; background:var(--accent); color:#fff; padding:0.25rem 0.7rem; border-radius:999px; margin-bottom:0.6rem; }
+    .spotlight-body h2 { font-size:1.7rem; font-weight:700; color:#fff; margin-bottom:0.4rem; line-height:1.25; }
+    .spotlight-body p { font-size:0.92rem; color:rgba(255,255,255,0.85); margin-bottom:0.8rem; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .spotlight-meta { display:flex; gap:1rem; flex-wrap:wrap; font-size:0.85rem; color:rgba(255,255,255,0.85); margin-bottom:1rem; }
+    .spotlight-meta span { display:flex; align-items:center; gap:0.3rem; }
     .event-card {
       display:flex; gap:1.25rem; padding:1.5rem; background:var(--bg-card); border:1px solid var(--border);
       border-radius:var(--radius-lg); margin-bottom:1rem; transition:all 0.3s; cursor:pointer;
     }
     .event-card:hover { border-color:var(--border-focus); box-shadow:var(--shadow-md); }
-    .event-card img { width:180px; height:120px; object-fit:cover; border-radius:var(--radius); flex-shrink:0; }
+    .event-card img { width:180px; height:120px; object-fit:cover; border-radius:var(--radius); flex-shrink:0; background:var(--bg-subtle); }
     .event-date-box {
       min-width:64px; text-align:center; padding:0.75rem 0.5rem; background:var(--accent-glow);
       border-radius:var(--radius); flex-shrink:0; align-self:flex-start;
@@ -112,6 +126,7 @@
         <button class="filter-chip" data-filter="past">Past Events</button>
       </div>
 
+      <div class="event-list" id="spotlight"></div>
       <div class="event-list" id="eventsList"></div>
       <div class="pagination" id="eventsPagination"></div>
     </div>
@@ -171,6 +186,7 @@
     let myRsvps = {};
     let allEvents = [];
     let currentFilter = 'all';
+    let spotlightId = null;
     let evPage = 1;
     const EV_PER = 6;
 
@@ -198,11 +214,44 @@
           chip.classList.add('active');
           currentFilter = chip.dataset.filter;
           evPage = 1;
+          renderSpotlight();
           renderEvents();
         });
       });
 
+      renderSpotlight();
       renderEvents();
+    }
+
+    function renderSpotlight() {
+      const el = document.getElementById('spotlight');
+      const now = new Date();
+      const upcoming = allEvents
+        .filter(e => new Date(e.date) >= now && e.status === 'published')
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+      const feat = upcoming[0];
+      if (!feat || currentFilter === 'past') { el.innerHTML = ''; spotlightId = null; return; }
+      spotlightId = feat.id;
+      const d = new Date(feat.date);
+      const img = esc(feat.image_url || eventImgs[0]);
+      const full = feat.capacity ? (feat.rsvp_count || 0) >= feat.capacity : false;
+      el.innerHTML = `
+        <div class="spotlight" style="background-image:url('${img}')" onclick="location.href=ua('/event/${feat.id}')">
+          <div class="spotlight-body">
+            <span class="spotlight-kicker">Next up &middot; ${d.toLocaleDateString('en',{weekday:'long', month:'long', day:'numeric'})}</span>
+            <h2>${esc(feat.title)}</h2>
+            <p>${esc(stripHtml(feat.description || '').slice(0, 160))}</p>
+            <div class="spotlight-meta">
+              <span>${d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'})}${feat.end_date ? ' — ' + new Date(feat.end_date).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}) : ''}</span>
+              ${feat.location ? `<span>${esc(feat.location)}</span>` : ''}
+              <span>${feat.rsvp_count || 0}${feat.capacity ? ' / ' + feat.capacity : ''} attending</span>
+            </div>
+            <div onclick="event.stopPropagation()" style="display:flex;gap:0.5rem;flex-wrap:wrap">
+              ${renderRsvpButton(feat, full, false, false)}
+              <a class="btn btn-outline btn-sm" style="border-color:rgba(255,255,255,0.5);color:#fff" href="/event/${feat.id}">Details</a>
+            </div>
+          </div>
+        </div>`;
     }
 
     function renderRsvpButton(e, full, cancelled, past) {
@@ -218,6 +267,7 @@
       const pag = document.getElementById('eventsPagination');
       const now = new Date();
       const events = allEvents.filter(e => {
+        if (e.id === spotlightId && currentFilter === 'all') return false;
         if (currentFilter === 'upcoming') return new Date(e.date) >= now && e.status === 'published';
         if (currentFilter === 'past') return new Date(e.date) < now || e.status === 'cancelled' || e.status === 'completed';
         return true;
@@ -244,7 +294,7 @@
 
         return `
           <div class="event-card" onclick="location.href=ua('/event/${e.id}')">
-            <img src="${eventImgs[idx % eventImgs.length]}" alt="" loading="lazy">
+            <img src="${esc(e.image_url || eventImgs[idx % eventImgs.length])}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${eventImgs[idx % eventImgs.length]}'">
             <div class="event-date-box">
               <div class="day">${d.getDate()}</div>
               <div class="month">${d.toLocaleString('en',{month:'short'})}</div>
