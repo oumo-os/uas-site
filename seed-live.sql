@@ -263,4 +263,15 @@ INSERT INTO dues_schedule (role_id, amount, period_year, description, created_by
 (@c_institutional, 100000, 2026, 'Annual dues, Institutional Member.', 1),
 (@c_corporate, 150000, 2026, 'Annual dues, Corporate Member.', 1);
 
+-- --------------------------------------------------------------------------
+-- M. CURATED EXTERNAL LINKS (public News page resources)
+-- --------------------------------------------------------------------------
+INSERT INTO useful_links (title, url, category, description, external_organization, status) VALUES
+('World Space Week Association', 'https://www.worldspaceweek.org', 'organization', 'Global coordinators of World Space Week, held 4-10 October each year.', 'World Space Week', 'active'),
+('African Astronomical Society', 'https://www.africanastronomicalsociety.org', 'organization', 'Continental body advancing astronomy across Africa.', 'AfAS', 'active'),
+('Space Generation Advisory Council', 'https://spacegeneration.org', 'organization', 'Global network of students and young professionals in the space sector.', 'SGAC', 'active'),
+('International Astronomical Union', 'https://www.iau.org', 'organization', 'The global authority for professional astronomy.', 'IAU', 'active'),
+('NASA', 'https://www.nasa.gov', 'organization', 'Missions, imagery and open science resources.', 'NASA', 'active'),
+('Stellarium', 'https://stellarium.org', 'tool', 'Free planetarium software - plan what to observe before an outing.', 'Stellarium', 'active');
+
 -- End of live baseline seed.
