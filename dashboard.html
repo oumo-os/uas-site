@@ -580,7 +580,7 @@
       </div>
       <div class="dash-hero-actions">
         <a href="/profile" class="btn btn-sm">Edit Profile</a>
-        <button class="btn btn-sm" onclick="api.logout();window.location.href=ua('/')">Logout</button>
+        <button class="btn btn-sm" onclick="api.logout().catch(function(){}).finally(function(){window.location.href=ua('/')})">Logout</button>
       </div>
     </div>
   </div>

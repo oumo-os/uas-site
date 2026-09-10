@@ -147,13 +147,16 @@
   <script src="js/api.js"></script>
   <script>
     async function load() {
+      try {
+        await api.me();
+      } catch(e) { window.location.href = ua('/login'); return; }
       let prof;
       try {
         prof = await api.getProfile();
       } catch(e) { window.location.href = ua('/login'); return; }
       updateNavUser();
-      const p = api._user;
-      const m = prof.member || {};
+      const p = api._user || {};
+      const m = (prof && prof.member) || {};
       document.getElementById('pvAvatar').textContent = (p.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
       document.getElementById('pvName').textContent = p.name;
       document.getElementById('pvMeta').textContent = (m.membership_number || '') + ' · ' + (m.class || 'Regular Member');

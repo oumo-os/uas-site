@@ -548,7 +548,7 @@ try {
         $interests = $stmt->fetchColumn();
         if ($interests && str_starts_with($interests, 'class:')) {
           $cat = substr($interests, 6);
-          $catMap = ['regular' => 'Regular Member', 'student' => 'Student Member', 'honorary' => 'Honorary Member', 'institutional' => 'Institutional Member'];
+          $catMap = ['regular' => 'Regular Member', 'student' => 'Student Member', 'honorary' => 'Honorary Member', 'institutional' => 'Institutional Member', 'affiliate' => 'Affiliate Member', 'corporate' => 'Corporate Member'];
           $classTitle = $catMap[$cat] ?? 'Regular Member';
         } else {
           $classTitle = 'Regular Member';
