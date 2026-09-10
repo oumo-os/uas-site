@@ -1,0 +1,4 @@
+# Uploads: serve files but never execute scripts from this directory.
+<FilesMatch "\.(php|phtml|phar|cgi|pl|py|sh)$">
+  Require all denied
+</FilesMatch>

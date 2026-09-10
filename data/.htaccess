@@ -1,0 +1,3 @@
+# Block direct web access to data files (e.g. database backups).
+# Backups remain available to admins through the API download endpoint.
+Require all denied

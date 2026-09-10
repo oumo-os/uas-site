@@ -15,8 +15,10 @@ require_once __DIR__ . '/backup.php';
 $method = $_SERVER['REQUEST_METHOD'];
 $route = $_GET['route'] ?? '';
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$path = rtrim(str_replace('/uas/api', '', $path), '/');
-$path = str_replace('/api', '', $path);
+// Strip everything up to and including the '/api' prefix so the router works
+// both at domain root (/api/...) and in any subdirectory (.../subdir/api/...).
+$path = preg_replace('#^.*/api(?=/|$)#', '', $path);
+$path = rtrim($path, '/');
 if ($path === '') $path = '/';
 
 // CSRF guard: state-changing requests must come from our own origin.
@@ -1365,7 +1367,7 @@ try {
   // --- PUBLIC EVENT DETAIL ---
   elseif (preg_match('#^/events/(\d+)$#', $path, $m) && $method === 'GET') {
     $eventId = (int) $m[1];
-    $stmt = db()->prepare('SELECT e.*, u.name AS organiser_name, u.avatar_url AS organiser_avatar, u.institution AS organiser_institution, u.bio AS organiser_bio, pr.title AS programme_title FROM events e JOIN users u ON u.id = e.organizer_id LEFT JOIN programmes pr ON pr.id = e.programme_id WHERE e.id = ? AND e.status IN ("published", "cancelled", "completed")');
+    $stmt = db()->prepare('SELECT e.*, u.name AS organiser_name, u.avatar_url AS organiser_avatar, u.institution AS organiser_institution, u.bio AS organiser_bio, pr.title AS programme_title FROM events e LEFT JOIN users u ON u.id = e.organizer_id LEFT JOIN programmes pr ON pr.id = e.programme_id WHERE e.id = ? AND e.status IN ("published", "cancelled", "completed")');
     $stmt->execute([$eventId]);
     $event = $stmt->fetch();
     if (!$event) json_error('Event not found', 404);
