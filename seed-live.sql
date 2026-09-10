@@ -7,9 +7,11 @@
 --
 -- Passwords: ALL accounts are created LOCKED ('NOT-SET-...'). Nobody can log
 -- in until an admin issues a password via the admin panel (Members -> reset
--- password). Bootstrap access: run the separate snippet for the technical
--- admin (kept out of git), log in, change it immediately, then reset the
--- other officers' passwords and share them out-of-band.
+-- password). Separation of duties: day-to-day administration is done through
+-- the dedicated 'System Administrator' account (id 21, hidden), NOT through
+-- any personal account. Bootstrap access: run the separate snippet for the
+-- system administrator (kept out of git), log in, change it immediately,
+-- then reset the other officers' passwords and share them out-of-band.
 --
 -- Conventions:
 --   * Stand-in personal emails: firstname.lastname@astronomy.ug (replace with
@@ -44,7 +46,9 @@ INSERT INTO users (id, name, email, password, institution, bio, status) VALUES
 (17, 'Ndagire Gloria Linda', 'gloria.ndagire@astronomy.ug', 'NOT-SET-USE-PASSWORD-RESET', NULL, 'Founding Vice Chairperson (2023); emeritus member.', 'active'),
 (18, 'Agaba Bruce', 'bruce.agaba@astronomy.ug', 'NOT-SET-USE-PASSWORD-RESET', NULL, 'Founding Treasurer (2023); emeritus member.', 'active'),
 (19, 'Kyamanya Majda Bajwara', 'majda.kyamanya@astronomy.ug', 'NOT-SET-USE-PASSWORD-RESET', NULL, 'Founding Events Coordinator (2023); emeritus member.', 'active'),
-(20, 'Sseggoma Timothy', 'timothy.sseggoma@astronomy.ug', 'NOT-SET-USE-PASSWORD-RESET', NULL, 'Founding signatory (2023); emeritus member.', 'active');
+(20, 'Sseggoma Timothy', 'timothy.sseggoma@astronomy.ug', 'NOT-SET-USE-PASSWORD-RESET', NULL, 'Founding signatory (2023); emeritus member.', 'active'),
+-- Dedicated administration account (a role, not a person). Hidden everywhere.
+(21, 'System Administrator', 'sysadmin@astronomy.ug', 'NOT-SET-USE-PASSWORD-RESET', NULL, 'Technical system administration account.', 'active');
 
 -- --------------------------------------------------------------------------
 -- B. MEMBERS (profile_visible=1 for officers, leads, emeritus, actives)
@@ -69,7 +73,9 @@ INSERT INTO members (user_id, membership_number, status, joined_date, approved_b
 (17, 'UAS-2026-0017', 'active', CURDATE(), 1, NOW(), 1),
 (18, 'UAS-2026-0018', 'active', CURDATE(), 1, NOW(), 1),
 (19, 'UAS-2026-0019', 'active', CURDATE(), 1, NOW(), 1),
-(20, 'UAS-2026-0020', 'active', CURDATE(), 1, NOW(), 1);
+(20, 'UAS-2026-0020', 'active', CURDATE(), 1, NOW(), 1),
+-- System administration account: deliberately hidden from all public listings
+(21, 'UAS-2026-0021', 'active', CURDATE(), 1, NOW(), 0);
 
 -- --------------------------------------------------------------------------
 -- C. MEMBER CLASSES (add the two missing tiers from the Sept framework)
@@ -147,10 +153,12 @@ SET @r_past_sec     := (SELECT id FROM roles WHERE title = 'Immediate Past Secre
 -- G. ASSIGNMENTS (offices + Regular Member class for everyone)
 -- --------------------------------------------------------------------------
 INSERT INTO role_assignments (role_id, user_id, assigned_by, effective_from, status) VALUES
--- System administrators: President, General Secretary, technical admin
+-- System administrators: President, General Secretary, and the dedicated
+-- (hidden, non-personal) System Administrator account. Personal accounts
+-- of technical staff deliberately hold NO admin rights.
 (@admin_role, 2, 1, CURDATE(), 'active'),
 (@admin_role, 3, 1, CURDATE(), 'active'),
-(@admin_role, 1, 1, CURDATE(), 'active'),
+(@admin_role, 21, 1, CURDATE(), 'active'),
 -- Offices
 (@r_president, 2, 1, CURDATE(), 'active'),
 (@r_secretary, 3, 1, CURDATE(), 'active'),
@@ -188,7 +196,8 @@ INSERT INTO role_assignments (role_id, user_id, assigned_by, effective_from, sta
 (@c_regular, 17, 1, CURDATE(), 'active'),
 (@c_regular, 18, 1, CURDATE(), 'active'),
 (@c_regular, 19, 1, CURDATE(), 'active'),
-(@c_regular, 20, 1, CURDATE(), 'active');
+(@c_regular, 20, 1, CURDATE(), 'active'),
+(@c_regular, 21, 1, CURDATE(), 'active');
 
 -- --------------------------------------------------------------------------
 -- H. LEADERSHIP COMMITTEES (drive the public About page)
