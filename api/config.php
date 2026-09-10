@@ -9,7 +9,16 @@ define('DB_PASS', getenv('UAS_DB_PASS') ?: '');
 define('DB_CHARSET', 'utf8mb4');
 
 define('SITE_NAME', 'Uganda Astronomical Society');
-define('SITE_URL', ENV === 'production' ? 'https://astronomy.ug' : 'http://localhost/uas');
+// Production URL is fixed; in development derive from the request host so the
+// app works identically under /uas, a vhost root (e.g. http://uas.local/), etc.
+// (CLI has no host — falls back to the legacy local URL.)
+if (ENV === 'production') {
+  define('SITE_URL', 'https://astronomy.ug');
+} else {
+  $devScheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+  $devHost = $_SERVER['HTTP_HOST'] ?? 'localhost/uas';
+  define('SITE_URL', $devScheme . '://' . $devHost);
+}
 define('API_URL', SITE_URL . '/api');
 define('UPLOAD_DIR', __DIR__ . '/../img/uploads/');
 
