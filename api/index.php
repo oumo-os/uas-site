@@ -484,7 +484,10 @@ try {
       foreach ($members as &$m) $m['class'] = $classByUser[(int)$m['user_id']] ?? 'Regular Member';
       json_response($members);
     }
-    require_login();
+    $viewer = current_user();
+    $canManageMembers = $viewer && $viewer['status'] === 'active'
+      && (user_has_cap($viewer['id'], 'members.manage') || user_has_cap($viewer['id'], 'members.approve'));
+    if (!$canManageMembers) json_error('Insufficient permissions: members.manage', 403);
     $stmt = db()->prepare('SELECT m.*, u.name, u.email, u.avatar_url, u.institution, u.location, u.status AS user_status FROM members m JOIN users u ON u.id = m.user_id ORDER BY m.joined_date DESC');
     $stmt->execute();
     $members = $stmt->fetchAll();
@@ -570,8 +573,12 @@ try {
   }
   elseif ($path === '/members/grouped' && $method === 'GET') {
     $isPublic = isset($_GET['public']) && $_GET['public'] === '1';
-    $loggedIn = !empty($_SESSION['user_id']);
-    if ($isPublic || !$loggedIn) {
+    // The full directory (pending/rejected applicants + emails) is only for
+    // member managers; everyone else — logged in or not — gets the public view.
+    $viewer = current_user();
+    $canManageMembers = $viewer && $viewer['status'] === 'active'
+      && (user_has_cap($viewer['id'], 'members.manage') || user_has_cap($viewer['id'], 'members.approve'));
+    if ($isPublic || !$canManageMembers) {
       $stmt = db()->prepare("
         SELECT DISTINCT m.id, m.user_id, m.membership_number, m.interests, m.joined_date,
                u.name, u.institution, u.location, u.avatar_url, u.bio
@@ -624,12 +631,21 @@ try {
     json_response($members);
   }
   elseif (preg_match('#^/members/(\d+)$#', $path, $m) && $method === 'GET') {
-    require_login();
     $userId = (int) $m[1];
+    $viewer = current_user();
+    $canManageMembers = $viewer && $viewer['status'] === 'active'
+      && (user_has_cap($viewer['id'], 'members.manage') || user_has_cap($viewer['id'], 'members.approve'));
     $stmt = db()->prepare('SELECT m.*, u.name, u.email, u.avatar_url, u.bio, u.institution, u.location, u.website FROM members m JOIN users u ON u.id = m.user_id WHERE m.user_id = ?');
     $stmt->execute([$userId]);
     $member = $stmt->fetch();
     if (!$member) json_error('Member not found', 404);
+    if (!$canManageMembers) {
+      // Applicants and hidden profiles stay invisible; emails never leave the server.
+      $vis = db()->prepare("SELECT 1 FROM members m JOIN users u ON u.id = m.user_id LEFT JOIN role_assignments ra ON ra.user_id = m.user_id AND ra.status = 'active' LEFT JOIN roles r ON r.id = ra.role_id AND r.status = 'active' WHERE m.user_id = ? AND m.status = 'active' AND u.status = 'active' AND (m.profile_visible = 1 OR r.scope IN ('institutional','committee','programme') OR r.scope LIKE 'programme:%' OR r.scope LIKE 'working_group:%') LIMIT 1");
+      $vis->execute([$userId]);
+      if (!$vis->fetch()) json_error('Member not found', 404);
+      unset($member['email']);
+    }
     $member['class'] = get_member_class($userId);
     $stmt = db()->prepare("SELECT r.id AS role_id, r.title, r.role_type, r.scope, r.target, r.description
       FROM role_assignments ra JOIN roles r ON r.id = ra.role_id WHERE ra.user_id = ? AND ra.status = 'active' AND r.status = 'active'");
