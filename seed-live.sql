@@ -343,4 +343,19 @@ INSERT INTO budget_items (title, description, type, amount, category, programme_
 ('Telescope maintenance', 'Maintenance kits and servicing', 'expense', 400000, 'equipment', NULL, NULL, NULL, 2026, 'active', 3),
 ('Website hosting and domain', 'Hosting, domain and site running costs', 'expense', 350000, 'communications', NULL, NULL, NULL, 2026, 'active', 3);
 
+-- --------------------------------------------------------------------------
+-- R. FINANCE VISIBILITY: paying classes may view society finances.
+-- Regular, Institutional, Affiliate and Corporate members get finance.view.
+-- Student and Honorary do not. Recording/approving stays with officers.
+-- --------------------------------------------------------------------------
+SET @cap_finview := (SELECT id FROM capabilities WHERE slug = 'finance.view' LIMIT 1);
+INSERT INTO role_capabilities (role_id, capability_id, granted_by)
+SELECT r.id, @cap_finview, 1 FROM roles r
+WHERE r.role_type = 'member_class' AND r.status = 'active'
+  AND r.title IN ('Regular Member', 'Institutional Member', 'Affiliate Member', 'Corporate Member')
+  AND NOT EXISTS (
+    SELECT 1 FROM role_capabilities rc
+    WHERE rc.role_id = r.id AND rc.capability_id = @cap_finview AND rc.scope_type IS NULL
+  );
+
 -- End of live baseline seed.
