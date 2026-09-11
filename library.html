@@ -79,6 +79,10 @@
     </div>
 
     <div class="cat-filter" id="catFilter"></div>
+    <div style="display:flex;gap:0.75rem;align-items:center;justify-content:center;margin-bottom:1.5rem;flex-wrap:wrap">
+      <input class="form-input" id="docSearch" placeholder="Search documents..." style="max-width:340px">
+      <span class="text-dim text-sm" id="docCount"></span>
+    </div>
     <div id="docsList"></div>
   </div>
 
@@ -126,6 +130,7 @@
   <script>
     let allDocs = [];
     let activeCat = '';
+    let searchTerm = '';
 
     async function load() {
       try { await api.me(); } catch(e) {}
@@ -136,27 +141,49 @@
         ? await api.getMemberDocuments().catch(() => [])
         : await api.getPublicDocuments().catch(() => []);
 
-      const cats = [...new Set(allDocs.map(d => d.category).filter(Boolean))];
-      document.getElementById('catFilter').innerHTML = `
-        <button class="btn btn-sm ${!activeCat ? 'btn-primary' : 'btn-outline'}" onclick="filterCat('')">All</button>
-        ${cats.map(c => `<button class="btn btn-sm ${activeCat === c ? 'btn-primary' : 'btn-outline'}" onclick="filterCat('${esc(c)}')">${esc(c)}</button>`).join('')}
-      `;
-      renderDocs(allDocs);
+      document.getElementById('docSearch').addEventListener('input', e => {
+        searchTerm = e.target.value.toLowerCase();
+        renderCurrent();
+      });
+
+      renderCats();
+      renderCurrent();
+    }
+
+    function filteredDocs() {
+      let list = activeCat ? allDocs.filter(d => d.category === activeCat) : allDocs;
+      if (searchTerm) list = list.filter(d => ((d.title || '') + ' ' + (d.category || '')).toLowerCase().includes(searchTerm));
+      return list;
+    }
+
+    function renderCurrent() {
+      const list = filteredDocs();
+      document.getElementById('docCount').textContent = list.length + (list.length === 1 ? ' document' : ' documents');
+      renderDocs(list);
     }
 
     function filterCat(cat) {
       activeCat = cat;
+      renderCats();
+      renderCurrent();
+    }
+
+    function renderCats() {
       const cats = [...new Set(allDocs.map(d => d.category).filter(Boolean))];
       document.getElementById('catFilter').innerHTML = `
         <button class="btn btn-sm ${!activeCat ? 'btn-primary' : 'btn-outline'}" onclick="filterCat('')">All</button>
         ${cats.map(c => `<button class="btn btn-sm ${activeCat === c ? 'btn-primary' : 'btn-outline'}" onclick="filterCat('${esc(c)}')">${esc(c)}</button>`).join('')}
       `;
-      renderDocs(activeCat ? allDocs.filter(d => d.category === activeCat) : allDocs);
     }
 
     function renderDocs(list) {
       const div = document.getElementById('docsList');
-      if (!list.length) { div.innerHTML = '<p class="text-center text-dim" style="padding:3rem 0">No documents published yet.</p>'; return; }
+      if (!list.length) {
+        div.innerHTML = (searchTerm || activeCat)
+          ? '<p class="text-center text-dim" style="padding:3rem 0">No documents match your search.</p>'
+          : '<p class="text-center text-dim" style="padding:3rem 0">No documents published yet. Officers can publish reports, policies and guides from the dashboard.</p>';
+        return;
+      }
       div.innerHTML = list.map(d => `
         <div class="doc-row">
           <span class="doc-icon"><span class='icon-inline icon-sm'><svg viewBox='0 0 24 24'><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/><polyline points='14 2 14 8 20 8'/></svg></span></span>

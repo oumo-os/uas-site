@@ -2435,9 +2435,30 @@ try {
     json_response(['announcements' => $announcements, 'links' => $links]);
   }
   elseif ($path === '/public/gallery' && $method === 'GET') {
-    $stmt = db()->prepare('SELECT a.id, a.title, a.category, a.image_url, a.published_at, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.status = "published" AND a.image_url IS NOT NULL AND a.image_url <> "" ORDER BY a.published_at DESC');
-    $stmt->execute();
-    json_response($stmt->fetchAll());
+    // Every image attached to content: covers plus inline rich-text images,
+    // captioned with the trimmed owning content. No gallery-specific uploads.
+    $items = [];
+    $seen = [];
+    $push = function ($src, $kind, $id, $title, $text, $category, $date) use (&$items, &$seen) {
+      $src = gallery_src($src);
+      if (!$src || isset($seen[$src])) return;
+      $seen[$src] = true;
+      $items[] = ['src' => $src, 'kind' => $kind, 'id' => (int) $id, 'title' => (string) $title,
+        'caption' => trim_text($text), 'category' => $category, 'date' => $date];
+    };
+    foreach (db()->query('SELECT id, title, body, category, image_url, published_at FROM articles WHERE status = "published" ORDER BY published_at DESC') as $a) {
+      $push($a['image_url'], 'article', $a['id'], $a['title'], $a['body'], $a['category'], $a['published_at']);
+      foreach (gallery_inline_srcs($a['body']) as $s) $push($s, 'article', $a['id'], $a['title'], $a['body'], $a['category'], $a['published_at']);
+    }
+    foreach (db()->query('SELECT id, title, description, category, image_url, date FROM events WHERE status = "published" ORDER BY date DESC') as $e) {
+      $push($e['image_url'], 'event', $e['id'], $e['title'], $e['description'], $e['category'], $e['date']);
+      foreach (gallery_inline_srcs($e['description']) as $s) $push($s, 'event', $e['id'], $e['title'], $e['description'], $e['category'], $e['date']);
+    }
+    foreach (db()->query('SELECT id, title, description, category, image_url FROM programmes WHERE status = "active" ORDER BY title') as $p) {
+      $push($p['image_url'], 'programme', $p['id'], $p['title'], $p['description'], $p['category'], null);
+      foreach (gallery_inline_srcs($p['description']) as $s) $push($s, 'programme', $p['id'], $p['title'], $p['description'], $p['category'], null);
+    }
+    json_response($items);
   }
   elseif ($path === '/public/articles' && $method === 'GET') {
     $stmt = db()->prepare('SELECT a.id, a.title, a.category, a.tags, a.image_url, a.published_at, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.status = "published" ORDER BY a.published_at DESC');

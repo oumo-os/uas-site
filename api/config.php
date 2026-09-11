@@ -72,6 +72,43 @@ function password_is_strong(string $pw): bool {
   return strlen($pw) >= 8 && preg_match('/[A-Za-z]/', $pw) && preg_match('/\d/', $pw);
 }
 
+// Gallery helpers: every image attached to content (covers + inline rich-text
+// images) feeds the photo gallery, captioned with trimmed owning content.
+function trim_text($html, int $len = 140): string {
+  $t = html_entity_decode(strip_tags((string) $html), ENT_QUOTES, 'UTF-8');
+  $t = trim(preg_replace('/\s+/', ' ', $t));
+  if (mb_strlen($t) > $len) $t = mb_substr($t, 0, $len) . '…';
+  return $t;
+}
+
+// Normalize a stored image ref to a gallery src: absolute http(s) URLs pass
+// through, site refs become /img/... paths. Anything else is rejected.
+function gallery_src($v): ?string {
+  if (!is_string($v)) return null;
+  $v = trim($v);
+  if ($v === '') return null;
+  if (preg_match('#^https?://#i', $v)) {
+    return preg_match('#^https?://[^\s<>"\'\\\\]+$#i', $v) ? $v : null;
+  }
+  $v = ltrim($v, '/');
+  if (strpos($v, 'img/') !== 0) $v = 'img/' . $v;
+  if (!preg_match('#^img/[^\s<>"\'\\\\]+$#', $v)) return null;
+  return '/' . $v;
+}
+
+// All <img> sources embedded in rich-text HTML, normalized + deduped.
+function gallery_inline_srcs($html): array {
+  $out = [];
+  if (!is_string($html) || stripos($html, '<img') === false) return $out;
+  if (preg_match_all('#<img[^>]+src=["\']([^"\']+)["\']#i', $html, $m)) {
+    foreach ($m[1] as $s) {
+      $n = gallery_src($s);
+      if ($n && !in_array($n, $out, true)) $out[] = $n;
+    }
+  }
+  return $out;
+}
+
 // Image URLs stored on content (covers, galleries): only same-site uploads
 // (/img/...) or http(s) URLs are allowed. Anything else becomes NULL, which
 // blocks javascript:/data: payloads from reaching <img src> output.
