@@ -236,12 +236,13 @@
       try { await api.me(); } catch(e) {}
       updateNavUser();
 
-      const [events, myEvents] = await Promise.all([
+      const [events, pastEvents, myEvents] = await Promise.all([
         api.getPublicEvents().catch(() => []),
+        api.getPastEvents().catch(() => []),
         api._user ? api.getEvents().catch(() => []) : Promise.resolve([]),
       ]);
       myEvents.forEach(e => { if (e.status === 'published') myRsvps[e.id] = true; });
-      allEvents = events;
+      allEvents = events.concat(pastEvents.filter(p => !events.some(e => e.id === p.id)));
 
       // Stats
       const now = new Date();
