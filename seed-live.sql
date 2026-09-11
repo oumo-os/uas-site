@@ -308,4 +308,39 @@ INSERT INTO articles (author_id, title, body, category, tags, status, approved_b
 (3, 'President Confirmed to Continue Leading the Society', '<p>Under the September 2026 governance framework, Obwengye Cosmus has been confirmed to continue as President of the Uganda Astronomical Society.</p><p>Cosmus founded the Society in 2023 and remains the only founding officer to continue in post through the reorganisation. A formal ratifying resolution is before the board.</p>', 'announcement', '["governance","announcement"]', 'published', 3, NOW(), NOW()),
 (3, 'Treasurer Nominated as Executive Team Takes Shape', '<p>Nsaale Ivan Kalule, a founding signatory, has been nominated as Treasurer, and six executive officers have been agreed across legal, programmes, operations, publicity, partnerships and culture.</p><p>Three officer seats and five programme-lead seats remain open - members interested in serving should see the Join page.</p>', 'announcement', '["governance","announcement"]', 'published', 3, NOW(), NOW());
 
+-- --------------------------------------------------------------------------
+-- Q. OPENING FINANCES: founding dues paid + 2026 working budget
+-- --------------------------------------------------------------------------
+-- All 9 committee members (Board + Executive, users 2-10) paid UGX 50,000
+-- founding contributions, effective 31 Aug 2026. Mirrors the in-app pay flow:
+-- a paid dues row + a linked approved income record each. No receivables:
+-- nobody owes anything at launch.
+SET @c_regular := (SELECT id FROM roles WHERE title = 'Regular Member' AND role_type = 'member_class' LIMIT 1);
+INSERT INTO membership_dues (member_id, role_id, period_year, amount_owed, amount_paid, due_date, paid_date, status, notes, recorded_by)
+SELECT m.id, @c_regular, 2026, 50000, 50000, '2026-08-31', '2026-08-31', 'paid', 'Founding contribution recorded at launch', 3
+FROM members m WHERE m.user_id BETWEEN 2 AND 10;
+INSERT INTO financial_records (type, amount, category, description, member_id, record_date, status, recorded_by)
+SELECT 'income', 50000, 'membership', 'Regular Member dues payment 2026', m.id, '2026-08-31', 'approved', 3
+FROM members m WHERE m.user_id BETWEEN 2 AND 10;
+UPDATE membership_dues md
+JOIN financial_records fr ON fr.member_id = md.member_id AND fr.type = 'income' AND fr.record_date = '2026-08-31' AND fr.amount = 50000
+SET md.payment_record_id = fr.id
+WHERE md.period_year = 2026 AND md.status = 'paid' AND md.payment_record_id IS NULL;
+
+-- 2026 working budget (active; officers adjust through the app).
+-- Income: confirmed dues (9 x 50k) + a WSW sponsorship target.
+-- Expenses: grounded figures (CLG ~500k per the framework discussion).
+SET @ev_wsw := (SELECT id FROM events WHERE title LIKE 'World Space Week%' LIMIT 1);
+SET @p_edu := (SELECT id FROM programmes WHERE title = 'Astronomy Education & STEM' LIMIT 1);
+INSERT INTO budget_items (title, description, type, amount, category, programme_id, project_id, event_id, fiscal_year, status, created_by) VALUES
+('Membership dues - founding contributions', 'Confirmed: 9 committee members x UGX 50,000', 'income', 450000, 'membership', NULL, NULL, NULL, 2026, 'active', 3),
+('World Space Week sponsorship target', 'Target: sponsor contributions toward October activities', 'income', 5000000, 'sponsorship', NULL, NULL, @ev_wsw, 2026, 'active', 3),
+('CLG registration and legal', 'Company Limited by Guarantee registration with in-group legal support', 'expense', 500000, 'administration', NULL, NULL, NULL, 2026, 'active', 3),
+('World Space Week activities', 'Venues, materials and logistics for the October programme', 'expense', 2500000, 'event', NULL, NULL, @ev_wsw, 2026, 'active', 3),
+('Monthly observing nights (Q4)', 'Logistics for public observing nights, Oct-Dec', 'expense', 600000, 'event', NULL, NULL, NULL, 2026, 'active', 3),
+('School outreach kits', 'Reusable workshop kits for school visits', 'expense', 800000, 'outreach', @p_edu, NULL, NULL, 2026, 'active', 3),
+('Teacher bootcamp workshop', 'Hands-on training for secondary school science teachers', 'expense', 750000, 'training', @p_edu, NULL, NULL, 2026, 'active', 3),
+('Telescope maintenance', 'Maintenance kits and servicing', 'expense', 400000, 'equipment', NULL, NULL, NULL, 2026, 'active', 3),
+('Website hosting and domain', 'Hosting, domain and site running costs', 'expense', 350000, 'communications', NULL, NULL, NULL, 2026, 'active', 3);
+
 -- End of live baseline seed.
