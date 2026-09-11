@@ -482,6 +482,13 @@
     }
     .chat-reply-chip.show { display: flex; }
     .chat-reply-chip button { border: none; background: none; color: var(--accent); cursor: pointer; font-weight: 700; }
+    .chat-day { display: flex; align-items: center; gap: 0.75rem; margin: 0.35rem 0; }
+    .chat-day::before, .chat-day::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .chat-day span {
+      font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--text-dim); background: var(--bg); border: 1px solid var(--border);
+      border-radius: 999px; padding: 0.15rem 0.7rem; white-space: nowrap;
+    }
     .chat-composer { display: flex; gap: 0.5rem; padding: 0.75rem 1.25rem 1rem; background: var(--bg-card); align-items: flex-end; }
     .chat-composer textarea {
       flex: 1; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: var(--radius);
@@ -2805,6 +2812,23 @@
       return sameDay ? time : d.toLocaleDateString('en', { month: 'short', day: 'numeric' }) + ' ' + time;
     }
 
+    function chatDayLabel(iso) {      const d = new Date(iso);
+      if (isNaN(d)) return '';
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      if (d.toDateString() === today.toDateString()) return 'Today';
+      if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+      return d.toLocaleDateString('en', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    }
+
+    function chatFullTime(iso) {
+      const d = new Date(iso);
+      if (isNaN(d)) return '';
+      return d.toLocaleDateString('en', { year: 'numeric', month: 'short', day: 'numeric' }) +
+        ' ' + d.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' });
+    }
+
     function renderChat(res, comments) {
       const titleEl = document.getElementById('chatTitle');
       const subEl = document.getElementById('chatSubtitle');
@@ -2821,20 +2845,30 @@
       const msgHtml = (c, isReply) => {
         const mine = api._user && c.user_id === api._user.id;
         const parent = c.parent_id && byId[c.parent_id];
+        const parentPreview = parent
+          ? String(parent.body || '').replace(/\s+/g, ' ').trim().slice(0, 80)
+          : '';
         return `
           <div class="chat-msg${mine ? ' mine' : ''}${isReply ? ' reply' : ''}">
             ${!mine ? `<div class="comment-avatar">${esc(chatInitials(c.user_name))}</div>` : ''}
             <div class="chat-bubble">
               ${!mine ? `<div class="chat-name">${esc(c.user_name)}</div>` : ''}
-              ${parent ? `<div class="chat-parent">↳ ${esc(parent.user_name)}</div>` : ''}
+              ${parent ? `<div class="chat-parent">↳ ${esc(parent.user_name)}${parentPreview ? `: “${esc(parentPreview)}${String(parent.body || '').length > 80 ? '…' : ''}”` : ''}</div>` : ''}
               <div class="chat-text">${esc(c.body)}</div>
-              <div class="chat-meta"><span>${esc(chatTime(c.created_at))}</span>${canReply ? `<button class="chat-reply-btn" onclick="chatSetReply(${c.id})">Reply</button>` : ''}</div>
+              <div class="chat-meta"><span title="${esc(chatFullTime(c.created_at))}">${esc(chatTime(c.created_at))}</span>${canReply ? `<button class="chat-reply-btn" onclick="chatSetReply(${c.id})">Reply</button>` : ''}</div>
             </div>
           </div>`;
       };
       let html = '';
+      let lastDay = '';
+      const dayDivider = (iso) => {
+        const label = chatDayLabel(iso);
+        if (label === lastDay) return '';
+        lastDay = label;
+        return `<div class="chat-day"><span>${esc(label)}</span></div>`;
+      };
       tops.forEach(t => {
-        html += msgHtml(t, false);
+        html += dayDivider(t.created_at) + msgHtml(t, false);
         comments.filter(c => c.parent_id === t.id).forEach(r => { html += msgHtml(r, true); });
       });
       thread.innerHTML = html || '<p class="text-dim text-sm" style="text-align:center;margin:auto">No messages yet. Start the discussion!</p>';
@@ -2849,6 +2883,10 @@
         const input = document.getElementById('chatInput');
         input.addEventListener('keydown', e => {
           if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chatSend(); }
+        });
+        input.addEventListener('input', () => {
+          input.style.height = 'auto';
+          input.style.height = Math.min(input.scrollHeight, 120) + 'px';
         });
         input.focus();
       } else {
