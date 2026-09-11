@@ -749,10 +749,38 @@ tr:hover td { background: var(--accent-glow); }
 .team-card .team-name { font-weight: 600; font-size: 0.9rem; }
 .team-card .team-role { font-size: 0.78rem; color: var(--text-dim); }
 
+/* Image placeholders: marked slots awaiting real photography */
+.img-placeholder {
+  border: 2px dashed var(--border-focus); border-radius: var(--radius-lg);
+  background: rgba(127,127,127,0.06); color: var(--text-dim);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.5rem; text-align: center; padding: 2rem 1rem; font-size: 0.82rem;
+  min-height: 220px; line-height: 1.5;
+}
+.img-placeholder .ph-icon {
+  width: 44px; height: 44px; border-radius: 50%; background: var(--accent-glow);
+  display: flex; align-items: center; justify-content: center; color: var(--accent);
+}
+.img-placeholder .ph-icon svg { width: 20px; height: 20px; }
+.img-placeholder strong { color: var(--text); font-size: 0.88rem; }
+.img-placeholder code { font-size: 0.72rem; opacity: 0.8; }
+
+/* Split section: text + visual side by side */
+.split-section { display: grid; grid-template-columns: 1.2fr 1fr; gap: 2rem; align-items: center; }
+@media (max-width: 768px) { .split-section { grid-template-columns: 1fr; } }
+
+/* Small stat band */
+.stat-band { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 0 auto; max-width: 800px; }
+.stat-band .stat-cell { text-align: center; padding: 1.25rem 0.5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.stat-band .stat-num { font-size: 1.9rem; font-weight: 800; color: var(--accent); line-height: 1; }
+.stat-band .stat-cap { font-size: 0.78rem; color: var(--text-dim); margin-top: 0.3rem; }
+@media (max-width: 600px) { .stat-band { grid-template-columns: 1fr 1fr; } }
+
 /* Responsive: detail pages */
 @media (max-width: 768px) {
-  .detail-hero { min-height: 25vh; padding: 4rem 1rem 2rem; }
-  .detail-hero h1 { font-size: 1.5rem; }
+  .detail-hero { min-height: 40vh; padding: 5.5rem 1rem 2.5rem; }
+  .detail-hero h1 { font-size: 1.8rem; }
+  .detail-hero .breadcrumb { margin-top: 0.5rem; }
   .content-grid { grid-template-columns: 1fr; }
   .sidebar { position: static; }
   .info-grid { grid-template-columns: repeat(2, 1fr); }

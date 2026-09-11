@@ -102,10 +102,12 @@
     .cta-section .btn-outline:hover { border-color:#fff; background:rgba(255,255,255,0.1); }
 
     @media (max-width:768px) {
-      .about-hero { min-height:40vh; padding:4rem 1rem 3rem; }
+      .about-hero { min-height:40vh; padding:5.5rem 1rem 3rem; }
       .about-hero h1 { font-size:1.8rem; }
       .vision-mission { grid-template-columns:1fr; }
       .objectives-grid { grid-template-columns:1fr; }
+      .is-grid { grid-template-columns:1fr !important; }
+      .gallery-placeholders { grid-template-columns:1fr !important; }
       .leadership-grid { grid-template-columns:repeat(2,1fr); }
       .section { padding:2.5rem 0; }
     }
@@ -136,11 +138,23 @@
 
   <section class="section">
     <div class="container">
-      <div class="about-content">
-        <h2>Our Story</h2>
-        <p>The Uganda Astronomical Society was founded in 2023 by Obwengye Cosmus as an amateur astronomy association — an organic response to public curiosity about the night sky, rather than a government, commercial or academic initiative. That origin remains part of the Society's institutional identity.</p>
-        <p>Within three years, UAS has grown into a national public-science community with an expanding membership base, established public astronomy programming, participation in Uganda's National World Space Week, and active engagement with the country's emerging space-science ecosystem. The September 2025 total lunar eclipse and the October World Space Week activities at Makerere University demonstrated public interest and national ecosystem participation. The May 2026 Stargazing Weekend at La Brise Resort confirmed genuine public demand for organised astronomy experiences — and exposed the Society's limitations in logistics, finance, equipment management, communications and volunteer coordination.</p>
-        <p>That growth has been carried by individual initiative and voluntary effort. The problem UAS must now solve is no longer public interest; it is organisational capacity. Membership growth, event demand and the Society's expanding role in national World Space Week programming have all outpaced its inherited, informal structure.</p>
+      <div class="split-section">
+        <div class="about-content" style="margin:0">
+          <h2>Our Story</h2>
+          <p>The Uganda Astronomical Society was founded in 2023 by Obwengye Cosmus as an amateur astronomy association — an organic response to public curiosity about the night sky, rather than a government, commercial or academic initiative. That origin remains part of the Society's institutional identity.</p>
+          <p>Within three years, UAS has grown into a national public-science community with an expanding membership base, established public astronomy programming, participation in Uganda's National World Space Week, and active engagement with the country's emerging space-science ecosystem. The September 2025 total lunar eclipse and the October World Space Week activities at Makerere University demonstrated public interest and national ecosystem participation. The May 2026 Stargazing Weekend at La Brise Resort confirmed genuine public demand for organised astronomy experiences — and exposed the Society's limitations in logistics, finance, equipment management, communications and volunteer coordination.</p>
+          <p>That growth has been carried by individual initiative and voluntary effort. The problem UAS must now solve is no longer public interest; it is organisational capacity. Membership growth, event demand and the Society's expanding role in national World Space Week programming have all outpaced its inherited, informal structure.</p>
+        </div>
+        <div class="img-placeholder" data-slot="about-story">
+          <span class="ph-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></span></span>
+          <strong>Our story in pictures</strong>
+          <span>Placeholder — e.g. founding team or first observing night.<br><code>about-story</code></span>
+        </div>
+      </div>
+      <div class="stat-band" style="margin-top:2.5rem">
+        <div class="stat-cell"><div class="stat-num">2023</div><div class="stat-cap">Founded</div></div>
+        <div class="stat-cell"><div class="stat-num">6</div><div class="stat-cap">Programme areas</div></div>
+        <div class="stat-cell"><div class="stat-num">6</div><div class="stat-cap">Membership classes</div></div>
       </div>
     </div>
   </section>
@@ -215,7 +229,7 @@
     <div class="container">
       <div class="about-content">
         <h2>What UAS Is and Is Not</h2>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:1rem">
+        <div class="is-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:1rem">
           <div>
             <h4 style="color:var(--success);margin-bottom:0.75rem">UAS Is</h4>
             <p>A public scientific gateway through which Ugandans encounter astronomy, develop scientific curiosity, and find pathways into the broader space sciences, engineering and technology — anchored in astronomy as its core mandate.</p>
@@ -231,6 +245,30 @@
             </ul>
             <p style="margin-top:0.75rem;font-style:italic;font-size:0.88rem">UAS plays a complementary role within the national ecosystem.</p>
           </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <h2 class="section-title">Life at UAS</h2>
+      <p class="section-subtitle">Observing nights, outreach and community — real photography coming soon</p>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem" class="gallery-placeholders">
+        <div class="img-placeholder" data-slot="about-observing">
+          <span class="ph-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg></span></span>
+          <strong>Observing nights</strong>
+          <span>Placeholder<br><code>about-observing</code></span>
+        </div>
+        <div class="img-placeholder" data-slot="about-outreach">
+          <span class="ph-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span></span>
+          <strong>Schools &amp; outreach</strong>
+          <span>Placeholder<br><code>about-outreach</code></span>
+        </div>
+        <div class="img-placeholder" data-slot="about-community">
+          <span class="ph-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></span></span>
+          <strong>Community</strong>
+          <span>Placeholder<br><code>about-community</code></span>
         </div>
       </div>
     </div>

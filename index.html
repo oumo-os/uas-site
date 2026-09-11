@@ -111,9 +111,10 @@
     .link-card .label { font-weight:500; font-size:0.9rem; }
 
     @media (max-width:768px) {
-      .hero { min-height:55vh; padding:4rem 1rem 3rem; }
+      .hero { min-height:55vh; padding:5.5rem 1rem 3rem; }
       .hero h1 { font-size:2rem; }
       .hero p { font-size:1rem; }
+      .home-gallery { grid-template-columns:1fr !important; }
       .stat-row { grid-template-columns:repeat(2,1fr); gap:1rem; }
       .stat-card { padding:1.25rem 0.75rem; }
       .stat-card .stat-value { font-size:1.8rem; }
@@ -207,6 +208,30 @@
       <p class="section-subtitle">News, reports, observing guides, and educational content</p>
       <div class="grid-3" id="articlesList"></div>
       <p class="text-center mt-3"><a href="/knowledge" class="btn btn-outline btn-sm">Browse all articles &rarr;</a></p>
+    </div>
+  </section>
+
+  <section class="section section-alt">
+    <div class="container">
+      <h2 class="section-title">Life at UAS</h2>
+      <p class="section-subtitle">Nights under the stars, classrooms, and community — real photography coming soon</p>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem" class="home-gallery">
+        <div class="img-placeholder" data-slot="home-observing">
+          <span class="ph-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg></span></span>
+          <strong>Observing nights</strong>
+          <span>Placeholder<br><code>home-observing</code></span>
+        </div>
+        <div class="img-placeholder" data-slot="home-outreach">
+          <span class="ph-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span></span>
+          <strong>Schools &amp; outreach</strong>
+          <span>Placeholder<br><code>home-outreach</code></span>
+        </div>
+        <div class="img-placeholder" data-slot="home-events">
+          <span class="ph-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span></span>
+          <strong>Events</strong>
+          <span>Placeholder<br><code>home-events</code></span>
+        </div>
+      </div>
     </div>
   </section>
 
