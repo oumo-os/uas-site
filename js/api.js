@@ -556,6 +556,17 @@ var stripHtml = stripHtml || window._stripHtml;
   else init();
 })();
 
+// --- Footer year ---
+// Keeps every .js-year span on the current calendar year; no per-page edits.
+(function () {
+  function init() {
+    const y = String(new Date().getFullYear());
+    document.querySelectorAll('.js-year').forEach(function (el) { el.textContent = y; });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+
 // --- Mobile nav (hamburger) ---
 // Injects a burger button into every .nav on small screens; no per-page edits.
 (function () {
