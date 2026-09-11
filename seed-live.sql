@@ -235,12 +235,13 @@ INSERT INTO programme_members (programme_id, user_id, role_in_programme, status,
 -- --------------------------------------------------------------------------
 -- J. EVENTS (grounded; officers adjust dates/venues as plans firm up)
 -- --------------------------------------------------------------------------
-INSERT INTO events (programme_id, title, description, organizer_id, date, end_date, location, capacity, status, created_by) VALUES
-(NULL, 'World Space Week 2026 - Uganda', '<p>Join the global celebration of space science and technology. UAS marks World Space Week (4-10 October) with public activities across Kampala.</p>', 2, '2026-10-04 09:00:00', '2026-10-10 18:00:00', 'Kampala - venues to be confirmed', 500, 'published', 3),
-(NULL, 'October Public Observing Night', '<p>An evening under the stars with Society telescopes. Beginners welcome; telescopes and guidance provided.</p>', 2, '2026-10-02 19:00:00', '2026-10-02 22:00:00', 'Kampala - venue to be confirmed', 200, 'published', 3),
-(NULL, 'Annual Sky-Viewing Event', '<p>The Society flagship sky-viewing gathering, coordinated with Matovu John Baptist. Date to be confirmed.</p>', 2, '2026-12-12 19:00:00', '2026-12-12 23:00:00', 'To be confirmed', 300, 'published', 3),
-(NULL, 'Teachers Astronomy Bootcamp', '<p>A hands-on workshop giving teachers reusable astronomy activities for their classrooms. Details to be announced.</p>', 3, '2026-11-14 09:00:00', '2026-11-14 13:00:00', 'To be confirmed', 60, 'draft', 3),
-(NULL, 'Society Planning Session', '<p>Internal planning session for officers and programme teams. Details to be announced.</p>', 3, '2027-01-16 10:00:00', '2027-01-16 13:00:00', 'To be confirmed', 40, 'draft', 3);
+INSERT INTO events (programme_id, title, description, organizer_id, date, end_date, location, capacity, status, image_url, category, created_by) VALUES
+(NULL, 'World Space Week 2026 - Uganda', '<p>Join the global celebration of space science and technology. UAS marks World Space Week (4-10 October) with public activities across Kampala.</p>', 2, '2026-10-04 09:00:00', '2026-10-10 18:00:00', 'Kampala - venues to be confirmed', 500, 'published', 'img/event-spaceweek-2026.jpg', 'conference', 3),
+(NULL, 'October Public Observing Night', '<p>An evening under the stars with Society telescopes. Beginners welcome; telescopes and guidance provided.</p>', 2, '2026-10-02 19:00:00', '2026-10-02 22:00:00', 'Kampala - venue to be confirmed', 200, 'published', 'img/event-nightwatch.jpg', 'observing', 3),
+(NULL, 'Annual Sky-Viewing Event', '<p>The Society flagship sky-viewing gathering, coordinated with Matovu John Baptist. Date to be confirmed.</p>', 2, '2026-12-12 19:00:00', '2026-12-12 23:00:00', 'To be confirmed', 300, 'published', 'img/event-nightwatch.jpg', 'observing', 3),
+(NULL, 'Under the Skies \u2014 Ugandan Edition', '<p>Star gazing with telescopes, planetarium shows, water rocket launch demos, and space trivia. A public astronomy evening organised in partnership with Leo Sky Africa and NLL (Stare Lions League).</p><p><strong>Venue:</strong> King\u2019s Park Arena<br><strong>Fee:</strong> UGX 30,000</p>', 2, '2026-12-21 17:00:00', '2026-12-21 22:00:00', 'King\u2019s Park Arena, Kampala', 300, 'published', 'img/event-undertheskies.jpg', 'observing', 3),
+(NULL, 'Teachers Astronomy Bootcamp', '<p>A hands-on workshop giving teachers reusable astronomy activities for their classrooms. Details to be announced.</p>', 3, '2026-11-14 09:00:00', '2026-11-14 13:00:00', 'To be confirmed', 60, 'draft', NULL, 'workshop', 3),
+(NULL, 'Society Planning Session', '<p>Internal planning session for officers and programme teams. Details to be announced.</p>', 3, '2027-01-16 10:00:00', '2027-01-16 13:00:00', 'To be confirmed', 40, 'draft', NULL, 'workshop', 3);
 
 -- --------------------------------------------------------------------------
 -- K. ARTICLES (grounded launch content)
