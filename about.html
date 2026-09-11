@@ -101,6 +101,30 @@
     .cta-section .btn-outline { border-color:rgba(255,255,255,0.5); color:#fff; }
     .cta-section .btn-outline:hover { border-color:#fff; background:rgba(255,255,255,0.1); }
 
+    .is-card { padding:1.5rem; border-radius:var(--radius-lg); border:1px solid var(--border); background:var(--bg-card); }
+    .is-card.is-yes { border-top:3px solid var(--success); }
+    .is-card.is-no { border-top:3px solid var(--danger); }
+    .is-card .is-head { display:flex; align-items:center; gap:0.6rem; margin-bottom:0.75rem; }
+    .is-card .is-head h4 { margin:0; font-size:1rem; }
+    .is-card .is-icon {
+      width:32px; height:32px; border-radius:50%; display:flex; align-items:center;
+      justify-content:center; flex-shrink:0;
+    }
+    .is-card.is-yes .is-icon { background:rgba(45,106,79,0.12); color:var(--success); }
+    .is-card.is-no .is-icon { background:rgba(185,28,28,0.1); color:var(--danger); }
+    .is-card.is-yes .is-head h4 { color:var(--success); }
+    .is-card.is-no .is-head h4 { color:var(--danger); }
+    .is-card p { font-size:0.92rem; line-height:1.75; color:var(--text-dim); margin:0; }
+    .is-card ul { list-style:none; padding:0; margin:0; display:grid; gap:0.55rem; }
+    .is-card ul li { position:relative; padding-left:1.5rem; font-size:0.9rem; color:var(--text-dim); line-height:1.55; }
+    .is-card ul li::before, .is-card ul li::after {
+      content:''; position:absolute; left:0.45rem; top:0.62rem; width:10px; height:2px;
+      background:var(--danger); border-radius:1px; opacity:0.7;
+    }
+    .is-card ul li::before { transform:rotate(45deg); }
+    .is-card ul li::after { transform:rotate(-45deg); }
+    .is-card .is-foot { margin-top:0.9rem; padding-top:0.75rem; border-top:1px dashed var(--border); font-style:italic; font-size:0.86rem !important; }
+
     @media (max-width:768px) {
       .about-hero { min-height:40vh; padding:5.5rem 1rem 3rem; }
       .about-hero h1 { font-size:1.8rem; }
@@ -229,21 +253,21 @@
     <div class="container">
       <div class="about-content">
         <h2>What UAS Is and Is Not</h2>
-        <div class="is-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:1rem">
-          <div>
-            <h4 style="color:var(--success);margin-bottom:0.75rem">UAS Is</h4>
+        <div class="is-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-top:1.5rem;align-items:stretch">
+          <div class="is-card is-yes">
+            <div class="is-head"><span class="is-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span></span><h4>UAS Is</h4></div>
             <p>A public scientific gateway through which Ugandans encounter astronomy, develop scientific curiosity, and find pathways into the broader space sciences, engineering and technology — anchored in astronomy as its core mandate.</p>
           </div>
-          <div>
-            <h4 style="color:var(--danger);margin-bottom:0.75rem">UAS Is Not</h4>
-            <ul style="color:var(--text-dim);font-size:0.92rem;line-height:1.8;padding-left:1.2rem">
+          <div class="is-card is-no">
+            <div class="is-head"><span class="is-icon"><span class="icon-inline"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></span><h4>UAS Is Not</h4></div>
+            <ul>
               <li>Uganda's national space agency</li>
               <li>A government regulator</li>
               <li>An aerospace engineering or rocket-development company</li>
               <li>A commercial satellite operator</li>
               <li>A substitute for specialised academic or professional institutions</li>
             </ul>
-            <p style="margin-top:0.75rem;font-style:italic;font-size:0.88rem">UAS plays a complementary role within the national ecosystem.</p>
+            <p class="is-foot">UAS plays a complementary role within the national ecosystem.</p>
           </div>
         </div>
       </div>
