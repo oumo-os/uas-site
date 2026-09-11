@@ -74,7 +74,7 @@
     <p>Uganda Astronomical Society &middot; Institutional Platform</p>
   </footer>
 
-  <script src="../js/api.js?v=20260911-3"></script>
+  <script src="../js/api.js?v=20260911-4"></script>
   <script>
     async function load() {
       try {

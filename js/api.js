@@ -317,7 +317,7 @@ const api = {
 };
 
 // --- FormBuilder: shared form rendering with validation ---
-// Field types: text, email, password, number, date, datetime-local, textarea, select, multiselect, rich-text, file, cover-image, hidden
+// Field types: text, email, password, number, date, datetime-local, textarea, select, multiselect, rich-text, file, cover-image, checkbox, hidden
 // Option: { label, value, group? }
 const FormBuilder = {
   render(fields, opts = {}) {
@@ -367,6 +367,9 @@ const FormBuilder = {
       case 'file':
         const accept = f.accept ? ` accept="${esc(f.accept)}"` : '';
         input = `<input type="file" class="form-input" id="${fid}"${accept}${reqAttr}>`;
+        break;
+      case 'checkbox':
+        input = `<label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.9rem"><input type="checkbox" id="${fid}"${f.value ? ' checked' : ''}> ${esc(f.checkLabel || '')}</label>`;
         break;
       case 'cover-image':
         input = `<div class="cover-picker" id="${fid}-wrap">` +
@@ -438,6 +441,8 @@ const FormBuilder = {
           data[f.name] = Array.from(el.selectedOptions).map(o => o.value);
         } else if (f.type === 'file') {
           data[f.name] = el.files[0] || null;
+        } else if (f.type === 'checkbox') {
+          data[f.name] = el.checked || false;
         } else if (f.type === 'cover-image') {
           const urlEl = document.getElementById(formId + '-' + f.name + '-url');
           data[f.name] = { file: el.files[0] || null, url: (urlEl && urlEl.value) || null };
@@ -502,6 +507,7 @@ const FormBuilder = {
       if (f.type === 'rich-text') data[f.name] = el.innerHTML.trim();
       else if (f.type === 'multiselect') data[f.name] = Array.from(el.selectedOptions).map(o => o.value);
       else if (f.type === 'file') data[f.name] = el.files[0] || null;
+      else if (f.type === 'checkbox') data[f.name] = el.checked || false;
       else if (f.type === 'cover-image') { const u = document.getElementById(formId + '-' + f.name + '-url'); data[f.name] = (u && u.value) || null; }
       else if (f.type === 'number') data[f.name] = el.value ? parseFloat(el.value) : null;
       else data[f.name] = el.value || null;

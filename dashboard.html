@@ -435,6 +435,16 @@
     }
     .comment-input textarea:focus { outline: none; border-color: var(--accent); }
 
+    /* ── Approval preview (public view before publish) ── */
+    .view-toggle { display: flex; gap: 0.4rem; margin-bottom: 1rem; }
+    .preview-frame { border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+    .preview-hero { height: 170px; background-size: cover; background-position: center; background-color: var(--bg); }
+    .preview-body-wrap { padding: 1.1rem 1.25rem 1.25rem; }
+    .preview-body-wrap h2 { font-size: 1.25rem; margin: 0.4rem 0 0.3rem; line-height: 1.35; }
+    .preview-body { font-size: 0.9rem; line-height: 1.7; margin-top: 0.75rem; overflow-wrap: anywhere; }
+    .preview-body img { max-width: 100%; height: auto; border-radius: var(--radius); margin: 0.75rem 0; }
+    .preview-meta { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.8rem; color: var(--text-dim); margin-top: 0.4rem; }
+
     /* ── Discussion chatroom modal ── */
     .chat-overlay {
       position: fixed; inset: 0; background: rgba(10, 17, 40, 0.55); z-index: 1500;
@@ -1060,7 +1070,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260911-3"></script>
+  <script src="js/api.js?v=20260911-4"></script>
   <script>
     let health = {};
     let allPendingData = [];
@@ -2415,61 +2425,114 @@
       try { groups = await api.request('/working-groups'); } catch(e) {}
       try { roles = await api.request('/roles'); } catch(e) {}
       const memberClassRoles = roles.filter(r => r.role_type === 'member_class' && r.status === 'active');
-      const groupOptions = groups.map(g => `<option value="${esc(g.name)}">${esc(g.name)}</option>`).join('');
-      const roleOptions = memberClassRoles.map(r => `<option value="${esc(r.title)}">${esc(r.title)}</option>`).join('');
-      const html = `
-        <div style="display:flex;flex-direction:column;gap:0.75rem">
-          <label>Title<input id="pTitle" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)"></label>
-          <label>Description<textarea id="pDesc" rows="2" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)"></textarea></label>
-          <label>Type<select id="pType" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)"><option value="consultation">Consultation</option><option value="governance">Governance</option></select></label>
-          <label>Eligibility<select id="pElig" onchange="togglePollEligTarget()" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)"><option value="members">Active members</option><option value="all">All users</option><option value="group">Specific group</option><option value="role">Specific role</option></select></label>
-          <div id="pEligGroupWrap" style="display:none"><label>Group<select id="pEligGroup" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)"><option value="">Select group</option>${groupOptions}</select></label></div>
-          <div id="pEligRoleWrap" style="display:none"><label>Role<select id="pEligRole" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)"><option value="">Select role</option>${roleOptions}</select></label></div>
-          <label>Options — one per line (min 2)<textarea id="pOptions" rows="3" placeholder="Keep 50k UGX&#10;Raise to 75k UGX" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)"></textarea></label>
-          <label>Quorum (required votes, 0 = none)<input id="pQuorum" type="number" min="0" value="0" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)"></label>
-          <label>Closes (YYYY-MM-DD HH:MM, optional)<input id="pEnds" placeholder="2026-09-01 23:59:59" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)"></label>
-          <label style="display:flex;align-items:center;gap:0.5rem"><input type="checkbox" id="pAnon"> Anonymous (hide who voted)</label>
-          <button class="btn btn-primary" onclick="createPoll()">Create Poll</button>
-        </div>`;
-      openModal('New Poll', html);
-    }
-
-    function togglePollEligTarget() {
-      const v = document.getElementById('pElig').value;
-      document.getElementById('pEligGroupWrap').style.display = v === 'group' ? '' : 'none';
-      document.getElementById('pEligRoleWrap').style.display = v === 'role' ? '' : 'none';
-    }
-
-    async function createPoll() {
-      const title = document.getElementById('pTitle').value.trim();
-      const options = (document.getElementById('pOptions').value || '').split('\n').map(s => s.trim()).filter(Boolean);
-      if (!title) return toast('Title is required', 'warning');
-      if (options.length < 2) return toast('At least 2 options are required', 'warning');
-      const eligibility = document.getElementById('pElig').value;
-      let eligibility_target = null;
-      if (eligibility === 'group') {
-        eligibility_target = document.getElementById('pEligGroup').value || null;
-        if (!eligibility_target) return toast('Please select a group', 'warning');
-      } else if (eligibility === 'role') {
-        eligibility_target = document.getElementById('pEligRole').value || null;
-        if (!eligibility_target) return toast('Please select a role', 'warning');
-      }
-      try {
+      const formId = 'poll-create';
+      const fields = [
+        { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Poll title' },
+        { name: 'description', label: 'Description', type: 'textarea', rows: 2, placeholder: 'What is this poll deciding?' },
+        { name: 'poll_type', label: 'Type', type: 'select', options: [
+          { label: 'Consultation', value: 'consultation' },
+          { label: 'Governance', value: 'governance' },
+        ]},
+        { name: 'eligibility', label: 'Eligibility', type: 'select', options: [
+          { label: 'Active members', value: 'members' },
+          { label: 'All users', value: 'all' },
+          { label: 'Specific group', value: 'group' },
+          { label: 'Specific role', value: 'role' },
+        ]},
+        { name: 'eligibility_target_group', label: 'Group', type: 'select', options: [{ label: 'Select group', value: '' }].concat(groups.map(g => ({ label: g.name, value: g.name }))) },
+        { name: 'eligibility_target_role', label: 'Role', type: 'select', options: [{ label: 'Select role', value: '' }].concat(memberClassRoles.map(r => ({ label: r.title, value: r.title }))) },
+        { name: 'quorum', label: 'Quorum (required votes, 0 = none)', type: 'number', min: 0 },
+        { name: 'ends_at', label: 'Closes (YYYY-MM-DD HH:MM, optional)', type: 'text', placeholder: '2026-12-31 23:59' },
+        { name: 'allow_anonymous', label: 'Anonymity', type: 'checkbox', checkLabel: 'Anonymous (hide who voted)' },
+      ];
+      openModal('New Poll', FormBuilder.render(fields, { id: formId, submitLabel: 'Create Poll' }));
+      const form = document.getElementById(formId);
+      const extra = document.createElement('div');
+      extra.innerHTML = `
+        <div class="form-group" data-field="__options">
+          <label class="form-label">Options <span class="form-required">*</span></label>
+          <div id="${formId}-options" style="display:grid;gap:0.4rem"></div>
+          <button type="button" class="btn btn-outline btn-sm" style="margin-top:0.4rem;justify-self:start" onclick="pollOptAdd('${formId}')">+ Add option</button>
+          <div class="form-help">At least 2 options. Voters pick exactly one.</div>
+        </div>
+        <div class="form-group"><label class="form-label">Preview</label><div id="${formId}-preview"></div></div>`;
+      form.insertBefore(extra, form.querySelector('.form-actions'));
+      pollOptAdd(formId);
+      pollOptAdd(formId);
+      const toggleTargets = () => {
+        const v = (document.getElementById(formId + '-eligibility') || {}).value;
+        const gw = form.querySelector('[data-field="eligibility_target_group"]');
+        const rw = form.querySelector('[data-field="eligibility_target_role"]');
+        if (gw) gw.style.display = v === 'group' ? '' : 'none';
+        if (rw) rw.style.display = v === 'role' ? '' : 'none';
+      };
+      document.getElementById(formId + '-eligibility').addEventListener('change', toggleTargets);
+      toggleTargets();
+      form.addEventListener('input', () => pollPreview(formId));
+      pollPreview(formId);
+      FormBuilder.init(formId, fields, async (data) => {
+        const opts = [...document.querySelectorAll('#' + formId + '-options .poll-opt')].map(i => i.value.trim()).filter(Boolean);
+        if (opts.length < 2) throw { error: 'At least 2 options are required' };
+        let target = null;
+        if (data.eligibility === 'group') {
+          target = data.eligibility_target_group || null;
+          if (!target) throw { error: 'Please select a group' };
+        } else if (data.eligibility === 'role') {
+          target = data.eligibility_target_role || null;
+          if (!target) throw { error: 'Please select a role' };
+        }
         await api.request('/polls', { method: 'POST', body: {
-          title,
-          description: document.getElementById('pDesc').value.trim() || null,
-          poll_type: document.getElementById('pType').value,
-          eligibility,
-          eligibility_target,
-          options,
-          quorum: parseInt(document.getElementById('pQuorum').value) || 0,
-          allow_anonymous: document.getElementById('pAnon').checked,
-          ends_at: document.getElementById('pEnds').value || null,
+          title: data.title,
+          description: data.description || null,
+          poll_type: data.poll_type,
+          eligibility: data.eligibility,
+          eligibility_target: target,
+          options: opts,
+          quorum: data.quorum || 0,
+          allow_anonymous: !!data.allow_anonymous,
+          ends_at: (data.ends_at || '').trim() || null,
         }});
         closeModal(); toast('Poll created', 'success');
         const polls = await api.request('/polls');
         renderPolls(polls);
-      } catch (e) { toast(e.error || 'Failed to create poll', 'error'); }
+      });
+    }
+
+    function pollOptAdd(formId) {
+      const wrap = document.getElementById(formId + '-options');
+      if (!wrap) return;
+      const n = wrap.querySelectorAll('.poll-opt').length + 1;
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:0.4rem';
+      row.innerHTML = `<input class="form-input poll-opt" placeholder="Option ${n}" style="flex:1"><button type="button" class="btn btn-outline btn-sm" onclick="this.closest('div').remove();pollPreview('${formId}')" aria-label="Remove option">&times;</button>`;
+      wrap.appendChild(row);
+      pollPreview(formId);
+    }
+
+    function pollPreview(formId) {
+      const box = document.getElementById(formId + '-preview');
+      if (!box) return;
+      const val = n => ((document.getElementById(formId + '-' + n) || {}).value || '');
+      const title = val('title').trim() || 'Untitled poll';
+      const type = val('poll_type') || 'consultation';
+      const elig = val('eligibility') || 'members';
+      const quorum = parseInt(val('quorum')) || 0;
+      const opts = [...document.querySelectorAll('#' + formId + '-options .poll-opt')].map(i => i.value.trim()).filter(Boolean);
+      box.innerHTML = `
+        <div class="wg-card" style="cursor:default">
+          <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
+            <h4 style="font-size:0.95rem;margin:0">${esc(title)}</h4>
+            <span class="wg-badge" style="background:rgba(124,58,237,0.1);color:#7c3aed">draft</span>
+            <span class="wg-badge" style="background:rgba(30,96,145,0.1);color:var(--info);text-transform:capitalize">${esc(type)}</span>
+          </div>
+          <div class="wg-meta" style="margin-top:0.35rem"><span>0 votes</span><span style="margin-left:0.5rem" class="text-dim text-sm">${esc(elig === 'members' ? 'Members' : elig === 'all' ? 'All users' : elig)}</span>${quorum ? `<span style="margin-left:0.5rem">quorum ${quorum}</span>` : ''}</div>
+          <div style="margin-top:0.6rem">${opts.length ? opts.map((o, i) => `
+            <div style="margin-bottom:0.5rem">
+              <div style="display:flex;justify-content:space-between;font-size:0.82rem"><span>${i + 1}. ${esc(o)}</span><span class="text-dim">0 (0%)</span></div>
+              <div style="height:6px;background:var(--bg-subtle);border-radius:4px;overflow:hidden"><div style="height:100%;width:0%;background:var(--accent)"></div></div>
+            </div>`).join('') : '<p class="text-dim text-sm">Add at least 2 options to see them here.</p>'}
+          </div>
+        </div>`;
     }
 
     const ROLE_TYPE_LABELS = {
@@ -2667,11 +2730,13 @@
     function pendingActions(item) {
       const out = [];
       if (item.item_type === 'article' && (item.status === 'submitted' || item.status === 'under_review')) {
+        out.push(`<button class="btn btn-outline btn-xs" onclick="showItemDetail('article', ${item.id}, 'preview')">Preview</button>`);
         if (api.hasCap('articles.approve')) out.push(`<button class="btn btn-primary btn-xs" onclick="actOnItem('article', 'approve', ${item.id})">Approve</button>`);
         if (api.hasCap('articles.publish') && item.status !== 'approved') out.push(`<button class="btn btn-outline btn-xs" onclick="actOnItem('article', 'publish', ${item.id})">Publish</button>`);
         if (api.hasCap('articles.approve')) out.push(`<button class="btn btn-outline btn-xs" onclick="rejectArticle(${item.id})">Reject</button>`);
       }
       if (item.item_type === 'event' && item.status === 'submitted') {
+        out.push(`<button class="btn btn-outline btn-xs" onclick="showItemDetail('event', ${item.id}, 'preview')">Preview</button>`);
         if (api.hasCap('events.approve')) out.push(`<button class="btn btn-primary btn-xs" onclick="actOnItem('event', 'approve', ${item.id})">Approve</button>`);
         if (api.hasCap('events.publish')) out.push(`<button class="btn btn-outline btn-xs" onclick="actOnItem('event', 'publish', ${item.id})">Publish</button>`);
       }
@@ -3779,9 +3844,17 @@
       }
     });
 
-    async function showItemDetail(type, id) {
+    async function showItemDetail(type, id, view = 'details') {
       try {
         let data, html = '';
+        const viewToggle = (t, i) => `
+          <div class="view-toggle">
+            <button class="btn btn-sm ${view !== 'preview' ? 'btn-primary' : 'btn-outline'}" onclick="showItemDetail('${t}', ${i})">Details</button>
+            <button class="btn btn-sm ${view === 'preview' ? 'btn-primary' : 'btn-outline'}" onclick="showItemDetail('${t}', ${i}, 'preview')">Preview public view</button>
+          </div>`;
+        const publicCover = (url, fallback) => url
+          ? (/^https?:\/\//i.test(url) ? url : ua('/' + String(url).replace(/^\/+/, '')))
+          : ua(fallback);
         if (type === 'article') {
           data = await api.request('/articles/' + id);
           const actions = [];
@@ -3793,14 +3866,26 @@
           if (data.status === 'rejected' && api.hasCap('articles.edit') && data.author_name === api._user?.name) actions.push(`<button class="btn btn-outline btn-sm" onclick="modalAction('article','resubmit',${id})">Resubmit</button>`);
 
           html = `
+            ${viewToggle(type, id)}
+            ${view === 'preview' ? `
+            <div class="preview-frame">
+              <div class="preview-hero" style="background-image:url('${esc(publicCover(data.image_url, '/img/header-knowledge.jpg'))}')"></div>
+              <div class="preview-body-wrap">
+                <span class="cap-tag">${esc((data.category || 'article').replace(/_/g, ' '))}</span>
+                <h2>${esc(data.title)}</h2>
+                <div class="text-dim text-sm">By ${esc(data.author_name || 'Unknown')}</div>
+                <div class="preview-body">${data.body || ''}</div>
+              </div>
+            </div>` : `
             <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
             <div class="field"><div class="field-label">Category</div>${esc(data.category)}</div>
             <div class="field"><div class="field-label">Author</div>${esc(data.author_name || 'Unknown')}</div>
             <div class="field"><div class="field-label">Created</div>${new Date(data.created_at).toLocaleDateString('en', {year:'numeric',month:'long',day:'numeric'})}</div>
             ${data.published_at ? `<div class="field"><div class="field-label">Published</div>${new Date(data.published_at).toLocaleDateString('en', {year:'numeric',month:'long',day:'numeric'})}</div>` : ''}
+            ${data.image_url ? `<div class="field"><div class="field-label">Cover</div><img src="${esc(publicCover(data.image_url, ''))}" alt="" style="max-width:100%;border-radius:var(--radius);border:1px solid var(--border)"></div>` : ''}
             ${data.tags ? `<div class="field"><div class="field-label">Tags</div>${JSON.parse(data.tags).map(t => `<span class="cap-tag">${esc(t)}</span>`).join(' ')}</div>` : ''}
             ${data.body ? `<div class="field"><div class="field-label">Body</div><div style="max-height:300px;overflow-y:auto;padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border);line-height:1.6">${data.body}</div></div>` : ''}
-            ${data.rejection_reason ? `<div class="field"><div class="field-label">Rejection Reason</div><div style="color:var(--danger);padding:0.5rem;background:rgba(185,28,28,0.05);border-radius:var(--radius)">${esc(data.rejection_reason)}</div></div>` : ''}
+            ${data.rejection_reason ? `<div class="field"><div class="field-label">Rejection Reason</div><div style="color:var(--danger);padding:0.5rem;background:rgba(185,28,28,0.05);border-radius:var(--radius)">${esc(data.rejection_reason)}</div></div>` : ''}`}
             ${actions.length ? `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);display:flex;gap:0.5rem">${actions.join('')}</div>` : ''}
           `;
 
@@ -3815,14 +3900,29 @@
           if (data.status === 'published' && api.hasCap('events.rsvp')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('event','rsvp',${id})">RSVP</button>`);
 
           html = `
+            ${viewToggle(type, id)}
+            ${view === 'preview' ? `
+            <div class="preview-frame">
+              <div class="preview-hero" style="background-image:url('${esc(publicCover(data.image_url, '/img/header-events.jpg'))}')"></div>
+              <div class="preview-body-wrap">
+                <h2>${esc(data.title)}</h2>
+                <div class="preview-meta">
+                  <span>${data.date ? new Date(String(data.date).replace(' ', 'T')).toLocaleDateString('en', {weekday:'long',year:'numeric',month:'long',day:'numeric'}) : 'Date TBC'}</span>
+                  <span>${esc(data.location || 'Venue TBC')}</span>
+                  <span>${data.capacity ? data.capacity + ' places' : 'Open attendance'}</span>
+                </div>
+                <div class="preview-body">${data.description || ''}</div>
+              </div>
+            </div>` : `
             <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
             <div class="field"><div class="field-label">Date</div>${new Date(data.date).toLocaleDateString('en', {weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
             ${data.end_date ? `<div class="field"><div class="field-label">End</div>${new Date(data.end_date).toLocaleDateString('en', {hour:'2-digit',minute:'2-digit'})}</div>` : ''}
             <div class="field"><div class="field-label">Location</div>${esc(data.location || 'TBA')}</div>
             <div class="field"><div class="field-label">Organizer</div>${esc(data.organizer_name || 'Unknown')}</div>
             <div class="field"><div class="field-label">Capacity</div>${data.capacity ? data.capacity + ' attendees' : 'Unlimited'}</div>
+            ${data.image_url ? `<div class="field"><div class="field-label">Cover</div><img src="${esc(publicCover(data.image_url, ''))}" alt="" style="max-width:100%;border-radius:var(--radius);border:1px solid var(--border)"></div>` : ''}
             ${data.description ? `<div class="field"><div class="field-label">Description</div><div style="max-height:200px;overflow-y:auto;padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${data.description}</div></div>` : ''}
-            ${rsvps.length ? `<div class="field"><div class="field-label">RSVPs (${rsvps.length})</div><div style="max-height:120px;overflow-y:auto">${rsvps.map(r => `<div style="padding:0.25rem 0;font-size:0.85rem">• ${esc(r.user_name)} <span class="text-dim">${esc(r.status)}</span></div>`).join('')}</div></div>` : ''}
+            ${rsvps.length ? `<div class="field"><div class="field-label">RSVPs (${rsvps.length})</div><div style="max-height:120px;overflow-y:auto">${rsvps.map(r => `<div style="padding:0.25rem 0;font-size:0.85rem">• ${esc(r.user_name)} <span class="text-dim">${esc(r.status)}</span></div>`).join('')}</div></div>` : ''}`}
             ${actions.length ? `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);display:flex;gap:0.5rem">${actions.join('')}</div>` : ''}
           `;
 
