@@ -292,6 +292,7 @@ const api = {
   async getPublicArticles() { return this.request('/public/articles'); },
   async getPublicEvents() { return this.request('/public/events'); },
   async getPastEvents() { return this.request('/public/past-events'); },
+  async getPublicStats() { return this.request('/public/stats'); },
   async getPublicProgrammes() { return this.request('/public/programmes'); },
   async getPublicProgramme(id) { return this.request('/public/programmes/' + id); },
   async getPublicDocuments() { return this.request('/public/documents'); },

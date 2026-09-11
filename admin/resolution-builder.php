@@ -99,7 +99,7 @@
     <p>Uganda Astronomical Society &middot; Institutional Platform</p>
   </footer>
 
-  <script src="../js/api.js?v=20260911"></script>
+  <script src="../js/api.js?v=20260911-2"></script>
   <script>
     const memberOptions = [];
     const roleOptions = [];

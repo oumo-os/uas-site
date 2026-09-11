@@ -288,7 +288,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260911"></script>
+  <script src="js/api.js?v=20260911-2"></script>
   <script>
     async function load() {
       try {
@@ -301,11 +301,12 @@
           api.getPublicArticles().catch(() => []),
         ]);
 
-        // Animate stat counters
-        animateCounter('statMembers', members.length || 0);
-        animateCounter('statProgrammes', programmes.length || 0);
-        animateCounter('statEvents', events.length || 0);
-        animateCounter('statArticles', articles.length || 0);
+        // Animate stat counters (public stats endpoint; fall back to list lengths)
+        const stats = await api.getPublicStats().catch(() => null);
+        animateCounter('statMembers', stats ? stats.members : (members.length || 0));
+        animateCounter('statProgrammes', stats ? stats.programmes : (programmes.length || 0));
+        animateCounter('statEvents', stats ? stats.events : (events.length || 0));
+        animateCounter('statArticles', stats ? stats.articles : (articles.length || 0));
 
         // Programmes
         const pDiv = document.getElementById('programmesList');

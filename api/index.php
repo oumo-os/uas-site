@@ -2395,6 +2395,14 @@ try {
   }
 
   // --- PUBLIC: published articles, events, programmes (for website) ---
+  elseif ($path === '/public/stats' && $method === 'GET') {
+    $stats = [];
+    $stats['members'] = (int) db()->query("SELECT COUNT(*) FROM members m JOIN users u ON u.id = m.user_id WHERE m.profile_visible = 1 AND m.status = 'active' AND u.status = 'active'")->fetchColumn();
+    $stats['programmes'] = (int) db()->query("SELECT COUNT(*) FROM programmes p WHERE p.status = 'active'")->fetchColumn();
+    $stats['events'] = (int) db()->query("SELECT COUNT(*) FROM events e WHERE (e.status = 'published' AND e.date >= NOW()) OR e.status = 'cancelled'")->fetchColumn();
+    $stats['articles'] = (int) db()->query("SELECT COUNT(*) FROM articles a WHERE a.status = 'published'")->fetchColumn();
+    json_response($stats);
+  }
   elseif ($path === '/public/news' && $method === 'GET') {
     $stmt = db()->prepare('SELECT a.id, a.title, a.category, a.image_url, a.published_at, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.status = "published" AND a.category = "announcement" ORDER BY a.published_at DESC');
     $stmt->execute();
