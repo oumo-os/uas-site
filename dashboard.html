@@ -1042,14 +1042,14 @@
           api.getMyAssignments().catch(() => []),
           api.request('/submissions/mine').catch(() => []),
           api.getCalendar().catch(() => []),
-          api.getFinanceSummary().catch(() => null),
-          api.getBudgetItems().catch(() => []),
+          api.hasCap('finance.view') ? api.getFinanceSummary().catch(() => null) : Promise.resolve(null),
+          api.hasCap('finance.view') ? api.getBudgetItems().catch(() => []) : Promise.resolve([]),
           api.getWorkingGroups().catch(() => []),
           api.getActivity(20).catch(() => []),
           api.request('/meetings').catch(() => []),
           api.request('/polls').catch(() => []),
           api.request('/delegations').catch(() => ({ outgoing: [], incoming: [] })),
-          api.request('/users').catch(() => []),
+          api.hasCap('roles.manage') ? api.request('/users').catch(() => []) : Promise.resolve([]),
         ]);
 
         health = healthData;
