@@ -274,4 +274,38 @@ INSERT INTO useful_links (title, url, category, description, external_organizati
 ('NASA', 'https://www.nasa.gov', 'organization', 'Missions, imagery and open science resources.', 'NASA', 'active'),
 ('Stellarium', 'https://stellarium.org', 'tool', 'Free planetarium software - plan what to observe before an outing.', 'Stellarium', 'active');
 
+-- --------------------------------------------------------------------------
+-- N. MANDATE-FOCUSED COMMITTEE DESCRIPTIONS
+-- (process history lives in resolutions + articles below, not here)
+-- --------------------------------------------------------------------------
+UPDATE working_groups SET description = 'The governing board of the Society. It sets strategy, guards the constitution, approves policy and finance, and holds the executive to account through the General Secretary.' WHERE name = 'Board of Directors';
+UPDATE working_groups SET description = 'The officers who run the Society day to day - programmes, operations and logistics, communications, finance, legal, partnerships, assets and culture - reporting through the General Secretary to the Board.' WHERE name = 'Executive Management';
+
+-- --------------------------------------------------------------------------
+-- O. RATIFYING RESOLUTIONS (draft: the board votes them through in-app)
+-- --------------------------------------------------------------------------
+INSERT INTO resolutions (code, title, description, type, status, proposed_by, quorum, majority) VALUES
+('UAS-BRD-2026-001', 'Confirmation of the President', 'Under the September 2026 governance framework, Obwengye Cosmus - the founding chair and only founding officer to remain in post - is confirmed to continue as President. This resolution formally records that decision.', 'appointment', 'draft', 3, 2, 'simple'),
+('UAS-BRD-2026-002', 'Appointment of the Treasurer', 'Nsaale Ivan Kalule, a founding signatory, submitted his name for Treasurer and is hereby appointed to the office with full financial responsibility.', 'appointment', 'draft', 3, 2, 'simple'),
+('UAS-BRD-2026-003', 'Confirmation of Executive Officers', 'Confirms the six agreed executive officers: Legal Affairs & Compliance (Shiella Splendour Aol), Programmes (Angel Uwera), Operations & Logistics (Reginald Busulwa), PR Media & Publicity (Kizito Mudambo), External Partnerships (Derrick Asedri), Values Discipline & Culture (Kalyango Dan Maseke).', 'appointment', 'draft', 3, 2, 'simple');
+SET @res_pres := (SELECT id FROM resolutions WHERE code = 'UAS-BRD-2026-001' LIMIT 1);
+SET @res_treas := (SELECT id FROM resolutions WHERE code = 'UAS-BRD-2026-002' LIMIT 1);
+SET @res_exec := (SELECT id FROM resolutions WHERE code = 'UAS-BRD-2026-003' LIMIT 1);
+INSERT INTO resolution_changes (resolution_id, change_type, target_type, target_id, payload) VALUES
+(@res_pres, 'appoint', 'role', NULL, '{"role_title": "President", "user_id": 2}'),
+(@res_treas, 'appoint', 'role', NULL, '{"role_title": "Treasurer", "user_id": 4}'),
+(@res_exec, 'appoint', 'role', NULL, '{"role_title": "Legal Affairs & Compliance Officer", "user_id": 5}'),
+(@res_exec, 'appoint', 'role', NULL, '{"role_title": "Programmes Officer", "user_id": 6}'),
+(@res_exec, 'appoint', 'role', NULL, '{"role_title": "Programme Operations & Logistics Officer", "user_id": 7}'),
+(@res_exec, 'appoint', 'role', NULL, '{"role_title": "PR, Media & Publicity Officer", "user_id": 8}'),
+(@res_exec, 'appoint', 'role', NULL, '{"role_title": "External Partnerships Officer", "user_id": 9}'),
+(@res_exec, 'appoint', 'role', NULL, '{"role_title": "Values, Discipline & Society Culture Officer", "user_id": 10}');
+
+-- --------------------------------------------------------------------------
+-- P. PERSONNEL ANNOUNCEMENTS (public record of the same decisions)
+-- --------------------------------------------------------------------------
+INSERT INTO articles (author_id, title, body, category, tags, status, approved_by, approved_at, published_at) VALUES
+(3, 'President Confirmed to Continue Leading the Society', '<p>Under the September 2026 governance framework, Obwengye Cosmus has been confirmed to continue as President of the Uganda Astronomical Society.</p><p>Cosmus founded the Society in 2023 and remains the only founding officer to continue in post through the reorganisation. A formal ratifying resolution is before the board.</p>', 'announcement', '["governance","announcement"]', 'published', 3, NOW(), NOW()),
+(3, 'Treasurer Nominated as Executive Team Takes Shape', '<p>Nsaale Ivan Kalule, a founding signatory, has been nominated as Treasurer, and six executive officers have been agreed across legal, programmes, operations, publicity, partnerships and culture.</p><p>Three officer seats and five programme-lead seats remain open - members interested in serving should see the Join page.</p>', 'announcement', '["governance","announcement"]', 'published', 3, NOW(), NOW());
+
 -- End of live baseline seed.

@@ -31,6 +31,16 @@
     .info-text h4 { font-size:0.9rem; margin-bottom:0.2rem; }
     .info-text p { font-size:0.85rem; color:var(--text-dim); margin:0; }
 
+    .email-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; }
+    .email-card {
+      display:block; padding:0.7rem 0.85rem; background:var(--bg-card);
+      border:1px solid var(--border); border-radius:var(--radius); text-decoration:none;
+      transition:border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+    }
+    .email-card:hover { border-color:var(--accent); box-shadow:var(--shadow); transform:translateY(-1px); }
+    .email-card strong { display:block; font-size:0.82rem; color:var(--accent); word-break:break-all; margin-bottom:0.1rem; }
+    .email-card span { font-size:0.76rem; color:var(--text-dim); }
+
     .form-card { padding:2rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); }
     .form-card h3 { font-size:1.2rem; font-weight:700; margin-bottom:1.25rem; }
     .form-row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem; }
@@ -55,6 +65,7 @@
       .page-hero { min-height:35vh; padding:4rem 1rem 3rem; }
       .page-hero h1 { font-size:1.8rem; }
       .contact-grid { grid-template-columns:1fr; gap:2rem; }
+      .email-grid { grid-template-columns:1fr; }
       .form-row { grid-template-columns:1fr; }
       .section { padding:2.5rem 0; }
     }
@@ -102,15 +113,15 @@
 
           <div style="margin-bottom:0.75rem">
             <h4 style="font-size:0.9rem;margin-bottom:0.6rem">Reach the right office</h4>
-            <div style="display:grid;gap:0.4rem;font-size:0.85rem">
-              <div><a href="mailto:info@astronomy.ug" style="color:var(--accent);font-weight:600">info@astronomy.ug</a> <span class="text-dim">— general information</span></div>
-              <div><a href="mailto:membership@astronomy.ug" style="color:var(--accent);font-weight:600">membership@astronomy.ug</a> <span class="text-dim">— membership, dues & applications</span></div>
-              <div><a href="mailto:programmes@astronomy.ug" style="color:var(--accent);font-weight:600">programmes@astronomy.ug</a> <span class="text-dim">— programmes & events</span></div>
-              <div><a href="mailto:partnerships@astronomy.ug" style="color:var(--accent);font-weight:600">partnerships@astronomy.ug</a> <span class="text-dim">— partnerships & institutions</span></div>
-              <div><a href="mailto:publicity@astronomy.ug" style="color:var(--accent);font-weight:600">publicity@astronomy.ug</a> <span class="text-dim">— media & press</span></div>
-              <div><a href="mailto:secretary@astronomy.ug" style="color:var(--accent);font-weight:600">secretary@astronomy.ug</a> <span class="text-dim">— governance & official correspondence</span></div>
-              <div><a href="mailto:legal@astronomy.ug" style="color:var(--accent);font-weight:600">legal@astronomy.ug</a> <span class="text-dim">— legal & compliance</span></div>
-              <div><a href="mailto:finance@astronomy.ug" style="color:var(--accent);font-weight:600">finance@astronomy.ug</a> <span class="text-dim">— finance & accountability</span></div>
+            <div class="email-grid">
+              <a class="email-card" href="mailto:info@astronomy.ug"><strong>info@astronomy.ug</strong><span>General information</span></a>
+              <a class="email-card" href="mailto:membership@astronomy.ug"><strong>membership@astronomy.ug</strong><span>Membership, dues &amp; applications</span></a>
+              <a class="email-card" href="mailto:programmes@astronomy.ug"><strong>programmes@astronomy.ug</strong><span>Programmes &amp; events</span></a>
+              <a class="email-card" href="mailto:partnerships@astronomy.ug"><strong>partnerships@astronomy.ug</strong><span>Partnerships &amp; institutions</span></a>
+              <a class="email-card" href="mailto:publicity@astronomy.ug"><strong>publicity@astronomy.ug</strong><span>Media &amp; press</span></a>
+              <a class="email-card" href="mailto:secretary@astronomy.ug"><strong>secretary@astronomy.ug</strong><span>Governance &amp; official correspondence</span></a>
+              <a class="email-card" href="mailto:legal@astronomy.ug"><strong>legal@astronomy.ug</strong><span>Legal &amp; compliance</span></a>
+              <a class="email-card" href="mailto:finance@astronomy.ug"><strong>finance@astronomy.ug</strong><span>Finance &amp; accountability</span></a>
             </div>
           </div>
 

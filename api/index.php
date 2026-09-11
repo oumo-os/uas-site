@@ -1945,6 +1945,12 @@ try {
     $stmt->execute();
     json_response($stmt->fetchAll());
   }
+  // --- OPEN ROLES (vacant non-member offices; powers leadership "vacant" cards) ---
+  elseif ($path === '/public/open-roles' && $method === 'GET') {
+    $stmt = db()->prepare("SELECT r.id, r.title, r.description, r.role_type, r.scope, r.target FROM roles r LEFT JOIN role_assignments ra ON ra.role_id = r.id AND ra.status = 'active' WHERE r.status = 'active' AND r.role_type IN ('governance', 'administrative') AND (r.scope IS NULL OR r.scope != 'emeritus') AND r.title != 'System Administrator' AND ra.id IS NULL ORDER BY r.role_type, r.title");
+    $stmt->execute();
+    json_response($stmt->fetchAll());
+  }
   elseif ($path === '/working-groups/with-members' && $method === 'GET') {
     $isPublic = isset($_GET['public']) && $_GET['public'] === '1';
     $stmt = db()->prepare('SELECT wg.*, p.title AS programme_name
