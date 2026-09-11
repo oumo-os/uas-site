@@ -67,10 +67,14 @@
 
     /* ── Stat Grid ── */
     .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 0.85rem; margin-bottom: 1.5rem; }
+    /* Overview: fixed 4-across so the 7 cards settle 4+3 instead of 6+1 */
+    .stat-grid-overview { grid-template-columns: repeat(4, 1fr); }
+    @media (max-width: 900px) { .stat-grid-overview { grid-template-columns: repeat(2, 1fr); } }
     .stat-card {
       padding: 1.1rem 1rem; background: var(--bg-card); border: 1px solid var(--border);
       border-radius: var(--radius-lg); text-align: center; position: relative; overflow: hidden;
       transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s; cursor: pointer;
+      min-height: 128px; display: flex; flex-direction: column; align-items: center; justify-content: center;
     }
     .stat-card:hover { border-color: var(--border-focus); box-shadow: var(--shadow-md); transform: translateY(-1px); }
     .stat-card::before {
@@ -107,7 +111,7 @@
     .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
     .section-header h3 { font-size: 1.05rem; font-weight: 700; margin: 0; }
     .section-header .btn { font-size: 0.78rem; }
-    .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.5rem; }
+    .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem; align-items: start; }
     @media (max-width: 768px) { .dash-grid { grid-template-columns: 1fr; } }
     .dash-card {
       background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
@@ -497,7 +501,7 @@
     .upcoming-event-rsvp { margin-top: 0.4rem; font-size: 0.7rem; color: var(--accent); font-weight: 600; }
 
     /* ── Activity Feed ── */
-    .activity-feed { max-height: 360px; overflow-y: auto; }
+    .activity-feed { max-height: 300px; overflow-y: auto; }
     .activity-item {
       display: flex; gap: 0.65rem; padding: 0.55rem 0;
       border-bottom: 1px solid var(--border); align-items: flex-start;
@@ -601,8 +605,8 @@
 
     <!-- Overview Panel -->
     <div class="dash-panel active" id="panel-overview">
-      <div id="upcomingStrip" style="margin-bottom:2rem"></div>
-      <div class="stat-grid" id="statGrid"></div>
+      <div id="upcomingStrip" style="margin-bottom:1.25rem"></div>
+      <div class="stat-grid stat-grid-overview" id="statGrid"></div>
       <div class="dash-grid">
         <div class="dash-card">
           <div class="dash-card-header">
@@ -1308,7 +1312,8 @@
         el.innerHTML = '<div class="empty-state"><h4>No activity yet</h4><p>Actions like creating content, approving items, and voting will appear here.</p></div>';
         return;
       }
-      el.innerHTML = items.map(a => {
+      // Cap the overview feed — full history lives with the admins
+      el.innerHTML = items.slice(0, 8).map(a => {
         const name = a.user_name || 'System';
         const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
         const actionText = formatAction(a);
