@@ -582,6 +582,13 @@ tr:hover td { background: var(--accent-glow); }
 .rte-editor p { margin:0 0 0.5rem; }
 .rte-editor ul, .rte-editor ol { margin:0.5rem 0; padding-left:1.5rem; }
 .rte-editor a { color:var(--accent); text-decoration:underline; }
+.rte-editor img { max-width:100%; height:auto; border-radius:var(--radius); margin:0.75rem 0; display:block; }
+.rte-btn:disabled { opacity:0.45; cursor:wait; }
+
+/* Cover image picker (forms) */
+.cover-picker { display:grid; gap:0.5rem; }
+.cover-preview { width:100%; max-height:220px; object-fit:cover; border-radius:var(--radius); border:1px solid var(--border); display:block; }
+.cover-picker .cover-remove { justify-self:start; }
 @media (max-width:480px) { .rte-toolbar { gap:0; } .rte-btn { min-width:1.5rem; height:1.5rem; font-size:0.75rem; } }
 
 /* ============ Detail Page Shared Styles ============ */

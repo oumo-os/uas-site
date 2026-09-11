@@ -72,6 +72,77 @@ function password_is_strong(string $pw): bool {
   return strlen($pw) >= 8 && preg_match('/[A-Za-z]/', $pw) && preg_match('/\d/', $pw);
 }
 
+// Image URLs stored on content (covers, galleries): only same-site uploads
+// (/img/...) or http(s) URLs are allowed. Anything else becomes NULL, which
+// blocks javascript:/data: payloads from reaching <img src> output.
+function clean_image_url($v): ?string {
+  if (!is_string($v)) return null;
+  $v = trim($v);
+  if ($v === '' || strlen($v) > 500) return null;
+  if (strpos($v, '/img/') === 0) return $v;
+  if (preg_match('#^https?://[^\s<>"\']+$#i', $v)) return $v;
+  return null;
+}
+
+// Recompress an uploaded image in place: max 1600px wide, JPEG q80,
+// PNG level 6 (alpha preserved), WebP q80. GIFs pass through untouched
+// (animation). Returns [width, height, compressed] or null when GD is
+// unavailable or the file is not a readable image of the stated type.
+function compress_uploaded_image(string $path, string $mime): ?array {
+  if (!function_exists('imagecreatetruecolor') || !function_exists('getimagesize')) return null;
+  $info = @getimagesize($path);
+  if (!$info || $info[0] <= 0 || $info[1] <= 0) return null;
+  $w = $info[0];
+  $h = $info[1];
+  if ($mime === 'image/gif') return [$w, $h, false];
+  $maxW = 1600;
+  $size = @filesize($path);
+  if ($w <= $maxW && $size !== false && $size <= 400 * 1024 && ($mime === 'image/jpeg' || $mime === 'image/webp')) {
+    return [$w, $h, false];
+  }
+  if ($mime === 'image/jpeg') {
+    $src = @imagecreatefromjpeg($path);
+  } elseif ($mime === 'image/png') {
+    $src = @imagecreatefrompng($path);
+  } elseif ($mime === 'image/webp' && function_exists('imagecreatefromwebp')) {
+    $src = @imagecreatefromwebp($path);
+  } else {
+    return null;
+  }
+  if (!$src) return null;
+  $nw = $w;
+  $nh = $h;
+  $dst = $src;
+  if ($w > $maxW) {
+    $nw = $maxW;
+    $nh = (int) round($h * $maxW / $w);
+    $dst = imagecreatetruecolor($nw, $nh);
+    if ($mime === 'image/png') {
+      imagealphablending($dst, false);
+      imagesavealpha($dst, true);
+    }
+    imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+  } elseif ($mime === 'image/png') {
+    $dst = imagecreatetruecolor($w, $h);
+    imagealphablending($dst, false);
+    imagesavealpha($dst, true);
+    imagecopy($dst, $src, 0, 0, 0, 0, $w, $h);
+  }
+  $ok = false;
+  if ($mime === 'image/jpeg') {
+    $ok = imagejpeg($dst, $path, 80);
+  } elseif ($mime === 'image/png') {
+    $ok = imagepng($dst, $path, 6);
+  } elseif ($mime === 'image/webp' && function_exists('imagewebp')) {
+    $ok = imagewebp($dst, $path, 80);
+  }
+  if ($dst !== $src) imagedestroy($dst);
+  imagedestroy($src);
+  if (!$ok) return null;
+  clearstatcache(true, $path);
+  return [$nw, $nh, true];
+}
+
 // JSON response helper
 function json_response($data, int $code = 200): void {
   http_response_code($code);

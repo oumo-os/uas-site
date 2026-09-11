@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/png" href="img/uas-emblem.png">
   <title>Dashboard — UAS</title>
-  <link rel="stylesheet" href="css/base.css?v=20260911">
+  <link rel="stylesheet" href="css/base.css?v=20260911-3">
   <style>
     /* ── Hero ── */
     .dash-hero {
@@ -997,7 +997,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260911-2"></script>
+  <script src="js/api.js?v=20260911-3"></script>
   <script>
     let health = {};
     let allPendingData = [];
@@ -2736,6 +2736,7 @@
             { label: 'Announcement', value: 'announcement' },
           ]},
           { name: 'body', label: 'Body', type: 'rich-text', required: true },
+          { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image' },
         ];
       } else if (type === 'event') {
         title = 'Create Event';
@@ -2752,6 +2753,7 @@
           { name: 'location', label: 'Location', type: 'text', placeholder: 'e.g. Kampala, Uganda' },
           { name: 'capacity', label: 'Capacity', type: 'number', min: 0, placeholder: 'Max attendees (0 = unlimited)' },
           { name: 'description', label: 'Description', type: 'rich-text', rows: 4, required: true },
+          { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image' },
         ];
       } else if (type === 'programme') {
         title = 'Propose Programme';
@@ -2759,6 +2761,7 @@
           { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Programme title' },
           { name: 'description', label: 'Description', type: 'rich-text', rows: 4, required: true },
           { name: 'objectives', label: 'Objectives', type: 'textarea', rows: 3, placeholder: 'Key objectives and goals' },
+          { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image' },
         ];
       } else if (type === 'project') {
         title = 'Create Project';

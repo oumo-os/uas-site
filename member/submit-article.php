@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Submit Article — Uganda Astronomical Society</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../css/base.css?v=20260911">
+  <link rel="stylesheet" href="../css/base.css?v=20260911-3">
 </head>
 <body>
   <nav class="nav">
@@ -52,11 +52,17 @@
         </div>
         <div class="form-group">
           <label class="form-label">Body</label>
-          <textarea class="form-textarea" id="artBody" rows="10" placeholder="Write your article here..."></textarea>
+          <div class="rte-wrap" id="artBody-wrap"><div class="rte-toolbar" id="artBody-toolbar"></div><div class="rte-editor" id="artBody" contenteditable="true"></div></div>
         </div>
         <div class="form-group">
-          <label class="form-label">Featured Image URL (optional)</label>
-          <input class="form-input" id="artImg" placeholder="https://...">
+          <label class="form-label">Cover Image (optional)</label>
+          <div class="cover-picker" id="artCover-wrap">
+            <img id="artCover-preview" class="cover-preview" alt="Cover preview" style="display:none">
+            <input class="form-input" type="file" id="artCover" accept="image/*">
+            <input type="hidden" id="artCoverUrl" value="">
+            <button type="button" class="btn btn-outline btn-sm cover-remove" id="artCoverRemove" style="display:none">Remove image</button>
+            <div class="form-help">JPG, PNG, GIF or WebP. Compressed automatically on upload.</div>
+          </div>
         </div>
         <button class="btn btn-primary" onclick="submitArticle()">Submit for Review</button>
         <p class="text-sm text-dim mt-2" id="status"></p>
@@ -68,7 +74,7 @@
     <p>Uganda Astronomical Society &middot; Institutional Platform</p>
   </footer>
 
-  <script src="../js/api.js?v=20260911-2"></script>
+  <script src="../js/api.js?v=20260911-3"></script>
   <script>
     async function load() {
       try {
@@ -79,25 +85,65 @@
         }
       } catch(e) { window.location.href = ua('/login'); }
       updateNavUser();
+      RichTextEditor.init('artBody-toolbar', 'artBody');
+      bindCoverPicker();
+    }
+
+    function bindCoverPicker() {
+      const fileEl = document.getElementById('artCover');
+      const prevEl = document.getElementById('artCover-preview');
+      const rmEl = document.getElementById('artCoverRemove');
+      fileEl.addEventListener('change', () => {
+        const file = fileEl.files[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) { alert('Please choose an image file (JPG, PNG, GIF, WebP).'); fileEl.value = ''; return; }
+        if (prevEl.dataset.objUrl) URL.revokeObjectURL(prevEl.dataset.objUrl);
+        const objUrl = URL.createObjectURL(file);
+        prevEl.dataset.objUrl = objUrl;
+        prevEl.src = objUrl;
+        prevEl.style.display = 'block';
+        rmEl.style.display = '';
+      });
+      rmEl.addEventListener('click', () => {
+        fileEl.value = '';
+        document.getElementById('artCoverUrl').value = '';
+        if (prevEl.dataset.objUrl) { URL.revokeObjectURL(prevEl.dataset.objUrl); delete prevEl.dataset.objUrl; }
+        prevEl.removeAttribute('src');
+        prevEl.style.display = 'none';
+        rmEl.style.display = 'none';
+      });
     }
 
     async function submitArticle() {
       const title = document.getElementById('artTitle').value;
-      const body = document.getElementById('artBody').value;
+      const body = RichTextEditor.getHtml('artBody');
       if (!title || !body) { alert('Title and body are required'); return; }
+      const statusEl = document.getElementById('status');
       try {
+        let imageUrl = document.getElementById('artCoverUrl').value || null;
+        const coverFile = document.getElementById('artCover').files[0];
+        if (coverFile) {
+          statusEl.textContent = 'Uploading cover image...';
+          const up = await api.uploadFile(coverFile);
+          imageUrl = up.url;
+        }
         await api.createArticle({
           title,
           category: document.getElementById('artCat').value,
           body,
           tags: document.getElementById('artTags').value.split(',').map(s => s.trim()).filter(Boolean),
-          image_url: document.getElementById('artImg').value || null,
+          image_url: imageUrl,
         });
         document.getElementById('status').textContent = 'Submitted for review. You can track it on your dashboard.';
         document.getElementById('artTitle').value = '';
-        document.getElementById('artBody').value = '';
+        RichTextEditor.setHtml('artBody', '');
         document.getElementById('artTags').value = '';
-        document.getElementById('artImg').value = '';
+        document.getElementById('artCover').value = '';
+        document.getElementById('artCoverUrl').value = '';
+        const prevEl = document.getElementById('artCover-preview');
+        prevEl.removeAttribute('src');
+        prevEl.style.display = 'none';
+        document.getElementById('artCoverRemove').style.display = 'none';
       } catch(e) { alert(e.error || 'Submission failed'); }
     }
 

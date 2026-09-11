@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Resolution Builder — Uganda Astronomical Society</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="../css/base.css?v=20260911">
+  <link rel="stylesheet" href="../css/base.css?v=20260911-3">
   <style>
     .change-row { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 0.75rem; }
     .vote-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; }
@@ -99,7 +99,7 @@
     <p>Uganda Astronomical Society &middot; Institutional Platform</p>
   </footer>
 
-  <script src="../js/api.js?v=20260911-2"></script>
+  <script src="../js/api.js?v=20260911-3"></script>
   <script>
     const memberOptions = [];
     const roleOptions = [];

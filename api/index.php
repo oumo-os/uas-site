@@ -1265,8 +1265,8 @@ try {
   elseif ($path === '/programmes' && $method === 'POST') {
     $user = require_cap('programmes.create');
     $data = input_json();
-    db()->prepare('INSERT INTO programmes (title, description, objectives, created_by) VALUES (?, ?, ?, ?)')
-      ->execute([$data['title'], $data['description'] ?? null, $data['objectives'] ?? null, $user['id']]);
+    db()->prepare('INSERT INTO programmes (title, description, objectives, image_url, created_by) VALUES (?, ?, ?, ?, ?)')
+      ->execute([$data['title'], $data['description'] ?? null, $data['objectives'] ?? null, clean_image_url($data['image_url'] ?? null), $user['id']]);
     $id = (int) db()->lastInsertId();
     audit_log('programme_create', 'programme', $id);
     json_response(['id' => $id], 201);
@@ -1320,8 +1320,8 @@ try {
     if (!user_has_cap($user['id'], 'events.create') && !($progId && user_has_cap($user['id'], 'events.create', 'programme', (int)$progId))) {
       json_error('Insufficient permissions: events.create', 403);
     }
-    db()->prepare('INSERT INTO events (programme_id, project_id, title, description, organizer_id, date, end_date, location, capacity, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      ->execute([$progId, $data['project_id'] ?? null, $data['title'], $data['description'] ?? null, $user['id'], $data['date'], $data['end_date'] ?? null, $data['location'] ?? null, $data['capacity'] ?? null, $user['id']]);
+    db()->prepare('INSERT INTO events (programme_id, project_id, title, description, organizer_id, date, end_date, location, capacity, image_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      ->execute([$progId, $data['project_id'] ?? null, $data['title'], $data['description'] ?? null, $user['id'], $data['date'], $data['end_date'] ?? null, $data['location'] ?? null, $data['capacity'] ?? null, clean_image_url($data['image_url'] ?? null), $user['id']]);
     $id = (int) db()->lastInsertId();
     transition('event', $id, 'submitted', $user['id']);
     audit_log('event_create', 'event', $id);
@@ -1587,7 +1587,7 @@ try {
       $tags = is_array($decoded) ? $decoded : array_map('trim', explode(',', $tags));
     }
     db()->prepare('INSERT INTO articles (author_id, title, body, category, tags, image_url, approver_role_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      ->execute([$user['id'], $data['title'], $data['body'] ?? null, $data['category'] ?? 'article', json_encode(array_values(array_filter($tags))), $data['image_url'] ?? null, $data['approver_role_id'] ?? null]);
+      ->execute([$user['id'], $data['title'], $data['body'] ?? null, $data['category'] ?? 'article', json_encode(array_values(array_filter($tags))), clean_image_url($data['image_url'] ?? null), $data['approver_role_id'] ?? null]);
     $id = (int) db()->lastInsertId();
     transition('article', $id, 'submitted', $user['id']);
     audit_log('article_create', 'article', $id);
@@ -1693,7 +1693,15 @@ try {
     $uploadDir = UPLOAD_DIR;
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
 
-    $ext = pathinfo($file['name'], PATHINFO_EXTENSION) ?: 'bin';
+    // Images get a canonical extension from their verified MIME type so the
+    // stored file always matches its contents; other types are sanitized.
+    $mimeToExt = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'];
+    if (isset($mimeToExt[$mimeType])) {
+      $ext = $mimeToExt[$mimeType];
+    } else {
+      $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION) ?: 'bin');
+      if (!preg_match('/^[a-z0-9]{1,5}$/', $ext)) $ext = 'bin';
+    }
     $filename = date('Ymd-His') . '-' . bin2hex(random_bytes(8)) . '.' . $ext;
     $filepath = $uploadDir . $filename;
 
@@ -1701,9 +1709,23 @@ try {
       json_error('Failed to save file', 500);
     }
 
+    // Images are normalized in place: max 1600px wide, web-friendly encoding.
+    $width = null;
+    $height = null;
+    $compressed = false;
+    if (strpos($mimeType, 'image/') === 0) {
+      $r = compress_uploaded_image($filepath, $mimeType);
+      if ($r) {
+        [$width, $height, $compressed] = $r;
+      } else {
+        $s = @getimagesize($filepath);
+        if ($s) { $width = $s[0]; $height = $s[1]; }
+      }
+    }
+
     $relativePath = '/img/uploads/' . $filename;
     audit_log('file_upload', 'file', 0, ['filename' => $file['name'], 'path' => $relativePath]);
-    json_response(['url' => $relativePath, 'filename' => $file['name'], 'mime' => $mimeType], 201);
+    json_response(['url' => $relativePath, 'filename' => $file['name'], 'mime' => $mimeType, 'width' => $width, 'height' => $height, 'bytes' => filesize($filepath), 'compressed' => $compressed], 201);
   }
 
   // --- FINANCE ---
@@ -2596,6 +2618,7 @@ try {
     foreach (['title', 'description', 'objectives', 'outputs', 'status'] as $f) {
       if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = $data[$f]; }
     }
+    if (array_key_exists('image_url', $data)) { $sets[] = 'image_url = ?'; $args[] = clean_image_url($data['image_url']); }
     if (array_key_exists('budget', $data)) { $sets[] = 'budget = ?'; $args[] = $data['budget'] !== null ? (float) $data['budget'] : null; }
     if (array_key_exists('spent', $data)) { $sets[] = 'spent = ?'; $args[] = $data['spent'] !== null ? (float) $data['spent'] : null; }
     if (!$sets) json_error('Nothing to update', 400);

@@ -317,7 +317,7 @@ const api = {
 };
 
 // --- FormBuilder: shared form rendering with validation ---
-// Field types: text, email, password, number, date, datetime-local, textarea, select, multiselect, rich-text, file, hidden
+// Field types: text, email, password, number, date, datetime-local, textarea, select, multiselect, rich-text, file, cover-image, hidden
 // Option: { label, value, group? }
 const FormBuilder = {
   render(fields, opts = {}) {
@@ -368,6 +368,15 @@ const FormBuilder = {
         const accept = f.accept ? ` accept="${esc(f.accept)}"` : '';
         input = `<input type="file" class="form-input" id="${fid}"${accept}${reqAttr}>`;
         break;
+      case 'cover-image':
+        input = `<div class="cover-picker" id="${fid}-wrap">` +
+          `<img id="${fid}-preview" class="cover-preview" alt="Cover preview"${f.value ? ` src="${esc(f.value)}" style="display:block"` : ' style="display:none"'}>` +
+          `<input type="file" class="form-input" id="${fid}" accept="image/*">` +
+          `<input type="hidden" id="${fid}-url" value="${esc(f.value || '')}">` +
+          `<button type="button" class="btn btn-outline btn-sm cover-remove" id="${fid}-remove"${f.value ? '' : ' style="display:none"'}>Remove image</button>` +
+          `<div class="form-help">JPG, PNG, GIF or WebP. Compressed automatically on upload.</div>` +
+          `</div>`;
+        break;
       case 'hidden':
         input = `<input type="hidden" id="${fid}" value="${esc(f.value || '')}">`;
         break;
@@ -387,6 +396,34 @@ const FormBuilder = {
       const fid = formId + '-' + f.name;
       RichTextEditor.init(fid + '-toolbar', fid);
     });
+    // Cover image pickers: live preview + remove
+    fields.filter(f => f.type === 'cover-image').forEach(f => {
+      const fid = formId + '-' + f.name;
+      const fileEl = document.getElementById(fid);
+      const prevEl = document.getElementById(fid + '-preview');
+      const urlEl = document.getElementById(fid + '-url');
+      const rmEl = document.getElementById(fid + '-remove');
+      if (!fileEl || !prevEl || !urlEl) return;
+      fileEl.addEventListener('change', () => {
+        const file = fileEl.files[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) { alert('Please choose an image file (JPG, PNG, GIF, WebP).'); fileEl.value = ''; return; }
+        if (prevEl.dataset.objUrl) URL.revokeObjectURL(prevEl.dataset.objUrl);
+        const objUrl = URL.createObjectURL(file);
+        prevEl.dataset.objUrl = objUrl;
+        prevEl.src = objUrl;
+        prevEl.style.display = 'block';
+        if (rmEl) rmEl.style.display = '';
+      });
+      if (rmEl) rmEl.addEventListener('click', () => {
+        fileEl.value = '';
+        urlEl.value = '';
+        if (prevEl.dataset.objUrl) { URL.revokeObjectURL(prevEl.dataset.objUrl); delete prevEl.dataset.objUrl; }
+        prevEl.removeAttribute('src');
+        prevEl.style.display = 'none';
+        rmEl.style.display = 'none';
+      });
+    });
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const data = {};
@@ -401,6 +438,9 @@ const FormBuilder = {
           data[f.name] = Array.from(el.selectedOptions).map(o => o.value);
         } else if (f.type === 'file') {
           data[f.name] = el.files[0] || null;
+        } else if (f.type === 'cover-image') {
+          const urlEl = document.getElementById(formId + '-' + f.name + '-url');
+          data[f.name] = { file: el.files[0] || null, url: (urlEl && urlEl.value) || null };
         } else if (f.type === 'number') {
           data[f.name] = el.value ? parseFloat(el.value) : null;
         } else {
@@ -426,6 +466,24 @@ const FormBuilder = {
       if (!valid) return;
       const btn = document.getElementById(formId + '-submit');
       if (btn) { btn.disabled = true; btn.dataset.origText = btn.textContent; btn.textContent = 'Saving...'; }
+      // Upload cover images first (the server compresses them); the stored URL goes to onSubmit
+      for (const f of fields.filter(f => f.type === 'cover-image')) {
+        const sel = data[f.name];
+        if (sel && sel.file) {
+          if (btn) btn.textContent = 'Uploading image...';
+          try {
+            const up = await api.uploadFile(sel.file);
+            data[f.name] = up.url;
+          } catch (err) {
+            const errEl = document.getElementById(formId + '-' + f.name + '-error');
+            if (errEl) errEl.textContent = (err && err.error) || 'Image upload failed';
+            if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origText || 'Submit'; }
+            return;
+          }
+        } else {
+          data[f.name] = (sel && sel.url) || null;
+        }
+      }
       try {
         await onSubmit(data);
       } catch (err) {
@@ -444,6 +502,7 @@ const FormBuilder = {
       if (f.type === 'rich-text') data[f.name] = el.innerHTML.trim();
       else if (f.type === 'multiselect') data[f.name] = Array.from(el.selectedOptions).map(o => o.value);
       else if (f.type === 'file') data[f.name] = el.files[0] || null;
+      else if (f.type === 'cover-image') { const u = document.getElementById(formId + '-' + f.name + '-url'); data[f.name] = (u && u.value) || null; }
       else if (f.type === 'number') data[f.name] = el.value ? parseFloat(el.value) : null;
       else data[f.name] = el.value || null;
     });
@@ -471,10 +530,35 @@ const RichTextEditor = {
       { cmd: 'formatBlock', val: 'h3', icon: 'H3', title: 'Heading' },
       { cmd: 'formatBlock', val: 'p', icon: 'P', title: 'Paragraph' },
       { cmd: 'createLink', icon: '<svg viewBox="0 0 24 24" width="14" height="14"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>', title: 'Link' },
+      { cmd: 'insertImage', icon: '<svg viewBox="0 0 24 24" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>', title: 'Insert image' },
     ];
     toolbar.innerHTML = cmds.map((c, i) =>
       `<button type="button" class="rte-btn" data-cmd="${c.cmd}" data-val="${c.val || ''}" title="${c.title}">${c.icon}</button>`
     ).join('');
+    // Hidden file picker for the image button (uploaded, then inserted at cursor)
+    const imgInput = document.createElement('input');
+    imgInput.type = 'file';
+    imgInput.accept = 'image/*';
+    imgInput.style.display = 'none';
+    toolbar.appendChild(imgInput);
+    imgInput.addEventListener('change', async () => {
+      const file = imgInput.files[0];
+      imgInput.value = '';
+      if (!file) return;
+      if (!file.type.startsWith('image/')) { alert('Please choose an image file (JPG, PNG, GIF, WebP).'); return; }
+      const imgBtn = toolbar.querySelector('[data-cmd="insertImage"]');
+      if (imgBtn) { imgBtn.disabled = true; imgBtn.title = 'Uploading image...'; }
+      try {
+        const up = await api.uploadFile(file);
+        editor.focus();
+        document.execCommand('insertImage', false, up.url);
+      } catch (err) {
+        alert((err && err.error) || 'Image upload failed');
+      } finally {
+        if (imgBtn) { imgBtn.disabled = false; imgBtn.title = 'Insert image'; }
+        editor.focus();
+      }
+    });
     toolbar.addEventListener('click', e => {
       const btn = e.target.closest('.rte-btn');
       if (!btn) return;
@@ -484,6 +568,8 @@ const RichTextEditor = {
       if (cmd === 'createLink') {
         const url = prompt('Enter URL:');
         if (url) document.execCommand(cmd, false, url);
+      } else if (cmd === 'insertImage') {
+        imgInput.click();
       } else {
         document.execCommand(cmd, false, val);
       }
