@@ -357,6 +357,7 @@ try {
       $s->execute([$id]);
       $poll['voters'] = $s->fetchAll();
     }
+    $poll['eligible'] = poll_eligible($poll, $user['id']);
     json_response($poll);
   }
   elseif (preg_match('#^/polls/(\d+)/open$#', $path, $m) && $method === 'POST') {

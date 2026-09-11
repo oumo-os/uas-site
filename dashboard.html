@@ -2173,6 +2173,37 @@
 
     // ================= POLLS =================
     let pollsData = [];
+    function pollDate(s) {
+      if (!s) return null;
+      const d = new Date(String(s).replace(' ', 'T'));
+      return isNaN(d) ? null : d;
+    }
+    function pollHasEnded(p) {
+      if (p.status === 'closed') return true;
+      const end = pollDate(p.ends_at);
+      return p.status === 'open' && end ? end.getTime() < Date.now() : false;
+    }
+    function pollCanVote(p) {
+      return api.hasCap('governance.poll.vote') && p.status === 'open' && !pollHasEnded(p) && p.eligible && p.my_vote === null;
+    }
+    function pollCountdown(p) {
+      const end = pollDate(p.ends_at);
+      if (!end || p.status !== 'open') return '';
+      const ms = end.getTime() - Date.now();
+      if (ms <= 0) return ' · ended';
+      const mins = Math.floor(ms / 60000);
+      if (mins < 60) return ` · closes in ${mins}m`;
+      const hours = Math.floor(mins / 60);
+      if (hours < 48) return ` · closes in ${hours}h`;
+      return ` · closes in ${Math.floor(hours / 24)}d`;
+    }
+    function pollQuorumHtml(p, total) {
+      if (!p.quorum || p.quorum <= 0) return '';
+      const pct = Math.min(100, Math.round((total / p.quorum) * 100));
+      const met = total >= p.quorum;
+      return `<div style="margin-top:0.4rem;font-size:0.78rem;color:${met ? 'var(--success)' : 'var(--text-dim)'}">Quorum ${total}/${p.quorum}${met ? ' ✓ met' : ''}</div>
+        <div style="height:6px;background:var(--bg-subtle);border-radius:4px;overflow:hidden;margin-top:0.2rem"><div style="height:100%;width:${pct}%;background:${met ? 'var(--success)' : 'var(--gold)'}"></div></div>`;
+    }
     function renderPolls(list) {
       pollsData = list || [];
       const div = document.getElementById('pollsList');
@@ -2181,12 +2212,13 @@
         return;
       }
       div.innerHTML = pollsData.map(p => {
-        const open = p.status === 'open';
-        const canVote = api.hasCap('governance.poll.vote') && open && p.eligible && p.my_vote === null;
+        const open = p.status === 'open' && !pollHasEnded(p);
+        const ended = pollHasEnded(p);
+        const canVote = pollCanVote(p);
         const canManage = api.hasCap('governance.poll.manage');
         const canResolve = api.hasCap('governance.poll.resolve') && open;
         const canDelete = api.hasCap('governance.poll.manage') && p.status === 'draft';
-        const deadline = p.ends_at ? ` · closes ${new Date(p.ends_at).toLocaleString('en', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : '';
+        const deadline = p.ends_at ? ` · closes ${pollDate(p.ends_at).toLocaleString('en', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}${pollCountdown(p)}` : '';
         let actions = '';
         if (canVote) actions += `<button class="btn btn-success btn-xs" onclick="showPollVote(${p.id})">Vote</button>`;
         if (canManage && p.status === 'draft') actions += `<button class="btn btn-outline btn-xs" onclick="openPoll(${p.id})">Open</button>`;
@@ -2195,7 +2227,7 @@
         if (canDelete) actions += `<button class="btn btn-outline btn-xs" onclick="deletePoll(${p.id})">Delete</button>`;
         const myVoteLabel = p.my_vote !== null ? `<span class="text-dim text-sm">Your vote: ${esc((p.options[p.my_vote] || '?').length > 40 ? (p.options[p.my_vote] || '').slice(0, 40) + '…' : (p.options[p.my_vote] || '?'))}</span>` : '';
         const typeBadge = `<span class="wg-badge" style="background:rgba(30,96,145,0.1);color:var(--info);text-transform:capitalize">${esc(p.poll_type)}</span>`;
-        const statusBadge = `<span class="wg-badge" style="background:${p.status === 'open' ? 'rgba(45,106,79,0.1);color:var(--success)' : p.status === 'closed' ? 'rgba(120,120,120,0.15);color:var(--text-dim)' : 'rgba(124,58,237,0.1);color:#7c3aed'};text-transform:capitalize">${esc(p.status)}</span>`;
+        const statusBadge = `<span class="wg-badge" style="background:${!ended && p.status === 'open' ? 'rgba(45,106,79,0.1);color:var(--success)' : ended || p.status === 'closed' ? 'rgba(120,120,120,0.15);color:var(--text-dim)' : 'rgba(124,58,237,0.1);color:#7c3aed'};text-transform:capitalize">${ended && p.status === 'open' ? 'ended' : esc(p.status)}</span>`;
         const eligLabel = p.eligibility === 'group' && p.eligibility_target ? `Group: ${p.eligibility_target}` : p.eligibility === 'role' && p.eligibility_target ? `Role: ${p.eligibility_target}` : p.eligibility === 'all' ? 'All users' : 'Members';
         const eligBadge = `<span class="text-dim text-sm">${esc(eligLabel)}</span>`;
         return `
@@ -2212,6 +2244,7 @@
                   ${myVoteLabel}
                 </div>
                 ${open && p.eligible && p.my_vote === null ? '<div class="text-sm" style="color:var(--gold);margin-top:0.3rem">Your vote is needed</div>' : ''}
+                ${p.status !== 'draft' ? pollQuorumHtml(p, p.votes || 0) : ''}
               </div>
               <div style="display:flex;gap:0.35rem;flex-wrap:wrap;justify-content:flex-end" onclick="event.stopPropagation()">${actions}</div>
             </div>
@@ -2227,10 +2260,11 @@
           const c = p.results[i] || 0;
           const pct = total ? Math.round((c / total) * 100) : 0;
           const winner = p.status === 'closed' && p.result_option === i;
+          const mine = p.my_vote === i;
           return `
             <div style="margin-bottom:0.7rem">
               <div style="display:flex;justify-content:space-between;font-size:0.85rem">
-                <span style="font-weight:500">${i + 1}. ${esc(opt)} ${winner ? '<span style="color:var(--success)">✓</span>' : ''}</span>
+                <span style="font-weight:500">${i + 1}. ${esc(opt)} ${winner ? '<span style="color:var(--success)">✓</span>' : ''}${mine ? '<span class="cap-tag" style="margin-left:0.4rem">your vote</span>' : ''}</span>
                 <span>${c} (${pct}%)</span>
               </div>
               <div style="height:8px;background:var(--bg-subtle);border-radius:4px;overflow:hidden">
@@ -2238,6 +2272,8 @@
               </div>
             </div>`;
         }).join('');
+        const votable = p.status === 'open' && !pollHasEnded(p) && p.eligible && p.my_vote === null && api.hasCap('governance.poll.vote');
+        const voteBlock = votable ? `<h5 style="margin-top:1rem">Cast your vote</h5><div>${delegatedHint()}${(p.options || []).map((opt, i) => `<button class="btn btn-outline" style="display:block;width:100%;margin-bottom:0.5rem;text-align:left" onclick="castPollVote(${p.id}, ${i}, true)">${i + 1}. ${esc(opt)}</button>`).join('')}</div>` : (p.my_vote !== null ? `<p class="text-dim text-sm">You voted: <strong>${esc((p.options || [])[p.my_vote] || '')}</strong></p>` : '');
         const votersBlock = p.voters && p.voters.length ? `<div class="text-dim text-sm" style="margin-top:0.75rem">Voters: ${p.voters.map(v => esc(v.voter_name)).join(', ')}</div>` : '';
         const noQuorum = p.status === 'closed' && p.result_option === null && p.quorum > 0 && total > 0 ? '<p style="color:var(--danger)">Quorum not met — no result declared.</p>' : '';
         openModal('Poll: ' + p.title, `
@@ -2246,7 +2282,9 @@
             <p class="text-dim">Status: ${esc(p.status)} · Type: ${esc(p.poll_type)} · Eligibility: ${esc(p.eligibility === 'group' && p.eligibility_target ? 'Group: ' + p.eligibility_target : p.eligibility === 'role' && p.eligibility_target ? 'Role: ' + p.eligibility_target : p.eligibility === 'all' ? 'All users' : 'Members')} · Votes cast: ${total}</p>
             ${p.status === 'closed' ? `<h5>Result${p.result_option !== null ? '' : ' (none)'}</h5>` : ''}
             ${bars}
+            ${p.status !== 'draft' ? pollQuorumHtml(p, total) : ''}
             ${noQuorum}
+            ${voteBlock}
             ${votersBlock}
           </div>
         `);
@@ -2326,14 +2364,15 @@
       openModal('Vote: ' + p.title, `<div style="padding:0.25rem 0">${delegatedHint()}${options}</div>`);
     }
 
-    async function castPollVote(id, optionIndex) {
+    async function castPollVote(id, optionIndex, stayOpen) {
       try {
         await api.request('/polls/' + id + '/vote', { method: 'POST', body: { option_index: optionIndex } });
-        closeModal(); toast('Vote cast', 'success');
+        toast('Vote cast', 'success');
         const polls = await api.request('/polls');
         renderPolls(polls);
         const pending = await api.getPending({ scope: pendingScope }).catch(() => []);
         renderPending(pending);
+        if (stayOpen) showPollDetail(id); else closeModal();
       } catch (e) { toast(e.error || 'Failed to cast vote', 'error'); }
     }
 
@@ -2354,6 +2393,7 @@
     }
 
     async function resolvePoll(id) {
+      if (!confirm('Declare the result and close this poll? This cannot be undone.')) return;
       try {
         await api.request('/polls/' + id + '/resolve', { method: 'POST' });
         const polls = await api.request('/polls');
