@@ -2,3 +2,6 @@
 # Production secrets live on the server only (see api/config.php)
 api/prod-env.php
 
+
+# Local site archives
+*.zip

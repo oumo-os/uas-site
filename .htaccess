@@ -30,3 +30,16 @@ RewriteRule ^[^/]+/img/(.*)$ img/$1 [L]
 
 # API: /api/... -> api/index.php
 RewriteRule ^api/(.*)$ api/index.php?route=$1 [QSA,L]
+
+# Cache policy: HTML always revalidates so deploys take effect immediately.
+# CSS/JS carry ?v= version params, so they can be cached long-term safely.
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/html "access plus 0 seconds"
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType image/jpeg "access plus 30 days"
+  ExpiresByType image/png "access plus 30 days"
+  ExpiresByType image/webp "access plus 30 days"
+  ExpiresByType image/svg+xml "access plus 30 days"
+</IfModule>
