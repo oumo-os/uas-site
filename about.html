@@ -92,12 +92,6 @@
     .role-badge.governance { background:rgba(30,96,145,0.12); color:var(--info); }
     .role-badge.administrative { background:rgba(184,134,11,0.12); color:var(--gold); }
     .role-badge.general { background:rgba(45,106,79,0.12); color:var(--success); }
-    .role-badge.vacant { background:transparent; border:1px dashed var(--text-dim); color:var(--text-dim); }
-    .leader-card.vacant { border-style:dashed; background:transparent; }
-    .leader-card.vacant:hover { border-color:var(--accent); }
-    .leader-card .vacant-cta { font-size:0.8rem; margin-top:0.5rem; }
-    .leader-card .vacant-cta a { color:var(--accent); font-weight:600; text-decoration:none; }
-    .leader-card .vacant-cta a:hover { text-decoration:underline; }
 
     .cta-section { padding:4rem 0; text-align:center; background:var(--accent); color:#fff; }
     .cta-section h2 { font-size:1.8rem; font-weight:700; color:#fff; margin-bottom:0.75rem; }
@@ -350,10 +344,7 @@
       updateNavUser();
 
       const container = document.getElementById('leadershipGrid');
-      const [groups, openRoles] = await Promise.all([
-        api.getWorkingGroupsWithMembers().catch(() => []),
-        api.request('/public/open-roles').catch(() => []),
-      ]);
+      const groups = await api.getWorkingGroupsWithMembers().catch(() => []);
       const committees = groups.filter(g => g.type === 'committee');
 
       if (!committees.length) {
@@ -361,19 +352,9 @@
         return;
       }
 
-      const vacantCard = v => `
-        <div class="leader-card vacant">
-          <h4>${esc(v.title)}</h4>
-          <span class="role-badge vacant">Vacant</span>
-          <div class="vacant-cta"><a href="/join">Express interest &rarr;</a></div>
-        </div>`;
-
       let html = '';
-      const matchedTargets = new Set();
       committees.forEach(g => {
         const members = (g.members || []);
-        const vacant = (openRoles || []).filter(o => o.target === g.name);
-        vacant.forEach(v => matchedTargets.add(v.title + '|' + v.target));
         const membersHtml = members.length ? '<div class="leadership-grid">' + members.map(m => {
           const initials = (m.user_name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
           const roleHtml = m.role && m.role !== 'member' ? `<span class="role-badge governance">${esc(m.role)}</span>` : '';
@@ -385,8 +366,7 @@
               ${m.institution ? `<div class="institution">${esc(m.institution)}</div>` : ''}
             </div>
           `;
-        }).join('') + (vacant.length ? vacant.map(vacantCard).join('') : '') + '</div>'
-          : (vacant.length ? '<div class="leadership-grid">' + vacant.map(vacantCard).join('') + '</div>' : '<p class="text-dim text-sm">No members assigned yet</p>');
+        }).join('') + '</div>' : '<p class="text-dim text-sm">No members assigned yet</p>';
 
         html += `<div style="margin-bottom:2rem">
           <h4 style="text-align:center;font-size:0.95rem;font-weight:600;margin:1.5rem 0 0.75rem;color:var(--accent)">${esc(g.name)}</h4>
@@ -394,20 +374,6 @@
           ${membersHtml}
         </div>`;
       });
-
-      // Vacant programme leads (targets are programme names, not committees)
-      const leadVacancies = (openRoles || []).filter(o => o.scope === 'programme' && !matchedTargets.has(o.title + '|' + o.target));
-      if (leadVacancies.length) {
-        html += `<div style="margin-bottom:2rem">
-          <h4 style="text-align:center;font-size:0.95rem;font-weight:600;margin:1.5rem 0 0.75rem;color:var(--accent)">Programme Leadership — open seats</h4>
-          <div class="leadership-grid">` + leadVacancies.map(v => `
-            <div class="leader-card vacant">
-              <h4>${esc(v.target || v.title)}</h4>
-              <span class="role-badge vacant">Lead vacant</span>
-              <div class="vacant-cta"><a href="/programmes">View programme</a> &middot; <a href="/join">Express interest &rarr;</a></div>
-            </div>`).join('') + `</div>
-        </div>`;
-      }
 
       container.innerHTML = html;
     }

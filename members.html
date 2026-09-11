@@ -85,6 +85,9 @@
       border-radius:var(--radius-lg); transition:all 0.3s; cursor:pointer;
     }
     .member-card:hover { border-color:var(--border-focus); box-shadow:var(--shadow-md); transform:translateY(-2px); }
+    .member-card.vacant { border-style:dashed; background:transparent; cursor:default; }
+    .member-card.vacant:hover { border-color:var(--accent); transform:none; }
+    .role-badge.vacant { background:transparent; border:1px dashed var(--text-dim); color:var(--text-dim); }
     .member-header { display:flex; align-items:center; gap:0.85rem; margin-bottom:0.75rem; }
     .member-avatar {
       width:52px; height:52px; border-radius:50%; background:var(--accent-glow);
@@ -214,6 +217,7 @@
   <script>
     let allMembers = [];
     let allWgData = [];
+    let allOpenRoles = [];
     let activeSection = '';
     const ROLE_TYPE_CSS = {
       governance: 'governance', administrative: 'administrative', member_class: 'general'
@@ -222,12 +226,14 @@
     async function load() {
       try { await api.me(); } catch(e) {}
       updateNavUser();
-      const [members, wgData] = await Promise.all([
+      const [members, wgData, openRoles] = await Promise.all([
         api.getMembersGrouped().catch(() => []),
         api.getWorkingGroupsWithMembers().catch(() => []),
+        api.request('/public/open-roles').catch(() => []),
       ]);
       allMembers = members;
       allWgData = wgData;
+      allOpenRoles = openRoles;
       renderStats();
       renderFilter();
       renderAll();
@@ -257,6 +263,7 @@
         { key: 'working_groups', label: 'Working Groups' },
         { key: 'key_members', label: 'Key Members' },
         { key: 'other', label: 'Other Members' },
+        { key: 'vacancies', label: 'Vacancies' },
       ];
       document.getElementById('roleFilter').innerHTML = sections.map(s =>
         `<button class="filter-chip ${activeSection === s.key ? 'active' : ''}" onclick="filterSection('${s.key}')">${s.label}</button>`
@@ -303,8 +310,49 @@
       if (!activeSection || activeSection === 'other') {
         html += renderOtherSection(members, committeeMembers, keyMemberIds);
       }
+      if (!activeSection || activeSection === 'vacancies') {
+        html += renderVacanciesSection();
+      }
 
       content.innerHTML = html || '<div class="empty-state"><p>No members found.</p></div>';
+    }
+
+    async function expressInterest(roleId, title) {
+      if (!api._user) { window.location.href = ua('/join'); return; }
+      if (!confirm('Express interest in "' + title + '"? The board will be in touch.')) return;
+      try {
+        await api.expressInterest(roleId);
+        alert('Interest recorded — the board will be in touch.');
+      } catch(e) { alert(e.error || 'Failed to record interest'); }
+    }
+
+    function renderVacanciesSection() {
+      const roles = allOpenRoles.filter(r => r.scope !== 'programme');
+      const leads = allOpenRoles.filter(r => r.scope === 'programme');
+      if (!roles.length && !leads.length) return '';
+      const card = v => `
+        <div class="member-card vacant">
+          <div class="member-header">
+            <div>
+              <div class="member-name">${esc(v.title)}</div>
+              <div class="member-inst">${esc(v.target || (v.scope === 'programme' ? 'Programme leadership' : 'Society office'))}</div>
+            </div>
+          </div>
+          <div><span class="role-badge vacant">Vacant</span></div>
+          <div class="member-meta">
+            <span>Open seat</span>
+            <button class="btn btn-outline btn-xs" onclick="event.stopPropagation();expressInterest(${v.id}, '${esc(v.title).replace(/'/g, "\\'")}')">Express interest</button>
+          </div>
+        </div>`;
+      let html = `
+        <div class="role-section">
+          <div class="role-section-header">
+            <h3>Open Seats</h3>
+            <span class="role-count">${roles.length + leads.length} vacanc${roles.length + leads.length !== 1 ? 'ies' : 'y'}</span>
+          </div>
+          <div class="member-grid">${roles.map(card).join('')}${leads.map(card).join('')}</div>
+        </div>`;
+      return html;
     }
 
     function formatRoleBadges(roles) {

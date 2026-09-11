@@ -124,6 +124,7 @@ const api = {
   async getMembers() { return this.request('/members'); },
   async getMembersGrouped() { return this.request('/members/grouped'); },
   async getMember(id) { return this.request('/members/' + id); },
+  async expressInterest(roleId) { return this.request('/roles/' + roleId + '/interest', { method: 'POST' }); },
   async approveMember(userId, status) { return this.request('/members', { method: 'POST', body: { user_id: userId, status } }); },
   async updateMemberStanding(userId, data) { return this.request('/members/' + userId + '/standing', { method: 'POST', body: data }); },
   async getMemberDues(userId) { return this.request('/members/' + userId + '/dues'); },

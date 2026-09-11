@@ -2508,6 +2508,25 @@ try {
     $stmt->execute();
     json_response($stmt->fetchAll());
   }
+  // --- ROLE INTEREST (member applies for a vacant seat; officers notified) ---
+  elseif (preg_match('#^/roles/(\d+)/interest$#', $path, $m) && $method === 'POST') {
+    $user = require_login();
+    $roleId = (int) $m[1];
+    $stmt = db()->prepare('SELECT id, title, description, target FROM roles WHERE id = ? AND status = "active" AND role_type IN ("governance", "administrative")');
+    $stmt->execute([$roleId]);
+    $role = $stmt->fetch();
+    if (!$role) json_error('Role not found', 404);
+    $stmt = db()->prepare('SELECT id FROM role_assignments WHERE role_id = ? AND status = "active" LIMIT 1');
+    $stmt->execute([$roleId]);
+    if ($stmt->fetch()) json_error('This seat is already filled', 400);
+    if (!rate_limit('interest:' . $user['id'], 'interest', 5, 3600)) {
+      json_error('Too many requests. Try again later.', 429);
+    }
+    audit_log('role_interest', 'role', $roleId, ['user_id' => $user['id'], 'role' => $role['title']]);
+    notify_capability('members.manage', 'role_interest', 'Interest in ' . $role['title'],
+      $user['name'] . ' (' . $user['email'] . ') expressed interest in the vacant seat: ' . $role['title'] . ($role['target'] ? ' (' . $role['target'] . ')' : '') . '.', '/admin');
+    json_response(['ok' => true]);
+  }
   // --- PUBLIC FINANCE SUMMARY --- REMOVED: finance is members-only
   // Use GET /finance (requires finance.view capability) instead
   elseif ($path === '/public/finance/summary' && $method === 'GET') {
