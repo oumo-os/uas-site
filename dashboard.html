@@ -2442,7 +2442,7 @@
         { name: 'eligibility_target_group', label: 'Group', type: 'select', options: [{ label: 'Select group', value: '' }].concat(groups.map(g => ({ label: g.name, value: g.name }))) },
         { name: 'eligibility_target_role', label: 'Role', type: 'select', options: [{ label: 'Select role', value: '' }].concat(memberClassRoles.map(r => ({ label: r.title, value: r.title }))) },
         { name: 'quorum', label: 'Quorum (required votes, 0 = none)', type: 'number', min: 0 },
-        { name: 'ends_at', label: 'Closes (YYYY-MM-DD HH:MM, optional)', type: 'text', placeholder: '2026-12-31 23:59' },
+        { name: 'ends_at', label: 'Closes (optional)', type: 'datetime-local' },
         { name: 'allow_anonymous', label: 'Anonymity', type: 'checkbox', checkLabel: 'Anonymous (hide who voted)' },
       ];
       openModal('New Poll', FormBuilder.render(fields, { id: formId, submitLabel: 'Create Poll' }));
@@ -2481,6 +2481,11 @@
           target = data.eligibility_target_role || null;
           if (!target) throw { error: 'Please select a role' };
         }
+        let endsAt = (data.ends_at || '').trim() || null;
+        if (endsAt) {
+          endsAt = endsAt.replace('T', ' ');
+          if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(endsAt)) endsAt += ':00';
+        }
         await api.request('/polls', { method: 'POST', body: {
           title: data.title,
           description: data.description || null,
@@ -2490,7 +2495,7 @@
           options: opts,
           quorum: data.quorum || 0,
           allow_anonymous: !!data.allow_anonymous,
-          ends_at: (data.ends_at || '').trim() || null,
+          ends_at: endsAt,
         }});
         closeModal(); toast('Poll created', 'success');
         const polls = await api.request('/polls');

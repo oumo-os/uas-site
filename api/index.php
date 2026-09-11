@@ -187,9 +187,24 @@ try {
         $user['id']
       ]);
     $id = (int) db()->lastInsertId();
-    audit_log('meeting_create', 'meeting', $id);
-    notify_capability('meetings.manage', 'meeting_scheduled', 'Meeting scheduled: ' . $data['title'], 'A new meeting has been scheduled. Review it from the dashboard.', '/dashboard');
+    audit_log('article_create', 'article', $id);
+    notify_capability('articles.approve', 'article_submitted', 'Article awaiting review: ' . $data['title'], 'Submitted by ' . $user['name'] . '.', '/admin?tab=articles');
     json_response(['id' => $id], 201);
+  }
+  elseif (preg_match('#^/articles/(\d+)$#', $path, $m) && $method === 'GET') {
+    // Full article detail for authors and approvers (any status) — powers
+    // dashboard preview/approval. Public uses /public/articles/:id instead.
+    $user = require_login();
+    $id = (int) $m[1];
+    $stmt = db()->prepare('SELECT a.*, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.id = ?');
+    $stmt->execute([$id]);
+    $article = $stmt->fetch();
+    if (!$article) json_error('Article not found', 404);
+    $mine = (int) $article['author_id'] === (int) $user['id'];
+    if (!$mine && !user_has_cap($user['id'], 'articles.approve') && !user_has_cap($user['id'], 'articles.publish')) {
+      json_error('Article not found', 404);
+    }
+    json_response($article);
   }
   elseif (preg_match('#^/meetings/(\d+)$#', $path, $m) && $method === 'GET') {
     require_login();
@@ -1389,13 +1404,21 @@ try {
     audit_log('rsvp_mark_attended', 'event', $eventId, ['registration_id' => $regId]);
     json_response(['ok' => true]);
   }
-  // --- PUBLIC EVENT DETAIL ---
+  // --- PUBLIC EVENT DETAIL (plus submitted/draft view for organizers & approvers) ---
   elseif (preg_match('#^/events/(\d+)$#', $path, $m) && $method === 'GET') {
     $eventId = (int) $m[1];
-    $stmt = db()->prepare('SELECT e.*, u.name AS organiser_name, u.avatar_url AS organiser_avatar, u.institution AS organiser_institution, u.bio AS organiser_bio, pr.title AS programme_title FROM events e LEFT JOIN users u ON u.id = e.organizer_id LEFT JOIN programmes pr ON pr.id = e.programme_id WHERE e.id = ? AND e.status IN ("published", "cancelled", "completed")');
+    $stmt = db()->prepare('SELECT e.*, u.name AS organiser_name, u.avatar_url AS organiser_avatar, u.institution AS organiser_institution, u.bio AS organiser_bio, pr.title AS programme_title FROM events e LEFT JOIN users u ON u.id = e.organizer_id LEFT JOIN programmes pr ON pr.id = e.programme_id WHERE e.id = ?');
     $stmt->execute([$eventId]);
     $event = $stmt->fetch();
     if (!$event) json_error('Event not found', 404);
+    if (!in_array($event['status'], ['published', 'cancelled', 'completed'], true)) {
+      $viewer = current_user();
+      $ok = $viewer && $viewer['status'] === 'active'
+        && ((int) $event['organizer_id'] === (int) $viewer['id']
+          || user_has_cap($viewer['id'], 'events.approve')
+          || user_has_cap($viewer['id'], 'events.publish'));
+      if (!$ok) json_error('Event not found', 404);
+    }
 
     $stmt = db()->prepare('SELECT COUNT(*) AS total, SUM(IF(status="attended",1,0)) AS attended FROM event_registrations WHERE event_id = ? AND status != "cancelled"');
     $stmt->execute([$eventId]);
