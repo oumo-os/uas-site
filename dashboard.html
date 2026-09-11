@@ -435,6 +435,62 @@
     }
     .comment-input textarea:focus { outline: none; border-color: var(--accent); }
 
+    /* ── Discussion chatroom modal ── */
+    .chat-overlay {
+      position: fixed; inset: 0; background: rgba(10, 17, 40, 0.55); z-index: 1500;
+      display: none; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .chat-overlay.open { display: flex; }
+    .chat-modal {
+      width: min(680px, 94vw); height: min(78vh, 720px); display: flex; flex-direction: column;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md); overflow: hidden;
+    }
+    .chat-header {
+      display: flex; align-items: flex-start; gap: 0.75rem; padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border); background: var(--bg);
+    }
+    .chat-header .chat-title { flex: 1; min-width: 0; }
+    .chat-header .chat-title h3 { font-size: 1rem; margin: 0 0 0.2rem; line-height: 1.35; }
+    .chat-header .chat-title .text-dim { font-size: 0.78rem; }
+    .chat-close {
+      border: none; background: transparent; color: var(--text-dim); font-size: 1.4rem;
+      cursor: pointer; line-height: 1; padding: 0.1rem 0.4rem; border-radius: var(--radius);
+    }
+    .chat-close:hover { color: var(--text); background: var(--border); }
+    .chat-thread { flex: 1; overflow-y: auto; padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: 0.6rem; }
+    .chat-msg { display: flex; gap: 0.5rem; max-width: 88%; align-items: flex-end; }
+    .chat-msg.mine { align-self: flex-end; flex-direction: row-reverse; }
+    .chat-msg.reply { margin-left: 2.5rem; max-width: calc(88% - 2.5rem); }
+    .chat-msg.reply.mine { margin-left: 0; margin-right: 2.5rem; }
+    .chat-bubble {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 12px; padding: 0.5rem 0.75rem; min-width: 0;
+    }
+    .chat-msg.mine .chat-bubble { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .chat-name { font-size: 0.72rem; font-weight: 700; color: var(--accent); margin-bottom: 0.1rem; }
+    .chat-parent { font-size: 0.72rem; opacity: 0.65; margin-bottom: 0.15rem; }
+    .chat-text { font-size: 0.88rem; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .chat-meta { font-size: 0.7rem; color: var(--text-faint); margin-top: 0.25rem; display: flex; gap: 0.5rem; align-items: center; }
+    .chat-msg.mine .chat-meta { color: rgba(255, 255, 255, 0.8); }
+    .chat-reply-btn { border: none; background: none; padding: 0; font-size: 0.7rem; font-weight: 600; color: var(--accent); cursor: pointer; font-family: inherit; }
+    .chat-msg.mine .chat-reply-btn { color: #fff; text-decoration: underline; }
+    .chat-reply-chip {
+      display: none; align-items: center; gap: 0.5rem; padding: 0.4rem 1.25rem;
+      font-size: 0.78rem; color: var(--text-dim); background: var(--accent-glow);
+      border-top: 1px solid var(--border);
+    }
+    .chat-reply-chip.show { display: flex; }
+    .chat-reply-chip button { border: none; background: none; color: var(--accent); cursor: pointer; font-weight: 700; }
+    .chat-composer { display: flex; gap: 0.5rem; padding: 0.75rem 1.25rem 1rem; background: var(--bg-card); align-items: flex-end; }
+    .chat-composer textarea {
+      flex: 1; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: var(--radius);
+      font-family: inherit; font-size: 0.88rem; resize: none; min-height: 42px; max-height: 120px;
+      background: var(--bg); color: var(--text);
+    }
+    .chat-composer textarea:focus { outline: none; border-color: var(--accent); }
+    .chat-notice { padding: 0.75rem 1.25rem 1rem; font-size: 0.82rem; color: var(--text-dim); }
+
     /* ── Detail Modal Extras ── */
     .detail-status {
       display: inline-flex; align-items: center; gap: 0.3rem;
@@ -2662,7 +2718,7 @@
                 </div>
               ` : ''}
               <div class="comment-thread" id="comments-${r.id}">
-                <button class="btn btn-outline btn-xs" onclick="loadComments(${r.id})" style="margin-top:0.5rem">Discussion</button>
+                <button class="btn btn-outline btn-xs" onclick="openResolutionChat(${r.id})" style="margin-top:0.5rem">Discussion</button>
               </div>
             </div>
           `;
@@ -2672,42 +2728,165 @@
       }
     }
 
-    async function loadComments(resId) {
-      const container = document.getElementById('comments-' + resId);
-      if (!container) return;
-      const existing = container.querySelector('.comment-list');
-      if (existing) { existing.remove(); return; }
+    // ── Resolution discussion chatroom ──
+    // A popup modal keeps long governance threads readable: chronological
+    // bubbles, one level of replies, auto-scroll, Enter to send.
+    let chatResId = null;
+    let chatReplyTo = null;
+    let chatNameById = {};
 
-      const comments = await api.getResolutionComments(resId).catch(() => []);
-      const list = document.createElement('div');
-      list.className = 'comment-list';
-      list.innerHTML = `
-        ${comments.length ? comments.map(c => `
-          <div class="comment-item">
-            <div class="comment-avatar">${(c.user_name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase()}</div>
-            <div class="comment-content">
-              <div class="comment-meta"><strong>${esc(c.user_name)}</strong> &middot; ${new Date(c.created_at).toLocaleDateString()}</div>
-              <div class="comment-body">${esc(c.body)}</div>
+    function ensureChatOverlay() {
+      if (document.getElementById('chatOverlay')) return;
+      const overlay = document.createElement('div');
+      overlay.className = 'chat-overlay';
+      overlay.id = 'chatOverlay';
+      overlay.innerHTML = `
+        <div class="chat-modal" role="dialog" aria-label="Resolution discussion">
+          <div class="chat-header">
+            <div class="chat-title">
+              <h3 id="chatTitle">Discussion</h3>
+              <div class="text-dim" id="chatSubtitle"></div>
             </div>
+            <button class="chat-close" onclick="closeResolutionChat()" aria-label="Close discussion">&times;</button>
           </div>
-        `).join('') : '<p class="text-dim text-sm" style="padding:0.5rem 0">No comments yet. Start the discussion!</p>'}
-        <div class="comment-input">
-          <textarea id="commentInput-${resId}" placeholder="Add a comment..."></textarea>
-          <button class="btn btn-primary btn-sm" onclick="postComment(${resId})">Post</button>
-        </div>
-      `;
-      container.appendChild(list);
+          <div class="chat-thread" id="chatThread"></div>
+          <div class="chat-reply-chip" id="chatReplyChip">
+            <span>Replying to <strong id="chatReplyName"></strong></span>
+            <button onclick="chatSetReply(null)">Cancel</button>
+          </div>
+          <div id="chatFooter"></div>
+        </div>`;
+      overlay.addEventListener('click', e => { if (e.target === overlay) closeResolutionChat(); });
+      document.body.appendChild(overlay);
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && document.getElementById('chatOverlay')?.classList.contains('open')) closeResolutionChat();
+      });
     }
 
-    async function postComment(resId) {
-      const textarea = document.getElementById('commentInput-' + resId);
-      const body = textarea.value.trim();
-      if (!body) return;
+    function closeResolutionChat() {
+      chatResId = null;
+      chatReplyTo = null;
+      document.getElementById('chatOverlay')?.classList.remove('open');
+    }
+
+    async function openResolutionChat(resId) {
+      chatResId = resId;
+      chatReplyTo = null;
+      ensureChatOverlay();
+      document.getElementById('chatOverlay').classList.add('open');
+      document.getElementById('chatTitle').textContent = 'Discussion';
+      document.getElementById('chatSubtitle').textContent = '';
+      document.getElementById('chatReplyChip').classList.remove('show');
+      document.getElementById('chatThread').innerHTML = '<p class="text-dim text-sm">Loading discussion...</p>';
+      document.getElementById('chatFooter').innerHTML = '';
       try {
-        await api.addResolutionComment(resId, body);
-        textarea.value = '';
-        loadComments(resId);
-      } catch(e) { toast(e.error || 'Failed to post comment', 'error'); }
+        const [res, comments] = await Promise.all([
+          api.request('/resolutions/' + resId).catch(() => null),
+          api.getResolutionComments(resId).catch(() => []),
+        ]);
+        if (chatResId !== resId) return; // superseded
+        renderChat(res, comments || []);
+      } catch(e) {
+        if (chatResId !== resId) return;
+        document.getElementById('chatThread').innerHTML = '<p class="text-dim text-sm">Could not load discussion.</p>';
+      }
+    }
+
+    function chatInitials(name) {
+      return (name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    }
+
+    function chatTime(iso) {
+      const d = new Date(iso);
+      if (isNaN(d)) return '';
+      const today = new Date();
+      const sameDay = d.toDateString() === today.toDateString();
+      const time = d.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' });
+      return sameDay ? time : d.toLocaleDateString('en', { month: 'short', day: 'numeric' }) + ' ' + time;
+    }
+
+    function renderChat(res, comments) {
+      const titleEl = document.getElementById('chatTitle');
+      const subEl = document.getElementById('chatSubtitle');
+      const thread = document.getElementById('chatThread');
+      const footer = document.getElementById('chatFooter');
+      titleEl.textContent = res ? res.title : 'Discussion';
+      subEl.innerHTML = (res ? `<span class="badge badge-${esc(res.status)}">${esc(res.status)}</span> <span style="margin-left:0.4rem">${esc(res.code || '')}</span> &middot; ` : '') + `${comments.length} message${comments.length !== 1 ? 's' : ''}`;
+
+      const byId = {};
+      comments.forEach(c => { byId[c.id] = c; chatNameById[c.id] = c.user_name; });
+      const tops = comments.filter(c => !c.parent_id || !byId[c.parent_id]);
+      const canReply = api.hasCap('resolutions.vote') || api.hasCap('resolutions.create') || api.hasCap('resolutions.manage');
+
+      const msgHtml = (c, isReply) => {
+        const mine = api._user && c.user_id === api._user.id;
+        const parent = c.parent_id && byId[c.parent_id];
+        return `
+          <div class="chat-msg${mine ? ' mine' : ''}${isReply ? ' reply' : ''}">
+            ${!mine ? `<div class="comment-avatar">${esc(chatInitials(c.user_name))}</div>` : ''}
+            <div class="chat-bubble">
+              ${!mine ? `<div class="chat-name">${esc(c.user_name)}</div>` : ''}
+              ${parent ? `<div class="chat-parent">↳ ${esc(parent.user_name)}</div>` : ''}
+              <div class="chat-text">${esc(c.body)}</div>
+              <div class="chat-meta"><span>${esc(chatTime(c.created_at))}</span>${canReply ? `<button class="chat-reply-btn" onclick="chatSetReply(${c.id})">Reply</button>` : ''}</div>
+            </div>
+          </div>`;
+      };
+      let html = '';
+      tops.forEach(t => {
+        html += msgHtml(t, false);
+        comments.filter(c => c.parent_id === t.id).forEach(r => { html += msgHtml(r, true); });
+      });
+      thread.innerHTML = html || '<p class="text-dim text-sm" style="text-align:center;margin:auto">No messages yet. Start the discussion!</p>';
+      thread.scrollTop = thread.scrollHeight;
+
+      if (canReply) {
+        footer.innerHTML = `
+          <div class="chat-composer">
+            <textarea id="chatInput" placeholder="Write a message... (Enter to send)" rows="1"></textarea>
+            <button class="btn btn-primary btn-sm" id="chatSendBtn" onclick="chatSend()">Send</button>
+          </div>`;
+        const input = document.getElementById('chatInput');
+        input.addEventListener('keydown', e => {
+          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chatSend(); }
+        });
+        input.focus();
+      } else {
+        footer.innerHTML = '<div class="chat-notice">Only members with voting rights can post in governance discussions.</div>';
+      }
+    }
+
+    function chatSetReply(id) {
+      chatReplyTo = id;
+      const chip = document.getElementById('chatReplyChip');
+      if (id) {
+        document.getElementById('chatReplyName').textContent = chatNameById[id] || 'message';
+        chip.classList.add('show');
+      } else {
+        chip.classList.remove('show');
+      }
+      document.getElementById('chatInput')?.focus();
+    }
+
+    async function chatSend() {
+      if (!chatResId) return;
+      const input = document.getElementById('chatInput');
+      const btn = document.getElementById('chatSendBtn');
+      const body = (input?.value || '').trim();
+      if (!body) return;
+      if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+      try {
+        await api.addResolutionComment(chatResId, body, chatReplyTo);
+        chatReplyTo = null;
+        document.getElementById('chatReplyChip')?.classList.remove('show');
+        const comments = await api.getResolutionComments(chatResId).catch(() => []);
+        const res = await api.request('/resolutions/' + chatResId).catch(() => null);
+        if (!document.getElementById('chatOverlay')?.classList.contains('open')) return;
+        renderChat(res, comments || []);
+      } catch(e) {
+        toast(e.error || 'Failed to send message', 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
+      }
     }
 
     async function vote(id, value) {
@@ -3620,20 +3799,7 @@
             ${data.description ? `<div class="field"><div class="field-label">Description</div><div style="max-height:200px;overflow-y:auto;padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${data.description}</div></div>` : ''}
             ${actions.length ? `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);display:flex;gap:0.5rem">${actions.join('')}</div>` : ''}
             <div class="comment-thread" style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border)">
-              <div style="font-weight:600;font-size:0.9rem;margin-bottom:0.5rem">Discussion (${comments.length})</div>
-              ${comments.length ? comments.map(c => `
-                <div class="comment-item">
-                  <div class="comment-avatar">${(c.user_name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase()}</div>
-                  <div class="comment-content">
-                    <div class="comment-meta"><strong>${esc(c.user_name)}</strong> &middot; ${new Date(c.created_at).toLocaleDateString()}</div>
-                    <div class="comment-body">${esc(c.body)}</div>
-                  </div>
-                </div>
-              `).join('') : '<p class="text-dim text-sm">No comments yet.</p>'}
-              <div class="comment-input">
-                <textarea id="modalCommentInput" placeholder="Add a comment..."></textarea>
-                <button class="btn btn-primary btn-sm" onclick="modalPostComment(${id})">Post</button>
-              </div>
+              <button class="btn btn-outline btn-sm" onclick="closeModal();openResolutionChat(${id})">Open discussion (${comments.length})</button>
             </div>
           `;
 
@@ -3738,17 +3904,6 @@
         closeModal(); toast('Assignment submitted', 'success');
         load();
       } catch(e) { toast(e.error || 'Failed', 'error'); }
-    }
-
-    async function modalPostComment(resId) {
-      const textarea = document.getElementById('modalCommentInput');
-      const body = textarea.value.trim();
-      if (!body) return;
-      try {
-        await api.addResolutionComment(resId, body);
-        // Refresh modal with updated comments
-        showItemDetail('resolution', resId);
-      } catch(e) { toast(e.error || 'Failed to post comment', 'error'); }
     }
 
     async function showResolutionDetail(id) {
