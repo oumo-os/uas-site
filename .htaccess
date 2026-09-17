@@ -1,5 +1,12 @@
 RewriteEngine On
 
+# Canonical host: www -> non-www (preserve path)
+RewriteCond %{HTTP_HOST} ^www\.astronomy\.ug$ [NC]
+RewriteRule ^(.*)$ https://astronomy.ug/$1 [R=301,L]
+
+# Sitemap: /sitemap.xml -> sitemap.php
+RewriteRule ^sitemap\.xml$ sitemap.php [L]
+
 # Custom 404 page
 ErrorDocument 404 /404.html
 
