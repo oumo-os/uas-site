@@ -1185,12 +1185,12 @@
           <div class="stat-label">Pending Items</div>
           ${overdueCount > 0 ? '<div class="stat-trend down">' + overdueCount + ' overdue</div>' : '<div class="stat-trend neutral">On track</div>'}
         </div>
-        <div class="stat-card resolutions" onclick="switchTab('resolutions')" title="View resolutions">
+        <div class="stat-card resolutions" onclick="goGov('resolutions')" title="View resolutions">
           <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span></div>
           <div class="stat-value">${health.governance?.total || 0}</div>
           <div class="stat-label">Active Resolutions</div>
         </div>
-        <div class="stat-card polls" onclick="switchTab('polls')" title="View polls">
+        <div class="stat-card polls" onclick="goGov('polls')" title="View polls">
           <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M17 3H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/></svg></span></div>
           <div class="stat-value">${pollOpen}</div>
           <div class="stat-label">Open Polls</div>
@@ -1498,8 +1498,8 @@
         const typeColors = { income: 'var(--success)', expense: 'var(--danger)', receivable: 'var(--gold)', payable: 'var(--info)' };
         recentDiv.innerHTML = fin.recent.map(r => {
           const color = typeColors[r.type] || 'var(--text)';
-          const prefix = r.type === 'income' || r.type === 'payable' ? '+' : '-';
-          const label = r.type.charAt(0).toUpperCase() + r.type.slice(1);
+          const prefix = r.type === 'income' || r.type === 'receivable' ? '+' : '-';
+          const label = { income: 'Income', expense: 'Expense', receivable: 'Expected', payable: 'Owed' }[r.type] || (r.type.charAt(0).toUpperCase() + r.type.slice(1));
           return `
           <div style="display:flex;justify-content:space-between;align-items:center;padding:0.65rem 0;border-bottom:1px solid var(--border);font-size:0.88rem">
             <div style="flex:1">
@@ -1509,7 +1509,7 @@
             <div style="display:flex;align-items:center;gap:0.5rem">
               <span style="color:${color};font-size:0.75rem;text-transform:uppercase;font-weight:500">${label}</span>
               <span style="font-weight:600;color:${color}">${prefix}UGX ${Number(r.amount).toLocaleString()}</span>
-              ${canEdit ? '<button class="btn btn-outline btn-xs" onclick="editTransaction(' + r.id + ')">Edit</button><button class="btn btn-outline btn-xs" onclick="deleteTransaction(' + r.id + ')" style="color:var(--danger)">Cancel</button>' : ''}
+              ${canEdit ? '<button class="btn btn-outline btn-xs" onclick="editTransaction(' + r.id + ')">Edit</button><button class="btn btn-outline btn-xs" onclick="deleteTransaction(' + r.id + ')" style="color:var(--danger)">Delete</button>' : ''}
             </div>
           </div>`;
         }).join('');
@@ -1774,7 +1774,7 @@
         return;
       }
       const canManage = api.hasCap('members.manage');
-      div.innerHTML = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.88rem"><thead><tr style="border-bottom:1px solid var(--border);text-align:left"><th style="padding:0.5rem">Name</th><th>Email</th><th>Class</th><th>Standing</th><th>Status</th><th>Roles</th><th>Joined</th>' + (canManage ? '<th>Actions</th>' : '') + '</tr></thead><tbody>' + list.map(m => {
+      div.innerHTML = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.88rem"><thead><tr style="border-bottom:1px solid var(--border);text-align:left"><th style="padding:0.5rem">Name</th><th>Email</th><th>Class</th><th>Standing</th><th>Status</th><th>Roles</th><th>Joined</th><th>Actions</th></tr></thead><tbody>' + list.map(m => {
         const standingBadge = m.standing === 'restricted'
           ? `<button class="btn btn-xs" onclick="toggleStanding(${m.user_id},'good_standing')" style="background:rgba(220,38,38,0.1);color:var(--danger);border:1px solid rgba(220,38,38,0.3);cursor:pointer;border-radius:var(--radius);padding:0.2rem 0.5rem;font-size:0.8rem">Restricted — click to restore</button>`
           : `<button class="btn btn-xs" onclick="toggleStanding(${m.user_id},'restricted')" style="background:rgba(34,197,94,0.1);color:var(--success);border:1px solid rgba(34,197,94,0.3);cursor:pointer;border-radius:var(--radius);padding:0.2rem 0.5rem;font-size:0.8rem">Good Standing — click to restrict</button>`;
@@ -1782,13 +1782,11 @@
         const roles = (m.roles || []).filter(r => r.role_type !== 'member_class');
         const roleBadges = roles.slice(0, 3).map(r => `<span class="wg-badge" style="font-size:0.75rem;background:rgba(30,96,145,0.1);color:var(--info)">${esc(r.title)}</span>`).join(' ') + (roles.length > 3 ? ` +${roles.length - 3}` : '');
         let actions = '';
-        if (canManage) {
-          if (m.status === 'pending') {
-            actions += `<button class="btn btn-outline btn-xs" onclick="approveMember(${m.user_id})" style="color:var(--success)">Approve</button> `;
-            actions += `<button class="btn btn-outline btn-xs" onclick="rejectMember(${m.user_id})" style="color:var(--danger)">Reject</button> `;
-          }
-          actions += `<button class="btn btn-outline btn-xs" onclick="showMemberDetail(${m.user_id})">Detail</button>`;
+        if (canManage && m.status === 'pending') {
+          actions += `<button class="btn btn-outline btn-xs" onclick="approveMember(${m.user_id})" style="color:var(--success)">Approve</button> `;
+          actions += `<button class="btn btn-outline btn-xs" onclick="rejectMember(${m.user_id})" style="color:var(--danger)">Reject</button> `;
         }
+        actions += `<button class="btn btn-outline btn-xs" onclick="showMemberDetail(${m.user_id})">Detail</button>`;
         return `<tr style="border-bottom:1px solid var(--border)">
           <td style="padding:0.5rem;font-weight:500">${esc(m.name)}</td>
           <td style="padding:0.5rem;color:var(--text-dim)">${esc(m.email || '')}</td>
@@ -1797,7 +1795,7 @@
           <td style="padding:0.5rem">${statusBadge}</td>
           <td style="padding:0.5rem">${roleBadges || '<span style="color:var(--text-dim)">—</span>'}</td>
           <td style="padding:0.5rem;color:var(--text-dim)">${m.joined_date || '—'}</td>
-          ${canManage ? '<td style="padding:0.5rem">' + actions + '</td>' : ''}
+          ${'<td style="padding:0.5rem">' + actions + '</td>'}
         </tr>`;
       }).join('') + '</tbody></table></div>';
     }
@@ -1814,6 +1812,9 @@
     }
 
     async function approveMember(userId) {
+      const m = allMembersData.find(x => x.user_id === userId);
+      const who = m ? `${m.name} (${(m.class || 'member').replace(' Member', '')})` : 'this applicant';
+      if (!confirm(`Approve ${who} as an active member?`)) return;
       try {
         await api.request('/members', { method: 'POST', body: { user_id: userId, status: 'active' } });
         toast('Member approved', 'success');
@@ -1869,8 +1870,8 @@
           const typeColors = { income: 'var(--success)', expense: 'var(--danger)', receivable: 'var(--gold)', payable: 'var(--info)' };
           statementHtml += statement.records.map(r => {
             const color = typeColors[r.type] || 'var(--text)';
-            const prefix = r.type === 'income' || r.type === 'payable' ? '+' : '-';
-            const label = r.type.charAt(0).toUpperCase() + r.type.slice(1);
+            const prefix = r.type === 'income' || r.type === 'receivable' ? '+' : '-';
+            const label = { income: 'Income', expense: 'Expense', receivable: 'Expected', payable: 'Owed' }[r.type] || (r.type.charAt(0).toUpperCase() + r.type.slice(1));
             return '<div style="display:flex;justify-content:space-between;padding:0.35rem 0;border-bottom:1px solid var(--border);font-size:0.82rem"><div><span style="color:' + color + ';font-size:0.75rem;font-weight:500;text-transform:uppercase">' + label + '</span> ' + esc(r.description || r.category) + '</div><div style="display:flex;gap:0.5rem;align-items:center"><span class="text-dim">' + (r.record_date || '') + '</span><span style="color:' + color + ';font-weight:500">' + prefix + 'UGX ' + Number(r.amount).toLocaleString() + '</span><span class="text-dim">= UGX ' + Number(r.running_balance).toLocaleString() + '</span></div></div>';
           }).join('');
           statementHtml += '</div></div>';
@@ -2364,6 +2365,8 @@
     }
 
     async function openPoll(id) {
+      const p = pollsData.find(x => x.id === id);
+      if (!confirm(`Open "${p ? p.title : 'this poll'}" for voting now? Eligible members will be notified.`)) return;
       try {
         await api.request('/polls/' + id + '/open', { method: 'POST' });
         const polls = await api.request('/polls');
@@ -2372,6 +2375,8 @@
     }
 
     async function closePoll(id) {
+      const p = pollsData.find(x => x.id === id);
+      if (!confirm(`Close "${p ? p.title : 'this poll'}"? No more votes will be accepted and results become visible.`)) return;
       try {
         await api.request('/polls/' + id + '/close', { method: 'POST' });
         const polls = await api.request('/polls');
@@ -2694,7 +2699,7 @@
       const actions = pendingActions(item);
       const itemType = item.item_type || 'article';
       const click = itemType === 'poll'
-        ? `onclick="switchTab('polls')"`
+        ? `onclick="goGov('polls')"`
         : `onclick="showItemDetail('${esc(itemType)}', ${item.id})"`;
       return `
         <div class="pending-item" style="cursor:pointer" ${click}>
@@ -2731,7 +2736,7 @@
         out.push(`<button class="btn btn-outline btn-xs" onclick="actOnItem('resolution', 'against', ${item.id})">Against</button>`);
       }
       if (item.item_type === 'poll' && api.hasCap('governance.poll.vote')) {
-        out.push(`<button class="btn btn-success btn-xs" onclick="switchTab('polls')">Vote</button>`);
+        out.push(`<button class="btn btn-success btn-xs" onclick="goGov('polls')">Vote</button>`);
       }
       return out.join('');
     }
@@ -2748,6 +2753,12 @@
     }
 
     async function actOnItem(type, action, id) {
+      if (type === 'resolution' && (action === 'for' || action === 'against' || action === 'abstain')) {
+        if (!(await confirmVote(id, action))) return;
+      }
+      if ((action === 'approve' || action === 'publish') && (type === 'article' || type === 'event' || type === 'document')) {
+        if (!confirm(`${action === 'approve' ? 'Approve' : 'Publish'} this ${type}?${action === 'publish' ? ' It will become publicly visible.' : ''}`)) return;
+      }
       try {
         switch (type) {
           case 'article':
@@ -2769,6 +2780,9 @@
         const pending = await api.getPending();
         renderOverview(pending);
         renderPending(pending);
+        if ((action === 'approve' || action === 'publish') && (type === 'article' || type === 'event' || type === 'document')) {
+          toast(`${type.charAt(0).toUpperCase() + type.slice(1)} ${action === 'approve' ? 'approved' : 'published'}`, 'success');
+        }
         if (type === 'resolution') {
           const resolutions = await api.getResolutions();
           renderResolutions(resolutions);
@@ -2777,6 +2791,7 @@
     }
 
     function renderResolutions(resolutions) {
+      resolutionsCache = resolutions || [];
       const div = document.getElementById('resolutionsList');
       if (resolutions.length) {
         div.innerHTML = resolutions.map(r => {
@@ -3014,7 +3029,17 @@
       }
     }
 
+    let resolutionsCache = [];
+
+    async function confirmVote(id, value) {
+      const r = resolutionsCache.find(x => x.id === id);
+      const title = r ? r.title : 'this resolution';
+      const n = (delegationsData.incoming || []).length;
+      return confirm(`Vote ${String(value).toUpperCase()} on "${title}"?${n ? ` Your ${n} delegated vote(s) will be cast too.` : ''} This cannot be changed afterwards.`);
+    }
+
     async function vote(id, value) {
+      if (!(await confirmVote(id, value))) return;
       try {
         await api.castVote(id, value);
         const resolutions = await api.getResolutions();
@@ -3330,10 +3355,17 @@
     }
 
     async function deleteTransaction(id) {
-      if (!confirm('Cancel this transaction?')) return;
+      let label = 'this transaction';
+      try {
+        const records = await api.getFinance();
+        const list = Array.isArray(records) ? records : (records.recent || []);
+        const found = list.find(x => x.id === id);
+        if (found) label = `"${found.description || found.category}" (UGX ${Number(found.amount).toLocaleString()})`;
+      } catch(e) {}
+      if (!confirm(`Delete ${label} permanently? This cannot be undone.`)) return;
       try {
         await api.deleteFinance(id);
-        toast('Transaction cancelled', 'success');
+        toast('Transaction deleted', 'success');
         load();
       } catch(e) { toast(e.error || 'Failed', 'error'); }
     }
@@ -3441,6 +3473,12 @@
       if (panel === 'members') loadMembersPanel();
     }
 
+    function goGov(sub) {
+      switchTab('governance');
+      const tab = document.querySelector(`#govTabs [data-gov="${sub}"]`);
+      if (tab) tab.click();
+    }
+
     async function loadMembersPanel() {
       try {
         const members = await api.request('/members');
@@ -3526,8 +3564,9 @@
               <span class="text-sm text-dim">Total: UGX ${totalBudget.toLocaleString()}</span>
             </div>
             ${data.items.map(b => {
-              const pct = b.amount > 0 ? Math.min(((b.type === 'income' ? b.spent_income : b.spent_expense) / b.amount) * 100, 100) : 0;
+              const pct = b.amount > 0 ? Math.round(((b.type === 'income' ? b.spent_income : b.spent_expense) / b.amount) * 100) : 0;
               const spent = b.type === 'income' ? b.spent_income : b.spent_expense;
+              const over = b.amount > 0 && spent > b.amount;
               const canEdit = api.hasCap('finance.record');
               return `
                 <div class="wg-card" style="margin-left:0.5rem;cursor:pointer" onclick="showItemDetail('budget_item',${b.id})">
@@ -3541,11 +3580,11 @@
                     </div>
                     <div style="text-align:right">
                       <div style="font-weight:600;font-size:0.9rem">UGX ${Number(b.amount).toLocaleString()}</div>
-                      <div class="text-sm text-dim">spent: UGX ${Number(spent).toLocaleString()}</div>
-                      ${canEdit ? '<div style="margin-top:0.3rem"><button class="btn btn-outline btn-xs" onclick="event.stopPropagation();editBudgetItem(' + b.id + ')">Edit</button> <button class="btn btn-outline btn-xs" onclick="event.stopPropagation();deleteBudgetItem(' + b.id + ')" style="color:var(--danger)">Cancel</button></div>' : ''}
+                      <div class="text-sm text-dim">${b.type === 'income' ? 'collected' : 'spent'}: UGX ${Number(spent).toLocaleString()}${over ? ' — over budget!' : ''}</div>
+                      ${canEdit ? '<div style="margin-top:0.3rem"><button class="btn btn-outline btn-xs" onclick="event.stopPropagation();editBudgetItem(' + b.id + ')">Edit</button> <button class="btn btn-outline btn-xs" onclick="event.stopPropagation();deleteBudgetItem(' + b.id + ')" style="color:var(--danger)">Delete</button></div>' : ''}
                     </div>
                   </div>
-                  <div class="budget-bar"><div class="budget-bar-fill ${b.type}" style="width:${pct}%"></div></div>
+                  <div class="budget-bar"><div class="budget-bar-fill ${b.type}" style="width:${pct}%;${over ? 'background:var(--danger)' : ''}"></div></div>
                 </div>
               `;
             }).join('')}
@@ -3692,10 +3731,15 @@
     }
 
     async function deleteBudgetItem(id) {
-      if (!confirm('Cancel this budget item?')) return;
+      let label = 'this budget item';
+      try {
+        const b = await api.getBudgetItem(id);
+        if (b) label = `"${b.title}" (UGX ${Number(b.amount).toLocaleString()})`;
+      } catch(e) {}
+      if (!confirm(`Delete ${label} permanently? This cannot be undone.`)) return;
       try {
         await api.deleteBudgetItem(id);
-        toast('Budget item cancelled', 'success');
+        toast('Budget item deleted', 'success');
         load();
       } catch(e) { toast(e.error || 'Failed', 'error'); }
     }
@@ -3951,6 +3995,7 @@
           `;
 
         } else if (type === 'working_group') {
+          data = await api.request('/working-groups/' + id);
           const members = await api.getWorkingGroupMembers(id).catch(() => []);
           html = `
             <div class="field"><div class="field-label">Type</div><span class="wg-badge ${data.type === 'committee' ? 'committee' : (data.type === 'task_force' ? 'task_force' : '')}">${esc(data.type?.replace('_', ' '))}</span></div>
@@ -3970,7 +4015,11 @@
     }
 
     async function modalAction(type, action, id) {
+      if ((action === 'approve' || action === 'publish') && (type === 'article' || type === 'event' || type === 'document')) {
+        if (!confirm(`${action === 'approve' ? 'Approve' : 'Publish'} this ${type}?${action === 'publish' ? ' It will become publicly visible.' : ''}`)) return;
+      }
       try {
+        let done = 'Action completed';
         if (type === 'article') {
           if (action === 'approve') await api.approveArticle(id);
           if (action === 'publish') await api.publishArticle(id);
@@ -3982,18 +4031,22 @@
           if (action === 'approve') await api.request('/documents/' + id + '/approve', { method: 'POST' });
           if (action === 'publish') await api.request('/documents/' + id + '/publish', { method: 'POST' });
         } else if (type === 'resolution') {
-          if (action === 'submit') await api.submitResolution(id);
-          if (action === 'begin_voting') await api.beginVoting(id);
+          if (action === 'submit') { await api.submitResolution(id); done = 'Resolution submitted for voting'; }
+          if (action === 'begin_voting') { await api.beginVoting(id); done = 'Voting is now open'; }
         } else if (type === 'assignment') {
-          if (action === 'start') await api.startAssignment(id);
-          if (action === 'complete') await api.completeAssignment(id);
+          if (action === 'start') { await api.startAssignment(id); done = 'Assignment started — now In Progress'; }
+          if (action === 'complete') { await api.completeAssignment(id); done = 'Assignment marked complete'; }
         }
-        closeModal(); toast('Action completed', 'success');
+        if (type === 'article') done = action === 'approve' ? 'Article approved' : action === 'publish' ? 'Article published' : done;
+        if (type === 'event') done = action === 'approve' ? 'Event approved' : action === 'publish' ? 'Event published' : action === 'rsvp' ? 'You are registered for this event' : done;
+        if (type === 'document') done = action === 'approve' ? 'Document approved' : action === 'publish' ? 'Document published' : done;
+        closeModal(); toast(done, 'success');
         load();
       } catch(e) { toast(e.error || 'Action failed', 'error'); }
     }
 
     async function modalVote(id, value) {
+      if (!(await confirmVote(id, value))) return;
       try {
         await api.castVote(id, value);
         closeModal(); toast('Vote recorded', 'success');

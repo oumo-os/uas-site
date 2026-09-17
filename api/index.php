@@ -2106,6 +2106,14 @@ try {
     audit_log('working_group_member_add', 'working_group', $groupId, ['user_id' => $userId]);
     json_response(['ok' => true], 201);
   }
+  elseif (preg_match('#^/working-groups/(\d+)$#', $path, $m) && $method === 'GET') {
+    require_login();
+    $stmt = db()->prepare('SELECT wg.*, p.title AS programme_name FROM working_groups wg LEFT JOIN programmes p ON p.id = wg.programme_id WHERE wg.id = ?');
+    $stmt->execute([(int) $m[1]]);
+    $group = $stmt->fetch();
+    if (!$group) json_error('Working group not found', 404);
+    json_response($group);
+  }
   elseif (preg_match('#^/working-groups/(\d+)$#', $path, $m) && $method === 'PUT') {
     $user = require_cap_for('roles.manage', 'working_group', (int)$m[1]);
     $wgId = (int) $m[1];
