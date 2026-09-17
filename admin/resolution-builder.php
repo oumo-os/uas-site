@@ -10,7 +10,7 @@
   <meta property="og:url" content="https://astronomy.ug/admin/resolution-builder">
   <meta name="robots" content="noindex, nofollow">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="../css/base.css?v=20260911-6">
+  <link rel="stylesheet" href="../css/base.css?v=20260911-7">
   <style>
     .change-row { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 0.75rem; }
     .vote-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; }

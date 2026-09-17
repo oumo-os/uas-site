@@ -10,7 +10,7 @@
   <meta property="og:url" content="https://astronomy.ug/member/submit-article">
   <meta name="robots" content="noindex, nofollow">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="../css/base.css?v=20260911-6">
+  <link rel="stylesheet" href="../css/base.css?v=20260911-7">
 </head>
 <body>
   <nav class="nav">

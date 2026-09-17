@@ -10,7 +10,7 @@
   <meta property="og:url" content="https://astronomy.ug/profile">
   <meta name="robots" content="noindex, nofollow">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="css/base.css?v=20260911-6">
+  <link rel="stylesheet" href="css/base.css?v=20260911-7">
 </head>
 <body>
   <nav class="nav" role="navigation" aria-label="Main navigation">
@@ -45,12 +45,14 @@
         </div>
         <div style="margin-bottom:1.25rem">
           <label class="form-label">Profile photo</label>
-          <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
-            <input class="form-input" type="file" id="avatarFile" accept="image/*" style="max-width:320px">
-            <button class="btn btn-outline btn-sm" id="avatarRemove" style="display:none" onclick="removeAvatar()">Remove</button>
+          <div class="avatar-drop" id="avatarDrop" role="button" tabindex="0" aria-label="Upload profile photo">
+            <input type="file" id="avatarFile" accept="image/*" hidden>
+            <span class="avatar-drop-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
+            <span class="avatar-drop-text"><strong>Drop a photo here or click to browse</strong><span>JPG · PNG · GIF · WebP — resized to 256px automatically</span></span>
+            <span class="btn btn-outline btn-sm" id="avatarRemove" style="display:none" onclick="event.stopPropagation();removeAvatar()">Remove</span>
+            <span class="avatar-progress" id="avatarProgress"><span></span></span>
           </div>
           <input type="hidden" id="avatarUrl" value="">
-          <div class="form-help">Square photo works best. Resized to 256px and compressed on upload.</div>
         </div>
         <div class="grid-2 gap-3">
           <div>
@@ -173,7 +175,7 @@
       renderPvAvatar();
       document.getElementById('avatarUrl').value = p.avatar_url || '';
       document.getElementById('avatarRemove').style.display = p.avatar_url ? '' : 'none';
-      document.getElementById('avatarFile').addEventListener('change', previewAvatar);
+      bindAvatarDrop();
       document.getElementById('pvName').textContent = p.name;
       document.getElementById('pvMeta').textContent = (m.membership_number || '') + ' · ' + (m.class || 'Regular Member');
       document.getElementById('fName').value = p.name || '';
@@ -237,6 +239,27 @@
       renderPvAvatar(URL.createObjectURL(file));
     }
 
+    function bindAvatarDrop() {
+      const drop = document.getElementById('avatarDrop');
+      const fileEl = document.getElementById('avatarFile');
+      drop.addEventListener('click', e => {
+        if (e.target.closest('#avatarRemove')) return;
+        fileEl.click();
+      });
+      drop.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileEl.click(); }
+      });
+      fileEl.addEventListener('change', previewAvatar);
+      ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('drag'); }));
+      ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('drag'); }));
+      drop.addEventListener('drop', e => {
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+          fileEl.files = e.dataTransfer.files;
+          previewAvatar();
+        }
+      });
+    }
+
     function removeAvatar() {
       document.getElementById('avatarFile').value = '';
       document.getElementById('avatarUrl').value = '';
@@ -247,12 +270,14 @@
 
     async function saveProfile() {
       const msg = document.getElementById('saveMsg');
+      const progress = document.getElementById('avatarProgress');
       msg.textContent = '';
       try {
         let avatarUrl = document.getElementById('avatarUrl').value || null;
         const avatarFile = document.getElementById('avatarFile').files[0];
         if (avatarFile) {
           msg.textContent = 'Uploading photo...';
+          progress.classList.add('show');
           const up = await api.uploadFile(avatarFile, { avatar: true });
           avatarUrl = up.url;
         }
@@ -277,6 +302,7 @@
         renderPvAvatar();
         updateNavUser();
       } catch(e) { alert(e.error || 'Failed to save'); }
+      finally { progress.classList.remove('show'); }
     }
 
     async function changePassword() {
