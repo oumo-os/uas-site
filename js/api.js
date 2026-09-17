@@ -613,6 +613,52 @@ const RichTextEditor = {
   };
 })();
 
+// --- SEO: dynamic meta + JSON-LD for JS-rendered detail pages ---
+// Call after content loads. Helps crawlers that render JS (e.g. Google);
+// plain social scrapers still see the static tags (documented limitation).
+window.setSeoMeta = function ({ title, description, image, canonical, schema }) {
+  if (title) document.title = title;
+  const setMeta = (attr, name, content) => {
+    if (!content) return;
+    let el = document.querySelector(`meta[${attr}="${name}"]`);
+    if (!el) { el = document.createElement('meta'); el.setAttribute(attr, name); document.head.appendChild(el); }
+    el.setAttribute('content', content);
+  };
+  if (description) {
+    setMeta('name', 'description', description);
+    setMeta('property', 'og:description', description);
+  }
+  if (title) setMeta('property', 'og:title', title);
+  if (image) {
+    const abs = /^https?:\/\//i.test(image)
+      ? image
+      : window.location.origin + (window.UAS_BASE || '') + '/' + String(image).replace(/^\/+/, '');
+    setMeta('property', 'og:image', abs);
+  }
+  if (canonical) {
+    let link = document.querySelector('link[rel="canonical"]');
+    if (!link) { link = document.createElement('link'); link.setAttribute('rel', 'canonical'); document.head.appendChild(link); }
+    link.setAttribute('href', canonical);
+    setMeta('property', 'og:url', canonical);
+  }
+  document.querySelectorAll('script[data-seo-jsonld]').forEach(el => el.remove());
+  if (schema) {
+    const s = document.createElement('script');
+    s.type = 'application/ld+json';
+    s.setAttribute('data-seo-jsonld', '1');
+    s.textContent = JSON.stringify(schema);
+    document.head.appendChild(s);
+  }
+};
+window.absImg = function (image) {
+  if (!image) return null;
+  if (/^https?:\/\//i.test(image)) return image;
+  var p = '/' + String(image).replace(/^\/+/, '');
+  var base = window.UAS_BASE || '';
+  if (base && (p === base || p.indexOf(base + '/') === 0)) return window.location.origin + p;
+  return window.location.origin + base + p;
+};
+
 // --- Global nav helpers ---
 window.updateNavUser = function () {
   const el = document.getElementById('navUser');

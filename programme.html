@@ -161,7 +161,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260911-4"></script>
+  <script src="js/api.js?v=20260911-5"></script>
   <script>
     async function load() {
       try { await api.me(); } catch(e) {}
@@ -182,6 +182,22 @@
       if (p.image_url) {
         document.getElementById('pHeroBg').style.backgroundImage = 'url(' + esc(p.image_url) + ')';
       }
+
+      // SEO: dynamic meta + structured data
+      (function () {
+        var desc = stripHtml(p.description || '').slice(0, 160);
+        var canon = 'https://astronomy.ug/programmes/' + p.id;
+        setSeoMeta({
+          title: p.title + ' — Uganda Astronomical Society',
+          description: desc, image: p.image_url || null, canonical: canon,
+          schema: {
+            '@context': 'https://schema.org', '@type': 'CreativeWork',
+            name: p.title, description: desc,
+            image: absImg(p.image_url), url: canon,
+            author: { '@type': 'Organization', name: 'Uganda Astronomical Society', url: 'https://astronomy.ug/' }
+          }
+        });
+      })();
 
       // Rich description
       document.getElementById('pDesc').innerHTML = p.description ? p.description : '';

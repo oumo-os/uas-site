@@ -163,7 +163,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260911-4"></script>
+  <script src="js/api.js?v=20260911-5"></script>
   <script>
     var eventImgs = {'lecture':ua('/img/event-lecture.jpg'),'workshop':ua('/img/event-workshop.jpg'),'observing':ua('/img/event-nightwatch.jpg'),'conference':ua('/img/event-lecture.jpg'),'outreach':ua('/img/event-workshop.jpg')};
     var eventId = null;
@@ -188,6 +188,26 @@
       // Dynamic hero image
       var coverImg = e.image_url || eventImgs[e.category] || ua('/img/header-events.jpg');
       document.getElementById('eHeroBg').style.backgroundImage = 'url(' + esc(coverImg) + ')';
+
+      // SEO: dynamic meta + Event structured data
+      (function () {
+        var desc = stripHtml(e.description || '').slice(0, 160);
+        var canon = 'https://astronomy.ug/event/' + e.id;
+        var iso = function (s) { return s ? String(s).replace(' ', 'T') + '+03:00' : undefined; };
+        setSeoMeta({
+          title: e.title + ' — Uganda Astronomical Society',
+          description: desc, image: coverImg, canonical: canon,
+          schema: {
+            '@context': 'https://schema.org', '@type': 'Event',
+            name: e.title, description: desc,
+            startDate: iso(e.date), endDate: iso(e.end_date),
+            eventStatus: e.status === 'cancelled' ? 'https://schema.org/EventCancelled' : 'https://schema.org/EventScheduled',
+            location: e.location ? { '@type': 'Place', name: e.location } : undefined,
+            image: absImg(coverImg), url: canon,
+            organizer: { '@type': 'Organization', name: 'Uganda Astronomical Society', url: 'https://astronomy.ug/' }
+          }
+        });
+      })();
 
       var d2 = new Date(e.date);
       var dEnd = e.end_date ? new Date(e.end_date) : null;
