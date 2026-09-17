@@ -11,6 +11,9 @@
   <meta property="og:description" content="Upcoming astronomy events, observing nights, workshops, and star parties in Uganda.">
   <meta property="og:image" content="img/uas-emblem.png">
   <meta property="og:type" content="website">
+  <link rel="canonical" href="https://astronomy.ug/events">
+  <meta property="og:url" content="https://astronomy.ug/events">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="css/base.css?v=20260911-3">
   <style>
     .page-hero {
@@ -451,7 +454,7 @@
 
         return `
           <div class="event-card" onclick="location.href=ua('/event/${e.id}')">
-            <img src="${esc(e.image_url || eventImgs[idx % eventImgs.length])}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${eventImgs[idx % eventImgs.length]}'">
+            <img src="${esc(e.image_url || eventImgs[idx % eventImgs.length])}" alt="${esc(e.title)}" loading="lazy" onerror="this.onerror=null;this.src='${eventImgs[idx % eventImgs.length]}'">
             <div class="event-date-box">
               <div class="day">${d.getDate()}</div>
               <div class="month">${d.toLocaleString('en',{month:'short'})}</div>

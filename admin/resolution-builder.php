@@ -6,6 +6,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Resolution Builder — Uganda Astronomical Society</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="canonical" href="https://astronomy.ug/admin/resolution-builder">
+  <meta property="og:url" content="https://astronomy.ug/admin/resolution-builder">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="../css/base.css?v=20260911-3">
   <style>
     .change-row { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 0.75rem; }

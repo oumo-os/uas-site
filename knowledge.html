@@ -6,6 +6,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/png" href="img/uas-emblem.png">
   <title>Knowledge — Uganda Astronomical Society</title>
+    <meta name="description" content="Explore UAS articles, observing guides, eclipse information and astronomy education resources from Uganda.">
+  <link rel="canonical" href="https://astronomy.ug/knowledge">
+  <meta property="og:url" content="https://astronomy.ug/knowledge">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="stylesheet" href="css/base.css?v=20260911-3">
   <style>
     .page-hero {
@@ -333,7 +337,7 @@
         const catLabel = (a.category || 'article').replace(/_/g, ' ');
         return `
           <div class="article-card" onclick="location.href=ua('/article/${a.id}')">
-            <img src="${articleImg(a, idx)}" alt="" loading="lazy">
+              <img src="${articleImg(a, idx)}" alt="${esc(a.title)}" loading="lazy">
             <div class="card-body">
               <span class="tag" style="margin-bottom:0.5rem;display:inline-flex">${esc(catLabel)}</span>
               <h3>${esc(a.title)}</h3>
