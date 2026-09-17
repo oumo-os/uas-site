@@ -585,6 +585,18 @@ tr:hover td { background: var(--accent-glow); }
 .rte-editor img { max-width:100%; height:auto; border-radius:var(--radius); margin:0.75rem 0; display:block; }
 .rte-btn:disabled { opacity:0.45; cursor:wait; }
 
+/* Form validation + screen-reader-only labels (shared with FormBuilder) */
+.uas-form .form-input.is-invalid,
+.uas-form .form-select.is-invalid,
+.uas-form .form-textarea.is-invalid { border-color: var(--danger); }
+.uas-form .form-input.is-invalid:focus,
+.uas-form .form-select.is-invalid:focus,
+.uas-form .form-textarea.is-invalid:focus { box-shadow: 0 0 0 3px rgba(185,28,28,0.1); }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
 /* Avatars: photo overlays initials fallback (see avatarHtml) */
 .member-avatar, .comment-avatar, .leader-avatar { position: relative; overflow: hidden; }
 .member-avatar img, .comment-avatar img, .leader-avatar img {

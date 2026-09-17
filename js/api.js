@@ -439,6 +439,8 @@ const FormBuilder = {
         if (!el) return;
         if (f.type === 'rich-text') {
           data[f.name] = el.innerHTML.trim();
+          // Empty editors contain <br> or <p><br></p> — treat whitespace-only as empty
+          if (!el.textContent.trim() && !el.querySelector('img')) data[f.name] = '';
         } else if (f.type === 'multiselect') {
           data[f.name] = Array.from(el.selectedOptions).map(o => o.value);
         } else if (f.type === 'file') {
@@ -455,17 +457,17 @@ const FormBuilder = {
         }
         // Validate
         if (errEl) errEl.textContent = '';
-        el.classList.remove('input-error');
+        el.classList.remove('is-invalid');
         if (f.required && !data[f.name] && data[f.name] !== 0) {
           if (errEl) errEl.textContent = f.label + ' is required';
-          el.classList.add('input-error');
+          el.classList.add('is-invalid');
           valid = false;
         }
         if (f.validate && data[f.name]) {
           const msg = f.validate(data[f.name]);
           if (msg) {
             if (errEl) errEl.textContent = msg;
-            el.classList.add('input-error');
+            el.classList.add('is-invalid');
             valid = false;
           }
         }
@@ -494,7 +496,9 @@ const FormBuilder = {
       try {
         await onSubmit(data);
       } catch (err) {
-        alert(err.error || err.message || 'Failed');
+        const msg = (err && (err.error || err.message)) || 'Failed';
+        if (typeof window.toast === 'function') window.toast(msg, 'error');
+        else alert(msg);
       } finally {
         if (btn) { btn.disabled = false; btn.textContent = btn.dataset.origText || 'Submit'; }
       }
@@ -519,7 +523,7 @@ const FormBuilder = {
 
   clearErrors(formId) {
     document.querySelectorAll(`#${formId} .form-error`).forEach(e => e.textContent = '');
-    document.querySelectorAll(`#${formId} .input-error`).forEach(e => e.classList.remove('input-error'));
+    document.querySelectorAll(`#${formId} .is-invalid`).forEach(e => e.classList.remove('is-invalid'));
   },
 };
 

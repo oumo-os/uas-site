@@ -10,7 +10,7 @@
   <meta property="og:url" content="https://astronomy.ug/dashboard">
   <meta name="robots" content="noindex, nofollow">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="css/base.css?v=20260911-7">
+  <link rel="stylesheet" href="css/base.css?v=20260911-8">
   <style>
     /* ── Hero ── */
     .dash-hero {
@@ -353,6 +353,7 @@
     .modal-actions {
       display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1.25rem;
       padding-top: 1rem; border-top: 1px solid var(--border);
+      position: sticky; bottom: 0; background: var(--bg-card); padding-bottom: 0.75rem;
     }
     .modal-actions .btn { min-width: 80px; }
     .modal-section { margin-top: 1rem; }
@@ -626,9 +627,15 @@
       .dash-hero-actions { margin-left: 0; width: 100%; }
       .dash-hero-actions .btn { flex: 1; }
       .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .stat-grid .stat-value { font-size: 1.25rem; overflow-wrap: anywhere; }
       .create-grid { grid-template-columns: 1fr 1fr; }
       .dash-tabs { gap: 0; }
       .dash-tab { padding: 0.55rem 0.65rem; font-size: 0.75rem; }
+      .pending-item { flex-wrap: wrap; }
+      .pending-title { flex-basis: 100%; }
+      .pending-meta { white-space: normal; }
+      #financeBreakdown { overflow-x: auto; }
+      #financeBreakdown table { min-width: 560px; }
     }
   </style>
 </head>
@@ -671,13 +678,13 @@
       <button class="dash-tab active" data-panel="overview">Overview</button>
       <button class="dash-tab" data-panel="inbox">Inbox <span class="tab-count" id="inboxTabCount"></span></button>
       <button class="dash-tab" data-panel="pending">Pending <span class="tab-count" id="pendingTabCount"></span></button>
-      <button class="dash-tab" data-panel="governance">Governance</button>
+      <button class="dash-tab" data-panel="governance">Votes & Decisions</button>
       <button class="dash-tab" data-panel="finance">Finance</button>
       <button class="dash-tab" data-panel="members" id="membersTab">Members</button>
-      <button class="dash-tab" data-panel="org">Org</button>
+      <button class="dash-tab" data-panel="org">Groups & Meetings</button>
       <button class="dash-tab" data-panel="roles">My Roles</button>
       <button class="dash-tab" data-panel="profile">Profile</button>
-      <button class="dash-tab" data-panel="create">Submit</button>
+      <button class="dash-tab" data-panel="create">Create</button>
     </div>
 
     <!-- Overview Panel -->
@@ -687,7 +694,7 @@
       <div class="dash-grid">
         <div class="dash-card">
           <div class="dash-card-header">
-            <h4>Upcoming</h4>
+            <h4>Calendar</h4>
           </div>
           <div id="upcomingCal"></div>
         </div>
@@ -729,10 +736,11 @@
 
     <!-- Pending Panel -->
     <div class="dash-panel" id="panel-pending">
-      <div class="dash-tabs" id="pendingTabs" style="margin-bottom:1rem">
-        <button class="dash-tab active" data-scope="mine">My Items</button>
-        <button class="dash-tab" data-scope="org">Org Wide</button>
+      <div class="dash-tabs" id="pendingTabs" style="margin-bottom:0.5rem">
+        <button class="dash-tab active" data-scope="mine">Needs my action</button>
+        <button class="dash-tab" data-scope="org">All pending</button>
       </div>
+      <p class="text-dim text-sm" style="margin:0 0 1rem">Needs my action = only items you can approve or vote on. All pending includes everything waiting across the society.</p>
       <div class="dash-grid" style="margin-bottom:1rem">
         <div class="dash-card">
           <div class="dash-card-header">
@@ -742,7 +750,7 @@
         </div>
         <div class="dash-card">
           <div class="dash-card-header">
-            <h4>List</h4>
+            <h4>Items to review</h4>
             <div id="pendingCounts" class="text-sm text-dim"></div>
           </div>
           <div id="allPending"></div>
@@ -754,7 +762,7 @@
     <!-- Governance Panel (Resolutions + Polls + Delegations) -->
     <div class="dash-panel" id="panel-governance">
       <div class="section-header">
-        <h3>Governance</h3>
+        <h3>Votes & Decisions</h3>
         <div style="display:flex;gap:0.4rem">
           <button class="btn btn-primary btn-sm" onclick="showCreateResolution()" id="createResBtn" style="display:none">New Resolution</button>
           <button class="btn btn-primary btn-sm" onclick="showPollForm()" id="createPollBtn" style="display:none">New Poll</button>
@@ -765,7 +773,7 @@
         <button class="dash-tab active" data-gov="resolutions">Resolutions</button>
         <button class="dash-tab" data-gov="polls">Polls</button>
         <button class="dash-tab" data-gov="delegations">Delegations</button>
-        <button class="dash-tab" data-gov="rbac" id="rbacTab" style="display:none">RBAC Audit</button>
+        <button class="dash-tab" data-gov="rbac" id="rbacTab" style="display:none">Access Audit</button>
       </div>
       <div id="gov-resolutions">
         <div id="resolutionsList"></div>
@@ -825,9 +833,9 @@
                 <button class="fin-toggle-btn" data-preset="lastyear">Last Year</button>
               </div>
               <div style="display:flex;align-items:center;gap:0.3rem;margin-left:auto;font-size:0.82rem">
-                <input type="date" id="finDateFrom" class="form-input" style="width:130px;padding:0.3rem 0.4rem;font-size:0.82rem" title="From date">
+                <input type="date" id="finDateFrom" aria-label="From date" class="form-input" style="width:130px;padding:0.3rem 0.4rem;font-size:0.82rem" title="From date">
                 <span class="text-dim">–</span>
-                <input type="date" id="finDateTo" class="form-input" style="width:130px;padding:0.3rem 0.4rem;font-size:0.82rem" title="To date">
+                <input type="date" id="finDateTo" aria-label="To date" class="form-input" style="width:130px;padding:0.3rem 0.4rem;font-size:0.82rem" title="To date">
                 <button class="btn btn-outline btn-xs" onclick="applyFinDateFilter()" title="Apply date filter">Go</button>
               </div>
             </div>
@@ -861,7 +869,7 @@
       <div id="memb-list">
         <div class="stat-grid" id="memberStats"></div>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem">
-          <select id="mFilterCat" onchange="filterMembers()" style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text);font-size:0.85rem">
+          <select id="mFilterCat" aria-label="Filter by member class" onchange="filterMembers()" style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text);font-size:0.85rem">
             <option value="">All classes</option>
             <option value="Regular Member">Regular</option>
             <option value="Student Member">Student</option>
@@ -870,19 +878,21 @@
             <option value="Affiliate Member">Affiliate</option>
             <option value="Corporate Member">Corporate</option>
           </select>
-          <select id="mFilterStanding" onchange="filterMembers()" style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text);font-size:0.85rem">
+          <select id="mFilterStanding" aria-label="Filter by standing" onchange="filterMembers()" style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text);font-size:0.85rem">
             <option value="">All standings</option>
             <option value="good_standing">Good Standing</option>
             <option value="restricted">Restricted</option>
           </select>
-          <select id="mFilterStatus" onchange="filterMembers()" style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text);font-size:0.85rem">
+          <select id="mFilterStatus" aria-label="Filter by status" onchange="filterMembers()" style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text);font-size:0.85rem">
             <option value="">All statuses</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
             <option value="suspended">Suspended</option>
           </select>
-          <input id="mSearch" oninput="filterMembers()" placeholder="Search name or email..." style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text);font-size:0.85rem;min-width:180px">
+          <input id="mSearch" oninput="filterMembers()" placeholder="Search name, email, number, institution..." aria-label="Search members" style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text);font-size:0.85rem;min-width:180px">
+          <button class="btn btn-outline btn-sm" onclick="clearMemberFilters()">Clear</button>
         </div>
+        <div class="text-sm text-dim" id="memberCount" style="margin-bottom:0.5rem"></div>
         <div id="memberList"></div>
       </div>
       <div id="memb-dues" style="display:none">
@@ -893,7 +903,7 @@
     <!-- Org Panel (Groups + Meetings) -->
     <div class="dash-panel" id="panel-org">
       <div class="section-header">
-        <h3>Organisation</h3>
+        <h3>Groups & Meetings</h3>
         <div style="display:flex;gap:0.4rem">
           <button class="btn btn-primary btn-sm" onclick="showWorkingGroupForm()" id="createWgBtn" style="display:none">New Group</button>
           <button class="btn btn-primary btn-sm" onclick="showMeetingForm()" id="createMeetingBtn" style="display:none">Schedule Meeting</button>
@@ -960,7 +970,7 @@
         <div class="create-card" onclick="showCreateForm('project')">
           <div class="icon-circle"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/></svg></span></div>
           <h4>Project</h4>
-          <p>Create a project under a programme</p>
+          <p>Create a project, optionally under a programme</p>
         </div>
       </div>
       <div id="createForm" class="mt-2"></div>
@@ -993,8 +1003,8 @@
     </div>
   </div>
 
-  <!-- Detail Modal -->
-  <div class="modal-overlay" id="detailModal">
+    <!-- Detail Modal -->
+    <div class="modal-overlay" id="detailModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal">
       <div class="modal-header">
         <h3 id="modalTitle"></h3>
@@ -1047,7 +1057,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260911-6"></script>
+  <script src="js/api.js?v=20260911-8"></script>
   <script>
     let health = {};
     let allPendingData = [];
@@ -1065,7 +1075,7 @@
         const user = data.user;
 
         // Avatar initials
-        const initials = user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+        const initials = ((user.name || '?').split(' ').map(w => w[0]).filter(Boolean).join('') || '?').toUpperCase().slice(0, 2);
         document.getElementById('dashAvatar').textContent = initials;
         document.getElementById('dashTitle').textContent = `Welcome back, ${user.name.split(' ')[0]}`;
         document.getElementById('dashSubtitle').textContent = user.email;
@@ -1178,6 +1188,7 @@
           <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span></div>
           <div class="stat-value">${health.events?.upcoming || 0}</div>
           <div class="stat-label">Upcoming Events</div>
+          ${meetingsUp > 0 ? '<div class="stat-trend up">' + meetingsUp + ' upcoming meeting' + (meetingsUp > 1 ? 's' : '') + '</div>' : ''}
         </div>
         <div class="stat-card pending" onclick="switchTab('pending')" title="View pending items">
           <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span></div>
@@ -1188,13 +1199,12 @@
         <div class="stat-card resolutions" onclick="goGov('resolutions')" title="View resolutions">
           <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span></div>
           <div class="stat-value">${health.governance?.total || 0}</div>
-          <div class="stat-label">Active Resolutions</div>
+          <div class="stat-label">Resolutions</div>
         </div>
         <div class="stat-card polls" onclick="goGov('polls')" title="View polls">
           <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M17 3H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/></svg></span></div>
           <div class="stat-value">${pollOpen}</div>
           <div class="stat-label">Open Polls</div>
-          ${meetingsUp > 0 ? '<div class="stat-trend up">' + meetingsUp + ' upcoming meeting' + (meetingsUp > 1 ? 's' : '') + '</div>' : ''}
         </div>
       `;
 
@@ -1244,27 +1254,33 @@
     }
 
     async function asgAction(id, action) {
-      try { await api[action === 'start' ? 'startAssignment' : 'completeAssignment'](id); load(); }
+      try {
+        await api[action === 'start' ? 'startAssignment' : 'completeAssignment'](id);
+        toast(action === 'start' ? 'Assignment started — now In Progress' : 'Assignment marked complete', 'success');
+        load();
+      }
       catch(e) { toast(e.error || 'Failed', 'error'); }
     }
 
     async function asgSubmit(id) {
       const evidence = prompt('Describe what was done / link evidence:');
-      if (evidence === null) return;
-      try { await api.submitAssignment(id, evidence); load(); }
+      if (!evidence || !evidence.trim()) { if (evidence !== null) toast('Please describe the evidence', 'warning'); return; }
+      try { await api.submitAssignment(id, evidence.trim()); toast('Evidence submitted for review', 'success'); load(); }
       catch(e) { toast(e.error || 'Failed', 'error'); }
     }
 
     function renderMySubmissions(list) {
       const div = document.getElementById('mySubmissions');
       if (!list.length) { div.innerHTML = '<div class="empty-state"><h4>No submissions yet</h4><p>Articles, events, and documents you submit will appear here for tracking.</p></div>'; return; }
-      div.innerHTML = list.slice(0, 5).map(s => `
+      div.innerHTML = list.slice(0, 5).map(s => {
+        const statusHints = { draft: 'Draft (not sent)', submitted: 'Waiting for review', under_review: 'Under review', approved: 'Approved', published: 'Published', rejected: 'Needs changes — see feedback' };
+        return `
         <div class="sub-item">
           <span class="pending-type-badge ${esc(s.kind)}">${esc(s.kind)}</span>
           <span style="flex:1;font-size:0.88rem">${esc(s.title)}</span>
-          <span class="badge badge-${s.status === 'published' || s.status === 'approved' ? 'active' : (s.status === 'rejected' ? 'inactive' : 'pending')}">${esc(s.status)}</span>
+          <span class="badge badge-${s.status === 'published' || s.status === 'approved' ? 'active' : (s.status === 'rejected' ? 'inactive' : 'pending')}" title="${esc(statusHints[s.status] || s.status)}">${esc(statusHints[s.status] || s.status)}</span>
         </div>
-      `).join('');
+      `}).join('');
     }
 
     function renderQuickActions() {
@@ -1335,9 +1351,11 @@
       const el = document.getElementById('upcomingStrip');
       if (!events || !events.length) {
         el.innerHTML = '';
+        el.style.display = 'none';
         return;
       }
-      el.innerHTML = '<div class="section-header"><h3>Upcoming Events</h3><a href="' + ua('/events') + '" class="btn btn-outline btn-xs">View all</a></div>'
+      el.style.display = '';
+      el.innerHTML = '<div class="section-header"><h3>Coming up soon</h3><a href="' + ua('/events') + '" class="btn btn-outline btn-xs">View all</a></div>'
         + '<div class="upcoming-strip">'
         + events.map(e => {
           const d = new Date(e.date);
@@ -1459,32 +1477,32 @@
       document.getElementById('financeStatGrid').innerHTML = `
         <div class="stat-card programmes">
           <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span></div>
-          <div class="stat-value" style="color:var(--success)">UGX ${fin.income.toLocaleString()}</div>
+          <div class="stat-value" style="color:var(--success)">UGX ${Number(fin.income || 0).toLocaleString('en-UG')}</div>
           <div class="stat-label">Total Income</div>
         </div>
         <div class="stat-card pending">
           <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span></div>
-          <div class="stat-value" style="color:var(--danger)">UGX ${fin.expense.toLocaleString()}</div>
+          <div class="stat-value" style="color:var(--danger)">UGX ${Number(fin.expense || 0).toLocaleString('en-UG')}</div>
           <div class="stat-label">Total Expenses</div>
         </div>
         <div class="stat-card events">
           <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span></div>
-          <div class="stat-value" style="color:var(--gold)">UGX ${(fin.committed || 0).toLocaleString()}</div>
+          <div class="stat-value" style="color:var(--gold)">UGX ${Number(fin.committed || 0).toLocaleString('en-UG')}</div>
           <div class="stat-label">Committed</div>
         </div>
         <div class="stat-card resolutions">
           <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span></div>
-          <div class="stat-value">UGX ${(fin.available !== undefined ? fin.available : fin.balance).toLocaleString()}</div>
+          <div class="stat-value">UGX ${Number(fin.available !== undefined ? fin.available : fin.balance || 0).toLocaleString('en-UG')}</div>
           <div class="stat-label">Available Balance</div>
         </div>
         <div class="stat-card pending">
           <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span></div>
-          <div class="stat-value" style="color:var(--gold)">UGX ${(fin.receivable || 0).toLocaleString()}</div>
+          <div class="stat-value" style="color:var(--gold)">UGX ${Number(fin.receivable || 0).toLocaleString('en-UG')}</div>
           <div class="stat-label">Receivable (${fin.receivable_count || 0} pending)</div>
         </div>
         <div class="stat-card pending">
           <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span></div>
-          <div class="stat-value" style="color:var(--info)">UGX ${(fin.payable || 0).toLocaleString()}</div>
+          <div class="stat-value" style="color:var(--info)">UGX ${Number(fin.payable || 0).toLocaleString('en-UG')}</div>
           <div class="stat-label">Payable (${fin.payable_count || 0} pending)</div>
         </div>
       `;
@@ -1508,7 +1526,7 @@
             </div>
             <div style="display:flex;align-items:center;gap:0.5rem">
               <span style="color:${color};font-size:0.75rem;text-transform:uppercase;font-weight:500">${label}</span>
-              <span style="font-weight:600;color:${color}">${prefix}UGX ${Number(r.amount).toLocaleString()}</span>
+              <span style="font-weight:600;color:${color}">${prefix}UGX ${Number(r.amount).toLocaleString('en-UG')}</span>
               ${canEdit ? '<button class="btn btn-outline btn-xs" onclick="editTransaction(' + r.id + ')">Edit</button><button class="btn btn-outline btn-xs" onclick="deleteTransaction(' + r.id + ')" style="color:var(--danger)">Delete</button>' : ''}
             </div>
           </div>`;
@@ -1532,18 +1550,18 @@
         const net = v.income - v.expense;
         return `<tr>
           <td>${esc(name)}</td>
-          <td style="color:var(--success)">${v.income ? '+' + v.income.toLocaleString() : '—'}</td>
-          <td style="color:var(--danger)">${v.expense ? '-' + v.expense.toLocaleString() : '—'}</td>
-          <td style="color:var(--gold)">${v.receivable ? v.receivable.toLocaleString() : '—'}</td>
-          <td style="color:var(--info)">${v.payable ? v.payable.toLocaleString() : '—'}</td>
-          <td style="color:${net >= 0 ? 'var(--success)' : 'var(--danger)'}">${net.toLocaleString()}</td>
+          <td style="color:var(--success)">${v.income ? '+UGX ' + v.income.toLocaleString('en-UG') : '—'}</td>
+          <td style="color:var(--danger)">${v.expense ? '-UGX ' + v.expense.toLocaleString('en-UG') : '—'}</td>
+          <td style="color:var(--gold)" title="Money owed to UAS">${v.receivable ? 'UGX ' + v.receivable.toLocaleString('en-UG') : '—'}</td>
+          <td style="color:var(--info)" title="Bills UAS must pay">${v.payable ? 'UGX ' + v.payable.toLocaleString('en-UG') : '—'}</td>
+          <td style="color:${net >= 0 ? 'var(--success)' : 'var(--danger)'}">UGX ${net.toLocaleString('en-UG')}</td>
         </tr>`;
       }).join('');
       const totNet = totIncome - totExpense;
       div.innerHTML = `<table class="fin-table">
-        <thead><tr><th>Group</th><th>Inflow</th><th>Outflow</th><th>Receivable</th><th>Payable</th><th>Net</th></tr></thead>
+        <thead><tr><th>Group</th><th>Income</th><th>Expenses</th><th>Expected in</th><th>Owed out</th><th>Net</th></tr></thead>
         <tbody>${rowsHtml}</tbody>
-        <tfoot><tr><td>Total</td><td style="color:var(--success)">+${totIncome.toLocaleString()}</td><td style="color:var(--danger)">-${totExpense.toLocaleString()}</td><td style="color:var(--gold)">${totReceivable.toLocaleString()}</td><td style="color:var(--info)">${totPayable.toLocaleString()}</td><td style="color:${totNet >= 0 ? 'var(--success)' : 'var(--danger)'}">${totNet.toLocaleString()}</td></tr></tfoot>
+        <tfoot><tr><td>Total</td><td style="color:var(--success)">+${totIncome.toLocaleString('en-UG')}</td><td style="color:var(--danger)">-${totExpense.toLocaleString('en-UG')}</td><td style="color:var(--gold)">${totReceivable.toLocaleString('en-UG')}</td><td style="color:var(--info)">${totPayable.toLocaleString('en-UG')}</td><td style="color:${totNet >= 0 ? 'var(--success)' : 'var(--danger)'}">${totNet.toLocaleString('en-UG')}</td></tr></tfoot>
       </table>`;
     }
 
@@ -1663,16 +1681,18 @@
       const minutes = document.getElementById('minText').value;
       const lines = (document.getElementById('minDecisions').value || '').split('\n').map(s => s.trim()).filter(Boolean);
       const decisions = [];
+      let skipped = 0;
       for (const line of lines) {
         const t = line.match(/^(.*?)(?:\s+@(\d+))?(?:\s+(\d{4}-\d{2}-\d{2}))?(?:\s+(low|medium|high|urgent))?$/);
-        if (!t) continue;
+        if (!t) { skipped++; continue; }
         const text = (t[1] || '').trim();
-        if (!text) continue;
+        if (!text) { skipped++; continue; }
         decisions.push({ text, assignee_id: t[2] ? parseInt(t[2]) : null, due_date: t[3] || null, priority: t[4] || 'medium' });
       }
       try {
         await api.request('/meetings/' + id + '/minutes', { method: 'POST', body: { minutes, decisions } });
-        closeModal(); toast('Minutes saved', 'success');
+        closeModal();
+        toast(skipped ? `Minutes saved (${skipped} action line(s) skipped — use: text @user_id YYYY-MM-DD priority)` : 'Minutes saved', skipped ? 'warning' : 'success');
         const list = await api.request('/meetings');
         renderMeetings(list);
       } catch (e) { toast(e.error || 'Failed to save minutes', 'error'); }
@@ -1689,17 +1709,21 @@
     }
 
     async function saveMeetingAttendance(id) {
+      const validStatus = ['attended', 'absent', 'excused', 'apology'];
       const lines = (document.getElementById('attRows').value || '').split('\n').map(s => s.trim()).filter(Boolean);
       const attendees = [];
+      let skipped = 0;
       for (const line of lines) {
         const parts = line.split(/\s+/);
         const userId = parseInt(parts[0]);
-        if (!userId) continue;
-        attendees.push({ user_id: userId, status: parts[1] || 'absent', notes: parts.slice(2).join(' ') || null });
+        const status = (parts[1] || 'absent').toLowerCase();
+        if (!userId || !validStatus.includes(status)) { skipped++; continue; }
+        attendees.push({ user_id: userId, status, notes: parts.slice(2).join(' ') || null });
       }
       try {
         await api.request('/meetings/' + id + '/attendance', { method: 'POST', body: { attendees } });
-        closeModal(); toast('Attendance saved', 'success');
+        closeModal();
+        toast(skipped ? `Attendance saved (${skipped} line(s) skipped — use: user_id status)` : 'Attendance saved', skipped ? 'warning' : 'success');
         const list = await api.request('/meetings');
         renderMeetings(list);
       } catch (e) { toast(e.error || 'Failed to save attendance', 'error'); }
@@ -1712,7 +1736,7 @@
           <label>Type<select id="mType" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)">
             <option value="board">Board</option><option value="general">General</option><option value="committee">Committee</option>
             <option value="working_group">Working Group</option><option value="other">Other</option></select></label>
-          <label>Scheduled (YYYY-MM-DD HH:MM)<input id="mWhen" placeholder="2026-09-01 10:00:00" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)"></label>
+          <label>Scheduled<input id="mWhen" type="datetime-local" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)"></label>
           <label>Location<input id="mLoc" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)"></label>
           <label>Agenda items — one per line<textarea id="mAgenda" rows="3" placeholder="Budget review&#10;Sponsorship update" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)"></textarea></label>
           <button class="btn btn-primary" onclick="createMeeting()">Schedule Meeting</button>
@@ -1723,12 +1747,17 @@
     async function createMeeting() {
       const title = document.getElementById('mTitle').value.trim();
       if (!title) return toast('Title is required', 'warning');
+      let when = (document.getElementById('mWhen').value || '').trim() || null;
+      if (when) {
+        when = when.replace('T', ' ');
+        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(when)) when += ':00';
+      }
       const agenda = (document.getElementById('mAgenda').value || '').split('\n').map(s => s.trim()).filter(Boolean).map(t => ({ title: t }));
       try {
         await api.request('/meetings', { method: 'POST', body: {
           title,
           meeting_type: document.getElementById('mType').value,
-          scheduled_at: document.getElementById('mWhen').value || null,
+          scheduled_at: when,
           location: document.getElementById('mLoc').value || null,
           agenda,
         }});
@@ -1756,6 +1785,14 @@
       filterMembers();
     }
 
+    function clearMemberFilters() {
+      document.getElementById('mFilterCat').value = '';
+      document.getElementById('mFilterStanding').value = '';
+      document.getElementById('mFilterStatus').value = '';
+      document.getElementById('mSearch').value = '';
+      filterMembers();
+    }
+
     function filterMembers() {
       const cat = document.getElementById('mFilterCat').value;
       const standing = document.getElementById('mFilterStanding').value;
@@ -1765,9 +1802,10 @@
         if (cat && m.class !== cat) return false;
         if (standing && m.standing !== standing) return false;
         if (status && m.status !== status) return false;
-        if (q && !(m.name || '').toLowerCase().includes(q) && !(m.email || '').toLowerCase().includes(q)) return false;
+        if (q && !((m.name || '').toLowerCase().includes(q) || (m.email || '').toLowerCase().includes(q) || (m.membership_number || '').toLowerCase().includes(q) || (m.institution || '').toLowerCase().includes(q) || (m.phone || '').toLowerCase().includes(q))) return false;
         return true;
       });
+      document.getElementById('memberCount').textContent = `Showing ${list.length} of ${allMembersData.length} members`;
       const div = document.getElementById('memberList');
       if (!list.length) {
         div.innerHTML = '<div class="empty-state"><p>No members match the filters.</p></div>';
@@ -1776,11 +1814,11 @@
       const canManage = api.hasCap('members.manage');
       div.innerHTML = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.88rem"><thead><tr style="border-bottom:1px solid var(--border);text-align:left"><th style="padding:0.5rem">Name</th><th>Email</th><th>Class</th><th>Standing</th><th>Status</th><th>Roles</th><th>Joined</th><th>Actions</th></tr></thead><tbody>' + list.map(m => {
         const standingBadge = m.standing === 'restricted'
-          ? `<button class="btn btn-xs" onclick="toggleStanding(${m.user_id},'good_standing')" style="background:rgba(220,38,38,0.1);color:var(--danger);border:1px solid rgba(220,38,38,0.3);cursor:pointer;border-radius:var(--radius);padding:0.2rem 0.5rem;font-size:0.8rem">Restricted — click to restore</button>`
-          : `<button class="btn btn-xs" onclick="toggleStanding(${m.user_id},'restricted')" style="background:rgba(34,197,94,0.1);color:var(--success);border:1px solid rgba(34,197,94,0.3);cursor:pointer;border-radius:var(--radius);padding:0.2rem 0.5rem;font-size:0.8rem">Good Standing — click to restrict</button>`;
+          ? `<span class="badge badge-inactive">Restricted</span> <button class="btn btn-outline btn-xs" onclick="toggleStanding(${m.user_id},'good_standing')">Restore</button>`
+          : `<span class="badge badge-active">Good</span> <button class="btn btn-outline btn-xs" onclick="toggleStanding(${m.user_id},'restricted')">Restrict</button>`;
         const statusBadge = m.status === 'active' ? '<span style="color:var(--success)">Active</span>' : m.status === 'pending' ? '<span style="color:var(--gold)">Pending</span>' : '<span style="color:var(--text-dim)">' + esc(m.status) + '</span>';
         const roles = (m.roles || []).filter(r => r.role_type !== 'member_class');
-        const roleBadges = roles.slice(0, 3).map(r => `<span class="wg-badge" style="font-size:0.75rem;background:rgba(30,96,145,0.1);color:var(--info)">${esc(r.title)}</span>`).join(' ') + (roles.length > 3 ? ` +${roles.length - 3}` : '');
+        const roleBadges = roles.slice(0, 3).map(r => `<span class="wg-badge" style="font-size:0.75rem;background:rgba(30,96,145,0.1);color:var(--info)">${esc(r.title)}</span>`).join(' ') + (roles.length > 3 ? ` <span class="wg-badge" style="font-size:0.75rem" title="${esc(roles.slice(3).map(r => r.title).join(', '))}">+${roles.length - 3}</span>` : '');
         let actions = '';
         if (canManage && m.status === 'pending') {
           actions += `<button class="btn btn-outline btn-xs" onclick="approveMember(${m.user_id})" style="color:var(--success)">Approve</button> `;
@@ -1791,7 +1829,7 @@
           <td style="padding:0.5rem;font-weight:500">${esc(m.name)}</td>
           <td style="padding:0.5rem;color:var(--text-dim)">${esc(m.email || '')}</td>
           <td style="padding:0.5rem">${esc((m.class || 'Regular Member').replace(' Member', ''))}</td>
-          <td style="padding:0.5rem">${canManage ? standingBadge : (m.standing === 'restricted' ? '<span style="color:var(--danger)">Restricted</span>' : '<span style="color:var(--success)">Good</span>')}</td>
+          <td style="padding:0.5rem">${canManage ? standingBadge : (m.standing === 'restricted' ? '<span class="badge badge-inactive">Restricted</span>' : '<span class="badge badge-active">Good</span>')}</td>
           <td style="padding:0.5rem">${statusBadge}</td>
           <td style="padding:0.5rem">${roleBadges || '<span style="color:var(--text-dim)">—</span>'}</td>
           <td style="padding:0.5rem;color:var(--text-dim)">${m.joined_date || '—'}</td>
@@ -1851,12 +1889,12 @@
             const statusColor = d.status === 'paid' ? 'var(--success)' : d.status === 'overdue' ? 'var(--danger)' : 'var(--gold)';
             return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0;font-size:0.85rem;border-bottom:1px solid var(--border)">
               <div>
-                <span class="text-dim">${esc(d.class_title || '')}</span> · ${esc(d.period_year || '')} · UGX ${Number(d.amount_owed).toLocaleString()}
-                ${d.amount_paid > 0 ? ' <span class="text-dim">(paid: UGX ' + Number(d.amount_paid).toLocaleString() + ')</span>' : ''}
+                <span class="text-dim">${esc(d.class_title || '')}</span> · ${esc(d.period_year || '')} · UGX ${Number(d.amount_owed).toLocaleString('en-UG')}
+                ${d.amount_paid > 0 ? ' <span class="text-dim">(paid: UGX ' + Number(d.amount_paid).toLocaleString('en-UG') + ')</span>' : ''}
               </div>
               <div style="display:flex;align-items:center;gap:0.4rem">
                 <span style="color:${statusColor};font-weight:500;font-size:0.8rem;text-transform:uppercase">${esc(d.status)}</span>
-                ${d.status !== 'paid' && api.hasCap('members.manage') ? '<button class="btn btn-outline btn-xs" onclick="markDuesPaid(' + d.member_id + ',' + d.id + ',' + d.amount_owed + ')">Pay</button>' : ''}
+                ${d.status !== 'paid' && api.hasCap('members.manage') ? '<button class="btn btn-outline btn-xs" onclick="markDuesPaid(' + d.member_id + ',' + d.id + ',' + d.amount_owed + ',' + (d.amount_paid || 0) + ')">Mark Paid</button>' : ''}
               </div>
             </div>`;
           }).join('');
@@ -1865,14 +1903,14 @@
         let statementHtml = '';
         if (statement.records && statement.records.length) {
           const balColor = statement.balance > 0 ? 'var(--success)' : statement.balance < 0 ? 'var(--danger)' : 'var(--text)';
-          statementHtml = '<div style="margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem"><strong style="font-size:0.85rem">Account Statement</strong><span style="font-size:0.85rem">Balance: <strong style="color:' + balColor + '">UGX ' + Number(statement.balance).toLocaleString() + '</strong></span></div>';
+          statementHtml = '<div style="margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem"><strong style="font-size:0.85rem">Account Statement</strong><span style="font-size:0.85rem">Balance: <strong style="color:' + balColor + '">UGX ' + Number(statement.balance).toLocaleString('en-UG') + '</strong></span></div>';
           statementHtml += '<div style="max-height:200px;overflow-y:auto">';
           const typeColors = { income: 'var(--success)', expense: 'var(--danger)', receivable: 'var(--gold)', payable: 'var(--info)' };
           statementHtml += statement.records.map(r => {
             const color = typeColors[r.type] || 'var(--text)';
             const prefix = r.type === 'income' || r.type === 'receivable' ? '+' : '-';
             const label = { income: 'Income', expense: 'Expense', receivable: 'Expected', payable: 'Owed' }[r.type] || (r.type.charAt(0).toUpperCase() + r.type.slice(1));
-            return '<div style="display:flex;justify-content:space-between;padding:0.35rem 0;border-bottom:1px solid var(--border);font-size:0.82rem"><div><span style="color:' + color + ';font-size:0.75rem;font-weight:500;text-transform:uppercase">' + label + '</span> ' + esc(r.description || r.category) + '</div><div style="display:flex;gap:0.5rem;align-items:center"><span class="text-dim">' + (r.record_date || '') + '</span><span style="color:' + color + ';font-weight:500">' + prefix + 'UGX ' + Number(r.amount).toLocaleString() + '</span><span class="text-dim">= UGX ' + Number(r.running_balance).toLocaleString() + '</span></div></div>';
+            return '<div style="display:flex;justify-content:space-between;padding:0.35rem 0;border-bottom:1px solid var(--border);font-size:0.82rem"><div><span style="color:' + color + ';font-size:0.75rem;font-weight:500;text-transform:uppercase">' + label + '</span> ' + esc(r.description || r.category) + '</div><div style="display:flex;gap:0.5rem;align-items:center"><span class="text-dim">' + (r.record_date || '') + '</span><span style="color:' + color + ';font-weight:500">' + prefix + 'UGX ' + Number(r.amount).toLocaleString('en-UG') + '</span><span class="text-dim">= UGX ' + Number(r.running_balance).toLocaleString('en-UG') + '</span></div></div>';
           }).join('');
           statementHtml += '</div></div>';
         }
@@ -1931,6 +1969,8 @@
     }
 
     function exportMembersCSV() {
+      const total = allMembersData.length;
+      if (!confirm(`Export all ${total} members to CSV? Note: table filters are not applied to the export.`)) return;
       window.location.href = api.base + '/export/members.csv';
     }
 
@@ -1961,13 +2001,14 @@
             html += '<div style="padding:0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);position:relative">';
             if (canEdit) html += '<button class="btn btn-outline btn-xs" style="position:absolute;top:0.5rem;right:0.5rem" onclick="showSetDuesRateForm(' + s.role_id + ',' + s.amount + ',' + s.period_year + ',\'' + esc(s.description || '').replace(/'/g, "\\'") + '\')">Edit</button>';
             html += '<div style="font-weight:500;margin-bottom:0.25rem">' + esc(s.class_title) + '</div>';
-            html += '<div style="font-size:1.2rem;font-weight:600;color:var(--success)">UGX ' + Number(s.amount).toLocaleString() + '</div>';
+            html += '<div style="font-size:1.2rem;font-weight:600;color:var(--success)">UGX ' + Number(s.amount).toLocaleString('en-UG') + '</div>';
             if (s.description) html += '<div class="text-dim" style="font-size:0.8rem;margin-top:0.25rem">' + esc(s.description) + '</div>';
             html += '</div>';
           });
           html += '</div>';
         }
         html += '</div>';
+        if (activeMembers.length > 50) html += `<p class="text-dim text-sm" style="margin:0 0 0.75rem">Showing dues for the first 50 of ${activeMembers.length} active members — open a member's Detail for the rest.</p>`;
         // === DUES RECORDS SECTION ===
         const allDues = [];
         for (const m of activeMembers.slice(0, 50)) {
@@ -1994,7 +2035,7 @@
             html += '<div style="margin-bottom:1rem"><h4 style="font-size:0.9rem;margin-bottom:0.5rem;color:var(--info)">' + esc(cls) + '</h4>';
             html += records.map(d => {
               const statusColor = d.status === 'paid' ? 'var(--success)' : d.status === 'overdue' ? 'var(--danger)' : 'var(--gold)';
-              return '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0;border-bottom:1px solid var(--border);font-size:0.88rem"><div><span style="font-weight:500">' + esc(d.user_name || '') + '</span><span class="text-dim" style="margin-left:0.4rem">' + esc(d.period_year || '') + '</span></div><div style="display:flex;align-items:center;gap:0.5rem"><span>UGX ' + Number(d.amount_owed).toLocaleString() + '</span><span style="color:' + statusColor + ';font-weight:500;font-size:0.82rem;text-transform:uppercase">' + esc(d.status) + '</span>' + (d.status !== 'paid' && api.hasCap('members.manage') ? '<button class="btn btn-outline btn-xs" onclick="markDuesPaid(' + d.member_id + ',' + d.id + ',' + d.amount_owed + ')">Mark Paid</button>' : '') + '</div></div>';
+              return '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0;border-bottom:1px solid var(--border);font-size:0.88rem"><div><span style="font-weight:500">' + esc(d.user_name || '') + '</span><span class="text-dim" style="margin-left:0.4rem">' + esc(d.period_year || '') + '</span></div><div style="display:flex;align-items:center;gap:0.5rem"><span>UGX ' + Number(d.amount_owed).toLocaleString('en-UG') + '</span><span style="color:' + statusColor + ';font-weight:500;font-size:0.82rem;text-transform:uppercase">' + esc(d.status) + '</span>' + (d.status !== 'paid' && api.hasCap('members.manage') ? '<button class="btn btn-outline btn-xs" onclick="markDuesPaid(' + d.member_id + ',' + d.id + ',' + d.amount_owed + ',' + (d.amount_paid || 0) + ')">Mark Paid</button>' : '') + '</div></div>';
             }).join('');
             html += '</div>';
           }
@@ -2069,10 +2110,13 @@
       } catch(e) { toast(e.error || 'Failed', 'error'); }
     }
 
-    async function markDuesPaid(memberId, duesId, amount) {
-      if (!confirm('Mark this dues record as paid (UGX ' + Number(amount).toLocaleString() + ')?')) return;
+    async function markDuesPaid(memberId, duesId, amount, paid) {
+      const owed = Number(amount) || 0;
+      const alreadyPaid = Number(paid) || 0;
+      const remaining = Math.max(0, owed - alreadyPaid);
+      if (!confirm(`Record UGX ${remaining.toLocaleString('en-UG')} as paid${alreadyPaid ? ` (balance of UGX ${owed.toLocaleString('en-UG')})` : ''}?`)) return;
       try {
-        await api.payDues(memberId, duesId, { amount: amount });
+        await api.payDues(memberId, duesId, { amount: remaining });
         toast('Dues marked as paid', 'success');
         loadDuesSchedule();
       } catch(e) { toast(e.error || 'Failed', 'error'); }
@@ -2283,11 +2327,12 @@
       const out = document.getElementById('outgoingDelegations');
       const inc = document.getElementById('incomingDelegations');
       const scopeLabel = s => s === 'all' ? 'All votes' : s === 'polls' ? 'Polls' : 'Resolutions';
+    const scopeHelp = s => s === 'all' ? 'Can vote for you on resolutions + polls' : s === 'polls' ? 'Can vote for you on polls' : 'Can vote for you on resolutions';
       if ((delegationsData.outgoing || []).length) {
-        out.innerHTML = '<table style="width:100%"><thead><tr><th>To</th><th>Scope</th><th>Since</th><th></th></tr></thead><tbody>' + delegationsData.outgoing.map(x => `
+        out.innerHTML = '<table class="fin-table" style="width:100%"><thead><tr><th>To</th><th>Scope</th><th>Since</th><th></th></tr></thead><tbody>' + delegationsData.outgoing.map(x => `
           <tr>
             <td>${esc(x.delegatee_name)}</td>
-            <td>${scopeLabel(x.scope)}</td>
+            <td title="${esc(scopeHelp(x.scope))}">${scopeLabel(x.scope)}</td>
             <td>${new Date(x.created_at).toLocaleDateString('en',{year:'numeric',month:'short',day:'numeric'})}</td>
             <td><button class="btn btn-outline btn-xs" onclick="revokeDelegation(${x.id})">Revoke</button></td>
           </tr>`).join('') + '</tbody></table>';
@@ -2295,10 +2340,10 @@
         out.innerHTML = '<div class="empty-state" style="padding:2rem 0"><p>You have no active delegations.</p></div>';
       }
       if ((delegationsData.incoming || []).length) {
-        inc.innerHTML = '<table style="width:100%"><thead><tr><th>From</th><th>Scope</th><th>Since</th></tr></thead><tbody>' + delegationsData.incoming.map(x => `
+        inc.innerHTML = '<table class="fin-table" style="width:100%"><thead><tr><th>From</th><th>Scope</th><th>Since</th></tr></thead><tbody>' + delegationsData.incoming.map(x => `
           <tr>
             <td>${esc(x.delegator_name)}</td>
-            <td>${scopeLabel(x.scope)}</td>
+            <td title="${esc(scopeHelp(x.scope))}">${scopeLabel(x.scope)}</td>
             <td>${new Date(x.created_at).toLocaleDateString('en',{year:'numeric',month:'short',day:'numeric'})}</td>
           </tr>`).join('') + '</tbody></table>';
       } else {
@@ -2309,21 +2354,24 @@
     function showDelegationForm() {
       const meId = api.currentUser().id;
       const opts = usersData.filter(u => u.id !== meId && u.status === 'active')
-        .map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('');
+        .map(u => `<option value="${u.id}">${esc(u.name)} — ${esc(u.email || 'no email')}</option>`).join('');
       openModal('New Delegation', `
         <div style="display:flex;flex-direction:column;gap:0.75rem">
-          <label>Delegate to<select id="dgDelegatee" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)">${opts}</select></label>
+          ${opts ? `<label>Delegate to<select id="dgDelegatee" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)">${opts}</select></label>` : '<p class="text-dim">No other active members available to delegate to.</p>'}
           <label>Scope<select id="dgScope" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)">
             <option value="all">All votes (resolutions + polls)</option>
             <option value="resolutions">Resolutions only</option>
             <option value="polls">Polls only</option>
           </select></label>
-          <button class="btn btn-primary" onclick="submitDelegation()">Delegate</button>
+          <p class="text-dim text-sm" style="margin:0">Your delegate can vote on your behalf in the chosen scope until you revoke this.</p>
+          ${opts ? '<button class="btn btn-primary" onclick="submitDelegation()">Delegate</button>' : ''}
         </div>`);
     }
 
     async function submitDelegation() {
-      const delegateeId = parseInt(document.getElementById('dgDelegatee').value, 10);
+      const sel = document.getElementById('dgDelegatee');
+      if (!sel || !sel.value) return toast('No one available to delegate to', 'warning');
+      const delegateeId = parseInt(sel.value, 10);
       const scope = document.getElementById('dgScope').value;
       try {
         await api.request('/delegations', { method: 'POST', body: { delegatee_id: delegateeId, scope } });
@@ -2421,10 +2469,10 @@
           { label: 'Specific group', value: 'group' },
           { label: 'Specific role', value: 'role' },
         ]},
-        { name: 'eligibility_target_group', label: 'Group', type: 'select', options: [{ label: 'Select group', value: '' }].concat(groups.map(g => ({ label: g.name, value: g.name }))) },
-        { name: 'eligibility_target_role', label: 'Role', type: 'select', options: [{ label: 'Select role', value: '' }].concat(memberClassRoles.map(r => ({ label: r.title, value: r.title }))) },
-        { name: 'quorum', label: 'Quorum (required votes, 0 = none)', type: 'number', min: 0 },
-        { name: 'ends_at', label: 'Closes (optional)', type: 'datetime-local' },
+        { name: 'eligibility_target_group', label: 'Working group', type: 'select', options: [{ label: 'Select group', value: '' }].concat(groups.map(g => ({ label: g.name, value: g.name }))) },
+        { name: 'eligibility_target_role', label: 'Member class', type: 'select', options: [{ label: 'Select role', value: '' }].concat(memberClassRoles.map(r => ({ label: r.title, value: r.title }))) },
+        { name: 'quorum', label: 'Quorum (required votes, 0 = none)', type: 'number', min: 0, help: 'Votes needed for a result to count. Times are East Africa Time.' },
+        { name: 'ends_at', label: 'Closes (optional)', type: 'datetime-local', help: 'Leave empty to keep open until manually closed.' },
         { name: 'allow_anonymous', label: 'Anonymity', type: 'checkbox', checkLabel: 'Anonymous (hide who voted)' },
       ];
       openModal('New Poll', FormBuilder.render(fields, { id: formId, submitLabel: 'Create Poll' }));
@@ -2445,8 +2493,8 @@
         const v = (document.getElementById(formId + '-eligibility') || {}).value;
         const gw = form.querySelector('[data-field="eligibility_target_group"]');
         const rw = form.querySelector('[data-field="eligibility_target_role"]');
-        if (gw) gw.style.display = v === 'group' ? '' : 'none';
-        if (rw) rw.style.display = v === 'role' ? '' : 'none';
+        if (gw) { gw.style.display = v === 'group' ? '' : 'none'; if (v !== 'group') gw.querySelector('select').value = ''; }
+        if (rw) { rw.style.display = v === 'role' ? '' : 'none'; if (v !== 'role') rw.querySelector('select').value = ''; }
       };
       document.getElementById(formId + '-eligibility').addEventListener('change', toggleTargets);
       toggleTargets();
@@ -2503,6 +2551,8 @@
       const title = val('title').trim() || 'Untitled poll';
       const type = val('poll_type') || 'consultation';
       const elig = val('eligibility') || 'members';
+      const eligTarget = elig === 'group' ? val('eligibility_target_group') : elig === 'role' ? val('eligibility_target_role') : '';
+      const eligLabel = elig === 'members' ? 'Members' : elig === 'all' ? 'All users' : (eligTarget || elig);
       const quorum = parseInt(val('quorum')) || 0;
       const opts = [...document.querySelectorAll('#' + formId + '-options .poll-opt')].map(i => i.value.trim()).filter(Boolean);
       box.innerHTML = `
@@ -2512,7 +2562,7 @@
             <span class="wg-badge" style="background:rgba(124,58,237,0.1);color:#7c3aed">draft</span>
             <span class="wg-badge" style="background:rgba(30,96,145,0.1);color:var(--info);text-transform:capitalize">${esc(type)}</span>
           </div>
-          <div class="wg-meta" style="margin-top:0.35rem"><span>0 votes</span><span style="margin-left:0.5rem" class="text-dim text-sm">${esc(elig === 'members' ? 'Members' : elig === 'all' ? 'All users' : elig)}</span>${quorum ? `<span style="margin-left:0.5rem">quorum ${quorum}</span>` : ''}</div>
+          <div class="wg-meta" style="margin-top:0.35rem"><span>0 votes</span><span style="margin-left:0.5rem" class="text-dim text-sm">${esc(eligLabel)}</span>${quorum ? `<span style="margin-left:0.5rem">quorum ${quorum}</span>` : ''}</div>
           <div style="margin-top:0.6rem">${opts.length ? opts.map((o, i) => `
             <div style="margin-bottom:0.5rem">
               <div style="display:flex;justify-content:space-between;font-size:0.82rem"><span>${i + 1}. ${esc(o)}</span><span class="text-dim">0 (0%)</span></div>
@@ -2581,7 +2631,7 @@
       // Update counts
       const counts = {};
       pending.forEach(i => { counts[i.item_type] = (counts[i.item_type] || 0) + 1; });
-      document.getElementById('pendingCounts').textContent = pending.length + ' items';
+      document.getElementById('pendingCounts').textContent = pending.length + ' items · ' + pending.filter(i => pendingActions(i) !== '').length + ' need your action';
       const badge = document.getElementById('pendingTabCount');
       if (badge) { badge.textContent = pending.length || ''; badge.dataset.count = pending.length; }
     }
@@ -2609,7 +2659,10 @@
         <div class="cal-header">
           <button class="btn btn-outline btn-xs" onclick="changeCalMonth(-1)">&laquo;</button>
           <h4>${monthName} ${calYear}</h4>
-          <button class="btn btn-outline btn-xs" onclick="changeCalMonth(1)">&raquo;</button>
+          <div style="display:flex;gap:0.35rem">
+            <button class="btn btn-outline btn-xs" onclick="calToday()">Today</button>
+            <button class="btn btn-outline btn-xs" onclick="changeCalMonth(1)">&raquo;</button>
+          </div>
         </div>
         <div class="cal-grid">
           ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => `<div class="cal-day-header">${d}</div>`).join('')}
@@ -2648,7 +2701,7 @@
         <span class="cal-legend-item"><span class="cal-day-dot document"></span> Document</span>
         <span class="cal-legend-item"><span class="cal-day-dot resolution"></span> Resolution</span>
         <span class="cal-legend-item"><span class="cal-day-dot assignment"></span> Assignment</span>
-      </div>`;
+      </div><p class="text-dim text-sm" style="margin:0.4rem 0 0">Dots mark submission dates — hover a day for titles.</p>`;
 
       div.innerHTML = html;
     }
@@ -2657,6 +2710,13 @@
       calMonth += delta;
       if (calMonth > 11) { calMonth = 0; calYear++; }
       if (calMonth < 0) { calMonth = 11; calYear--; }
+      renderPendingCalendar();
+    }
+
+    function calToday() {
+      const n = new Date();
+      calYear = n.getFullYear();
+      calMonth = n.getMonth();
       renderPendingCalendar();
     }
 
@@ -2694,8 +2754,10 @@
     }
 
     function renderPendingItem(item) {
-      const age = item.created_at ? Math.floor((Date.now() - new Date(item.created_at)) / 86400000) : 0;
-      const overdue = age > 7;
+      const ageDays = item.created_at ? Math.floor((Date.now() - new Date(item.created_at)) / 86400000) : 0;
+      const overdue = ageDays > 7;
+      const ageLabel = ageDays <= 0 ? 'Today' : ageDays === 1 ? 'Yesterday' : ageDays + ' days ago';
+      const ageTitle = item.created_at ? `Submitted ${new Date(item.created_at).toLocaleDateString('en', { year: 'numeric', month: 'short', day: 'numeric' })}` : '';
       const actions = pendingActions(item);
       const itemType = item.item_type || 'article';
       const click = itemType === 'poll'
@@ -2707,9 +2769,9 @@
           <span class="pending-title">${esc(item.title || item.name)}</span>
           <span class="pending-meta">
             by ${esc(item.author_name || 'Unknown')}
-            <span class="pending-age ${overdue ? 'overdue' : ''}">${age}d</span>
+            <span class="pending-age ${overdue ? 'overdue' : ''}" title="${esc(ageTitle)}">${ageLabel}</span>
           </span>
-          ${actions ? `<span class="pending-actions" onclick="event.stopPropagation()">${actions}</span>` : ''}
+          ${actions ? `<span class="pending-actions" onclick="event.stopPropagation()">${actions}</span>` : '<span class="text-dim text-sm">FYI — no action for you</span>'}
         </div>
       `;
     }
@@ -2811,13 +2873,13 @@
               </div>
               ${r.description ? `<p class="text-dim" style="margin:0.5rem 0;font-size:0.88rem">${esc(r.description).slice(0, 200)}${r.description.length > 200 ? '...' : ''}</p>` : ''}
               ${r.status === 'voting' ? `
-                <div class="vote-bar">
+                <div class="vote-bar" style="flex-wrap:wrap">
                   <span class="counts">
                     <span style="color:var(--success)">&#10003; ${r.votes_for}</span>
                     <span style="color:var(--danger)">&#10007; ${r.votes_against}</span>
                     <span style="color:var(--text-faint)">— ${r.votes_abstain}</span>
                   </span>
-                  <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>
+                  <div class="bar" style="display:flex" title="${total} vote${total !== 1 ? 's' : ''} cast">${total > 0 ? `<div class="bar-fill" style="width:${Math.round(r.votes_for / total * 100)}%;background:var(--success);border-radius:3px 0 0 3px"></div><div class="bar-fill" style="width:${Math.round(r.votes_against / total * 100)}%;background:var(--danger);border-radius:0"></div><div class="bar-fill" style="flex:1;background:var(--text-faint);opacity:0.5;border-radius:0 3px 3px 0"></div>` : ''}</div>
                   ${canVote ? `
                     ${delegatedHint()}
                     <button class="btn btn-success btn-vote" onclick="vote(${r.id},'for')">For</button>
@@ -3058,7 +3120,7 @@
         title = 'Submit Article';
         fields = [
           { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Article title' },
-          { name: 'category', label: 'Category', type: 'select', required: true, options: [
+          { name: 'category', label: 'Category', type: 'select', required: true, placeholder: '— Choose type —', options: [
             { label: 'Article', value: 'article' },
             { label: 'Observing Report', value: 'observing_report' },
             { label: 'Educational', value: 'educational' },
@@ -3080,7 +3142,7 @@
           { name: 'date', label: 'Start Date & Time', type: 'datetime-local', required: true },
           { name: 'end_date', label: 'End Date & Time', type: 'datetime-local' },
           { name: 'location', label: 'Location', type: 'text', placeholder: 'e.g. Kampala, Uganda' },
-          { name: 'capacity', label: 'Capacity', type: 'number', min: 0, placeholder: 'Max attendees (0 = unlimited)' },
+          { name: 'capacity', label: 'Capacity', type: 'number', min: 0, placeholder: 'Leave blank for unlimited', help: 'Leave blank for open attendance' },
           { name: 'description', label: 'Description', type: 'rich-text', rows: 4, required: true },
           { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image' },
         ];
@@ -3135,7 +3197,10 @@
       }
       FormBuilder.init(formId, fields, async (data) => {
         if (type === 'article') await api.createArticle(data);
-        else if (type === 'event') await api.createEvent(data);
+        else if (type === 'event') {
+          if (data.end_date && data.date && data.end_date <= data.date) throw { error: 'End date must be after the start date' };
+          await api.createEvent(data);
+        }
         else if (type === 'programme') await api.createProgramme(data);
         else if (type === 'project') await api.createProject(data);
         div.innerHTML = `<div class="card" style="max-width:700px;text-align:center;padding:2rem">
@@ -3252,23 +3317,23 @@
         { label: 'Other', value: 'other' },
       ];
       const fields = [
-        { name: 'type', label: 'Type', type: 'select', required: true, value: editData?.type || '', options: [
+        { name: 'type', label: 'Type', type: 'select', required: true, value: editData?.type || '', help: 'Income = money in · Expense = money out · Commitment = earmarked, not yet spent · Payable = bill to pay · Receivable = income to receive', options: [
           { label: 'Income', value: 'income' },
           { label: 'Expense', value: 'expense' },
-          { label: 'Commitment', value: 'commitment' },
+          { label: 'Commitment (earmarked)', value: 'commitment' },
           { label: 'Payable (Bill to pay)', value: 'payable' },
           { label: 'Receivable (Expected income)', value: 'receivable' },
         ]},
-        { name: 'amount', label: 'Amount (UGX)', type: 'number', required: true, min: 0, value: editData?.amount || '' },
-        { name: 'category', label: 'Category', type: 'select', required: true, value: editData?.category || 'other', options: catOpts },
+        { name: 'amount', label: 'Amount (UGX)', type: 'number', required: true, min: 0, placeholder: 'e.g. 50000', value: editData?.amount || '' },
+        { name: 'category', label: 'Category', type: 'select', required: true, placeholder: '— Choose category —', value: editData?.category || '', options: catOpts },
         { name: 'description', label: 'Description', type: 'text', required: true, placeholder: 'Brief description', value: editData?.description || '' },
         { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts, value: editData?.programme_id || '' },
         { name: 'event_id', label: 'Event', type: 'select', options: evtOpts, value: editData?.event_id || '' },
         { name: 'project_id', label: 'Project', type: 'select', options: projOpts, value: editData?.project_id || '' },
         { name: 'budget_item_id', label: 'Budget Item', type: 'select', options: biOpts, value: editData?.budget_item_id || '' },
         { name: 'record_date', label: 'Date', type: 'date', value: editData?.record_date || new Date().toISOString().split('T')[0] },
-        { name: 'due_date', label: 'Due Date', type: 'date', help: 'For payables/receivables', value: editData?.due_date || '' },
-        { name: 'status', label: 'Status', type: 'select', value: editData?.status || 'approved', options: [
+        { name: 'due_date', label: 'Due Date', type: 'date', help: 'Only for payables and receivables', value: editData?.due_date || '' },
+        { name: 'status', label: 'Status', type: 'select', value: editData?.status || 'approved', help: 'Paid = cash moved · Approved = confirmed, awaiting payment', options: [
           { label: 'Approved', value: 'approved' },
           { label: 'Pending Approval', value: 'pending' },
           { label: 'Paid', value: 'paid' },
@@ -3280,14 +3345,18 @@
       // --- Receivable linking (custom element injected after FormBuilder renders) ---
       const receivableHtml = '<div id="receivableLinkWrap" style="display:none;margin-top:0.75rem;padding:0.75rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle)"><label class="form-label">Link to Outstanding Receivable</label><select id="form-finance-receivable_link" class="form-select" style="width:100%"><option value="">— None (manual entry) —</option></select><div id="receivableLinkInfo" class="text-dim" style="font-size:0.8rem;margin-top:0.4rem"></div></div>';
       const formEl = document.getElementById(formId);
-      if (formEl) formEl.insertAdjacentHTML('beforeend', receivableHtml);
+      if (formEl) {
+        const actionsEl = formEl.querySelector('.form-actions');
+        if (actionsEl) actionsEl.insertAdjacentHTML('beforebegin', receivableHtml);
+        else formEl.insertAdjacentHTML('beforeend', receivableHtml);
+      }
       // Load outstanding receivables
       let outstandingReceivables = [];
       api.getOutstandingReceivables().then(list => {
         outstandingReceivables = list || [];
         const sel = document.getElementById('form-finance-receivable_link');
         if (!sel || !outstandingReceivables.length) return;
-        sel.innerHTML = '<option value="">— None (manual entry) —</option>' + outstandingReceivables.map(r => '<option value="' + r.finance_record_id + '">' + esc(r.member_name) + ' — ' + esc(r.class_title || 'Dues') + ' ' + esc(r.period_year || '') + ' (UGX ' + Number(r.amount).toLocaleString() + ')</option>').join('');
+        sel.innerHTML = '<option value="">— None (manual entry) —</option>' + outstandingReceivables.map(r => '<option value="' + r.finance_record_id + '">' + esc(r.member_name) + ' — ' + esc(r.class_title || 'Dues') + ' ' + esc(r.period_year || '') + ' (UGX ' + Number(r.amount).toLocaleString('en-UG') + ')</option>').join('');
       }).catch(() => {});
       // Show/hide receivable link based on type
       const typeSel = document.getElementById(formId + '-type');
@@ -3297,6 +3366,13 @@
       }
       if (typeSel) typeSel.addEventListener('change', toggleReceivableLink);
       toggleReceivableLink();
+      // Due date only applies to payables/receivables
+      const dueWrap = formEl ? formEl.querySelector('[data-field="due_date"]') : null;
+      function toggleDueDate() {
+        if (dueWrap) dueWrap.style.display = (typeSel && (typeSel.value === 'payable' || typeSel.value === 'receivable')) ? '' : 'none';
+      }
+      if (typeSel) typeSel.addEventListener('change', toggleDueDate);
+      toggleDueDate();
       // Auto-fill when receivable selected
       const rcvSel = document.getElementById('form-finance-receivable_link');
       if (rcvSel) rcvSel.addEventListener('change', () => {
@@ -3312,7 +3388,7 @@
         if (amtEl) amtEl.value = r.amount;
         if (descEl) descEl.value = r.member_name + ' — ' + (r.class_title || 'Dues') + ' ' + (r.period_year || '') + ' payment';
         if (catEl) catEl.value = 'membership';
-        if (info) info.textContent = 'Will mark dues as paid for ' + esc(r.member_name) + ' (UGX ' + Number(r.amount).toLocaleString() + ')';
+        if (info) info.textContent = 'Will mark dues as paid for ' + esc(r.member_name) + ' (UGX ' + Number(r.amount).toLocaleString('en-UG') + ')';
       });
       // --- End receivable linking ---
       const progSel = document.getElementById(formId + '-programme_id');
@@ -3360,7 +3436,7 @@
         const records = await api.getFinance();
         const list = Array.isArray(records) ? records : (records.recent || []);
         const found = list.find(x => x.id === id);
-        if (found) label = `"${found.description || found.category}" (UGX ${Number(found.amount).toLocaleString()})`;
+        if (found) label = `"${found.description || found.category}" (UGX ${Number(found.amount).toLocaleString('en-UG')})`;
       } catch(e) {}
       if (!confirm(`Delete ${label} permanently? This cannot be undone.`)) return;
       try {
@@ -3500,7 +3576,7 @@
           return;
         }
         div.innerHTML = items.map(n => `
-          <div class="inbox-item ${n.is_read ? '' : 'unread'}" onclick="readDashNotif(${n.id}, '${esc(n.link || '')}')" style="cursor:pointer">
+          <div class="inbox-item ${n.is_read ? '' : 'unread'}" data-id="${n.id}" onclick="readDashNotif(${n.id}, '${esc(n.link || '')}')" style="cursor:pointer">
             <div style="font-weight:${n.is_read ? '400' : '600'};font-size:0.9rem;margin-bottom:0.2rem">${esc(n.title)}</div>
             ${n.body ? `<div class="text-dim text-sm">${esc(n.body).slice(0, 120)}${n.body.length > 120 ? '...' : ''}</div>` : ''}
             <div class="text-faint text-sm" style="margin-top:0.3rem">${fmtTimeAgo(new Date(n.created_at.replace(' ', 'T')))}</div>
@@ -3509,9 +3585,11 @@
       } catch(e) { div.innerHTML = '<div class="empty-state"><p>Failed to load notifications</p></div>'; }
     }
 
-    function readDashNotif(id, link) {
-      api.request('/notifications/' + id + '/read', { method: 'POST' }).catch(() => {});
-      const el = document.querySelector(`.inbox-item[onclick*="${id}"]`);
+    async function readDashNotif(id, link) {
+      try {
+        await api.request('/notifications/' + id + '/read', { method: 'POST' });
+      } catch(e) { toast('Could not mark notification as read', 'error'); return; }
+      const el = document.querySelector(`.inbox-item[data-id="${id}"]`);
       if (el) el.classList.remove('unread');
       const badge = document.getElementById('inboxTabCount');
       if (badge && parseInt(badge.textContent) > 0) {
@@ -3522,8 +3600,10 @@
       if (link) location.href = ua(link);
     }
 
-    function markAllDashNotifsRead() {
-      api.request('/notifications/read-all', { method: 'POST' }).catch(() => {});
+    async function markAllDashNotifsRead() {
+      try {
+        await api.request('/notifications/read-all', { method: 'POST' });
+      } catch(e) { toast('Could not mark notifications as read', 'error'); return; }
       document.querySelectorAll('#dashInbox .inbox-item.unread').forEach(el => el.classList.remove('unread'));
       const badge = document.getElementById('inboxTabCount');
       if (badge) { badge.textContent = ''; badge.style.display = 'none'; }
@@ -3561,7 +3641,7 @@
           <div style="margin-bottom:1.5rem">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
               <h4 style="font-size:1rem;margin:0">${esc(parent)}</h4>
-              <span class="text-sm text-dim">Total: UGX ${totalBudget.toLocaleString()}</span>
+              <span class="text-sm text-dim">Total: UGX ${totalBudget.toLocaleString('en-UG')}</span>
             </div>
             ${data.items.map(b => {
               const pct = b.amount > 0 ? Math.round(((b.type === 'income' ? b.spent_income : b.spent_expense) / b.amount) * 100) : 0;
@@ -3579,8 +3659,8 @@
                       </div>
                     </div>
                     <div style="text-align:right">
-                      <div style="font-weight:600;font-size:0.9rem">UGX ${Number(b.amount).toLocaleString()}</div>
-                      <div class="text-sm text-dim">${b.type === 'income' ? 'collected' : 'spent'}: UGX ${Number(spent).toLocaleString()}${over ? ' — over budget!' : ''}</div>
+                      <div style="font-weight:600;font-size:0.9rem">UGX ${Number(b.amount).toLocaleString('en-UG')}</div>
+                      <div class="text-sm text-dim">${b.type === 'income' ? 'collected' : 'spent'}: UGX ${Number(spent).toLocaleString('en-UG')}${over ? ' — over budget!' : ''}</div>
                       ${canEdit ? '<div style="margin-top:0.3rem"><button class="btn btn-outline btn-xs" onclick="event.stopPropagation();editBudgetItem(' + b.id + ')">Edit</button> <button class="btn btn-outline btn-xs" onclick="event.stopPropagation();deleteBudgetItem(' + b.id + ')" style="color:var(--danger)">Delete</button></div>' : ''}
                     </div>
                   </div>
@@ -3641,7 +3721,7 @@
               <option value="income" ${editData?.type === 'income' ? 'selected' : ''}>Income</option>
             </select>
           </div>
-          <div class="form-group"><label class="form-label">Amount (UGX) *</label><input type="number" class="form-input" id="biAmount" value="${editData?.amount || ''}"></div>
+          <div class="form-group"><label class="form-label">Amount (UGX) *</label><input type="number" min="0" placeholder="e.g. 500000" class="form-input" id="biAmount" value="${editData?.amount || ''}"></div>
           <div class="form-group"><label class="form-label">Category</label>
             <select class="form-select" id="biCat">
               <option value="donation" ${editData?.category === 'donation' ? 'selected' : ''}>Donation</option>
@@ -3667,8 +3747,8 @@
               <option value="closed" ${editData?.status === 'closed' ? 'selected' : ''}>Closed</option>
             </select>
           </div>
-          <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="biDesc" value="${esc(editData?.description || '')}"></div>
-          <div class="form-group"><label class="form-label">Fiscal Year</label><input type="number" class="form-input" id="biYear" value="${editData?.fiscal_year || new Date().getFullYear()}"></div>
+          <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="biDesc" rows="2" placeholder="What is this line item for?">${esc(editData?.description || '')}</textarea></div>
+          <div class="form-group"><label class="form-label">Fiscal Year</label><input type="number" min="2000" max="2100" class="form-input" id="biYear" value="${editData?.fiscal_year || new Date().getFullYear()}"></div>
           <button class="btn btn-primary" onclick="submitBudgetItem(${editData?.id || 'null'})">${isEdit ? 'Save' : 'Add Line Item'}</button>
         </div>
       `);
@@ -3698,14 +3778,16 @@
       const amount = parseFloat(document.getElementById('biAmount').value);
       if (!title) return toast('Title is required', 'warning');
       if (!amount || amount <= 0) return toast('Amount must be a positive number', 'warning');
+      const year = parseInt(document.getElementById('biYear').value) || new Date().getFullYear();
+      if (year < 2000 || year > 2100) return toast('Fiscal year must be between 2000 and 2100', 'warning');
       const [parentType, parentId] = parentVal.split(':');
       const data = {
         title,
         type: document.getElementById('biType').value,
         amount,
         category: document.getElementById('biCat').value,
-        description: document.getElementById('biDesc').value,
-        fiscal_year: document.getElementById('biYear').value,
+        description: document.getElementById('biDesc').value.trim(),
+        fiscal_year: year,
         status: document.getElementById('biStatus').value,
         programme_id: parentType === 'programme' ? parseInt(parentId) : null,
         event_id: parentType === 'event' ? parseInt(parentId) : null,
@@ -3734,7 +3816,7 @@
       let label = 'this budget item';
       try {
         const b = await api.getBudgetItem(id);
-        if (b) label = `"${b.title}" (UGX ${Number(b.amount).toLocaleString()})`;
+        if (b) label = `"${b.title}" (UGX ${Number(b.amount).toLocaleString('en-UG')})`;
       } catch(e) {}
       if (!confirm(`Delete ${label} permanently? This cannot be undone.`)) return;
       try {
@@ -3748,16 +3830,15 @@
       const userOpts = '';
       openModal('Create Working Group / Committee', `
         <div class="create-form" style="max-width:100%">
-          <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="wgName"></div>
+          <div class="form-group"><label class="form-label">Name *</label><input class="form-input" id="wgName" placeholder="e.g. Outreach Committee"></div>
           <div class="form-group"><label class="form-label">Type</label>
             <select class="form-select" id="wgType">
               <option value="working_group">Working Group</option>
               <option value="committee">Committee</option>
               <option value="task_force">Task Force</option>
               <option value="sub_committee">Sub-Committee</option>
-            </select>
-          </div>
-          <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="wgDesc" rows="3"></textarea></div>
+            </select></div>
+          <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="wgDesc" rows="3" placeholder="What will this group do?"></textarea></div>
           <div class="form-group"><label class="form-label">Term Start</label><input type="date" class="form-input" id="wgStart"></div>
           <div class="form-group"><label class="form-label">Term End</label><input type="date" class="form-input" id="wgEnd"></div>
           <button class="btn btn-primary" onclick="submitWorkingGroup()">Create</button>
@@ -3766,11 +3847,13 @@
     }
 
     async function submitWorkingGroup() {
+      const name = document.getElementById('wgName').value.trim();
+      if (!name) return toast('Group name is required', 'warning');
       try {
         await api.createWorkingGroup({
-          name: document.getElementById('wgName').value,
+          name,
           type: document.getElementById('wgType').value,
-          description: document.getElementById('wgDesc').value,
+          description: document.getElementById('wgDesc').value.trim() || null,
           term_start: document.getElementById('wgStart').value || null,
           term_end: document.getElementById('wgEnd').value || null,
         });
@@ -3864,10 +3947,10 @@
             <div class="field"><div class="field-label">Created</div>${new Date(data.created_at).toLocaleDateString('en', {year:'numeric',month:'long',day:'numeric'})}</div>
             ${data.published_at ? `<div class="field"><div class="field-label">Published</div>${new Date(data.published_at).toLocaleDateString('en', {year:'numeric',month:'long',day:'numeric'})}</div>` : ''}
             ${data.image_url ? `<div class="field"><div class="field-label">Cover</div><img src="${esc(publicCover(data.image_url, ''))}" alt="" style="max-width:100%;border-radius:var(--radius);border:1px solid var(--border)"></div>` : ''}
-            ${data.tags ? `<div class="field"><div class="field-label">Tags</div>${JSON.parse(data.tags).map(t => `<span class="cap-tag">${esc(t)}</span>`).join(' ')}</div>` : ''}
+            ${(() => { let tags = []; try { tags = Array.isArray(data.tags) ? data.tags : JSON.parse(data.tags || '[]'); } catch(e) { tags = []; } if (!Array.isArray(tags)) tags = []; return tags.length ? `<div class="field"><div class="field-label">Tags</div>${tags.map(t => `<span class="cap-tag">${esc(t)}</span>`).join(' ')}</div>` : ''; })()}
             ${data.body ? `<div class="field"><div class="field-label">Body</div><div style="max-height:300px;overflow-y:auto;padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border);line-height:1.6">${data.body}</div></div>` : ''}
             ${data.rejection_reason ? `<div class="field"><div class="field-label">Rejection Reason</div><div style="color:var(--danger);padding:0.5rem;background:rgba(185,28,28,0.05);border-radius:var(--radius)">${esc(data.rejection_reason)}</div></div>` : ''}`}
-            ${actions.length ? `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);display:flex;gap:0.5rem">${actions.join('')}</div>` : ''}
+            ${actions.length ? `<div class="modal-actions">${actions.join('')}</div>` : ''}
           `;
 
         } else if (type === 'event') {
@@ -3896,15 +3979,15 @@
               </div>
             </div>` : `
             <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
-            <div class="field"><div class="field-label">Date</div>${new Date(data.date).toLocaleDateString('en', {weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
-            ${data.end_date ? `<div class="field"><div class="field-label">End</div>${new Date(data.end_date).toLocaleDateString('en', {hour:'2-digit',minute:'2-digit'})}</div>` : ''}
+            <div class="field"><div class="field-label">Date</div>${data.date ? new Date(String(data.date).replace(' ', 'T')).toLocaleDateString('en', {weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Date TBC'}</div>
+            ${data.end_date ? `<div class="field"><div class="field-label">End</div>${new Date(String(data.end_date).replace(' ', 'T')).toLocaleDateString('en', {weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>` : ''}
             <div class="field"><div class="field-label">Location</div>${esc(data.location || 'TBA')}</div>
             <div class="field"><div class="field-label">Organizer</div>${esc(data.organizer_name || 'Unknown')}</div>
             <div class="field"><div class="field-label">Capacity</div>${data.capacity ? data.capacity + ' attendees' : 'Unlimited'}</div>
             ${data.image_url ? `<div class="field"><div class="field-label">Cover</div><img src="${esc(publicCover(data.image_url, ''))}" alt="" style="max-width:100%;border-radius:var(--radius);border:1px solid var(--border)"></div>` : ''}
             ${data.description ? `<div class="field"><div class="field-label">Description</div><div style="max-height:200px;overflow-y:auto;padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${data.description}</div></div>` : ''}
             ${rsvps.length ? `<div class="field"><div class="field-label">RSVPs (${rsvps.length})</div><div style="max-height:120px;overflow-y:auto">${rsvps.map(r => `<div style="padding:0.25rem 0;font-size:0.85rem">• ${esc(r.user_name)} <span class="text-dim">${esc(r.status)}</span></div>`).join('')}</div></div>` : ''}`}
-            ${actions.length ? `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);display:flex;gap:0.5rem">${actions.join('')}</div>` : ''}
+            ${actions.length ? `<div class="modal-actions">${actions.join('')}</div>` : ''}
           `;
 
         } else if (type === 'document') {
@@ -3921,8 +4004,8 @@
             <div class="field"><div class="field-label">Owner</div>${esc(data.owner_name || 'Unknown')}</div>
             <div class="field"><div class="field-label">Visibility</div><span class="cap-tag">${esc(data.visibility)}</span></div>
             <div class="field"><div class="field-label">Version</div>${data.version || 1}</div>
-            <div class="field"><div class="field-label">File</div><a href="${esc(data.file_path)}" target="_blank" style="color:var(--accent)">${esc(data.file_path)}</a></div>
-            ${actions.length ? `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);display:flex;gap:0.5rem">${actions.join('')}</div>` : ''}
+            <div class="field"><div class="field-label">File</div><a href="${esc(data.file_path)}" target="_blank" rel="noopener" style="color:var(--accent)">Download file</a> <span class="text-dim text-sm">${esc(data.file_path.split('/').pop())}</span></div>
+            ${actions.length ? `<div class="modal-actions">${actions.join('')}</div>` : ''}
           `;
 
         } else if (type === 'resolution') {
@@ -3956,7 +4039,7 @@
               ${total > 0 ? `<div class="budget-bar" style="margin-top:0.35rem"><div class="budget-bar-fill income" style="width:${pct}%"></div></div>` : ''}
             </div>
             ${data.description ? `<div class="field"><div class="field-label">Description</div><div style="max-height:200px;overflow-y:auto;padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${data.description}</div></div>` : ''}
-            ${actions.length ? `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);display:flex;gap:0.5rem">${actions.join('')}</div>` : ''}
+            ${actions.length ? `<div class="modal-actions">${actions.join('')}</div>` : ''}
             <div class="comment-thread" style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border)">
               <button class="btn btn-outline btn-sm" onclick="closeModal();openResolutionChat(${id})">Open discussion (${comments.length})</button>
             </div>
@@ -3978,7 +4061,7 @@
             <div class="field"><div class="field-label">Priority</div><span class="cap-tag" style="${data.priority === 'urgent' ? 'background:rgba(185,28,28,0.1);color:var(--danger)' : data.priority === 'high' ? 'background:rgba(184,134,11,0.1);color:var(--gold)' : ''}">${esc(data.priority)}</span></div>
             ${data.description ? `<div class="field"><div class="field-label">Description</div><div style="padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${esc(data.description)}</div></div>` : ''}
             ${data.completion_evidence ? `<div class="field"><div class="field-label">Completion Evidence</div><div style="padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${esc(data.completion_evidence)}</div></div>` : ''}
-            ${actions.length ? `<div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);display:flex;gap:0.5rem">${actions.join('')}</div>` : ''}
+            ${actions.length ? `<div class="modal-actions">${actions.join('')}</div>` : ''}
           `;
 
         } else if (type === 'budget_item') {
@@ -3987,7 +4070,7 @@
           html = `
             <div class="field"><div class="field-label">Parent</div>${esc(linked)}</div>
             <div class="field"><div class="field-label">Type</div><span class="cap-tag" style="${data.type === 'income' ? 'background:rgba(45,106,79,0.1);color:var(--success)' : 'background:rgba(185,28,28,0.1);color:var(--danger)'}">${esc(data.type)}</span></div>
-            <div class="field"><div class="field-label">Amount</div><span style="font-weight:600;font-size:1.1rem">UGX ${Number(data.amount).toLocaleString()}</span></div>
+            <div class="field"><div class="field-label">Amount</div><span style="font-weight:600;font-size:1.1rem">UGX ${Number(data.amount).toLocaleString('en-UG')}</span></div>
             <div class="field"><div class="field-label">Category</div>${esc(data.category)}</div>
             <div class="field"><div class="field-label">Fiscal Year</div>${data.fiscal_year}</div>
             <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
@@ -4056,7 +4139,7 @@
 
     async function modalRejectArticle(id) {
       const reason = prompt('Rejection reason (shown to the author):');
-      if (reason === null || !reason.trim()) return;
+      if (reason === null || !reason.trim()) { if (reason !== null) toast('A reason is required', 'warning'); return; }
       try {
         await api.request('/articles/' + id + '/reject', { method: 'POST', body: { reason: reason.trim() } });
         closeModal(); toast('Article rejected', 'success');
