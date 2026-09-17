@@ -455,12 +455,13 @@ try {
   elseif ($path === '/profile' && $method === 'PUT') {
     $user = require_login();
     $data = input_json();
-    $allowed = ['name', 'phone', 'institution', 'location', 'bio', 'avatar_url'];
+    $allowed = ['name', 'phone', 'institution', 'location', 'bio'];
     $sets = [];
     $args = [];
     foreach ($allowed as $f) {
       if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = $data[$f]; }
     }
+    if (array_key_exists('avatar_url', $data)) { $sets[] = 'avatar_url = ?'; $args[] = clean_image_url($data['avatar_url']); }
     if ($sets) {
       $args[] = $user['id'];
       db()->prepare('UPDATE users SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($args);
@@ -1240,7 +1241,7 @@ try {
     require_login();
     $resId = (int) $m[1];
     $stmt = db()->prepare('
-      SELECT c.*, u.name AS user_name
+      SELECT c.*, u.name AS user_name, u.avatar_url
       FROM resolution_comments c
       JOIN users u ON u.id = c.user_id
       WHERE c.resolution_id = ?
@@ -1749,12 +1750,13 @@ try {
       json_error('Failed to save file', 500);
     }
 
-    // Images are normalized in place: max 1600px wide, web-friendly encoding.
+    // Images are normalized in place: max 1600px wide (256px for avatars).
     $width = null;
     $height = null;
     $compressed = false;
     if (strpos($mimeType, 'image/') === 0) {
-      $r = compress_uploaded_image($filepath, $mimeType);
+      $isAvatar = !empty($_POST['avatar']) || (isset($_GET['avatar']) && $_GET['avatar'] === '1');
+      $r = compress_uploaded_image($filepath, $mimeType, $isAvatar ? 256 : 1600);
       if ($r) {
         [$width, $height, $compressed] = $r;
       } else {
@@ -2028,8 +2030,8 @@ try {
       $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
       // Fetch members (emails only for logged-in users — this endpoint is public)
       $memberCols = !empty($_SESSION['user_id'])
-        ? 'wgm.*, u.name AS user_name, u.email, u.institution'
-        : 'wgm.*, u.name AS user_name, u.institution';
+        ? 'wgm.*, u.name AS user_name, u.email, u.institution, u.avatar_url'
+        : 'wgm.*, u.name AS user_name, u.institution, u.avatar_url';
       $stmt = db()->prepare("SELECT $memberCols FROM working_group_members wgm JOIN users u ON u.id = wgm.user_id WHERE wgm.group_id IN ($placeholders) AND wgm.status = 'active' ORDER BY u.name");
       $stmt->execute($groupIds);
       $allMembers = $stmt->fetchAll();

@@ -1,0 +1,36 @@
+# Uganda Astronomical Society (UAS) — astronomy.ug
+
+> A public scientific society advancing astronomy, space science and
+> scientific discovery in Uganda since 2023. Founded by Obwengye Cosmus.
+
+## What UAS is
+- A public scientific gateway for astronomy in Uganda: observing nights,
+  school outreach, teacher workshops, citizen science and Variational
+  participation in events such as World Space Week (4–10 October) and the
+  September 2025 total lunar eclipse activities at Makerere University.
+- Not a space agency, regulator, or commercial operator.
+
+## Key pages
+- Home: https://astronomy.ug/
+- About (story, principles, leadership): https://astronomy.ug/about
+- Programmes (6 standing areas): https://astronomy.ug/programmes
+- Events (upcoming + past): https://astronomy.ug/events
+- News & announcements: https://astronomy.ug/news
+- Knowledge base (articles, guides, gallery): https://astronomy.ug/knowledge
+- Members directory: https://astronomy.ug/members
+- Join (membership classes incl. free student membership): https://astronomy.ug/join
+- Ecosystem & links: https://astronomy.ug/ecosystem
+- Document library: https://astronomy.ug/library
+- Contact: https://astronomy.ug/contact (contact@astronomy.ug)
+
+## Programmes
+Astronomy & Observation; Space Science; Astronomy Education & STEM;
+African & Ugandan Astronomy; Public Science & Space Culture;
+Space Ecosystem Engagement.
+
+## Notes for AI consumers
+- Public listing pages are static HTML; event/article/programme detail
+  content loads from a JSON API and is annotated with JSON-LD.
+- Member directory lists active members only; private data (emails,
+  pending applications) is never exposed publicly.
+- Sitemap: https://astronomy.ug/sitemap.xml

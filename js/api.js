@@ -223,10 +223,11 @@ const api = {
   async getDocuments() { return this.request('/documents'); },
   async uploadDocument(data) { return this.request('/documents', { method: 'POST', body: data }); },
 
-  // File Upload
-  async uploadFile(file) {
+  // File Upload (opts.avatar resizes server-side to 256px)
+  async uploadFile(file, opts = {}) {
     const formData = new FormData();
     formData.append('file', file);
+    if (opts.avatar) formData.append('avatar', '1');
     const url = API_BASE + '/upload';
     const res = await fetch(url, { method: 'POST', body: formData, credentials: 'same-origin' });
     const data = await res.json();
@@ -679,6 +680,15 @@ var esc = esc || window._esc;
 
 window._stripHtml = window._stripHtml || function (s) { return s ? s.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim() : ''; };
 var stripHtml = stripHtml || window._stripHtml;
+
+// Avatar: photo over initials fallback (broken images remove themselves,
+// revealing the initials underneath).
+window.avatarHtml = function (url, name) {
+  const initials = esc((name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase());
+  const src = url ? (/^https?:\/\//i.test(url) ? url : ua('/' + String(url).replace(/^\/+/, ''))) : null;
+  if (!src) return initials;
+  return `${initials}<img src="${esc(src)}" alt="${esc(name || '')}" loading="lazy" onerror="this.remove()">`;
+};
 
 // --- Brand emblem ---
 // Adds the UAS emblem to every .nav-brand (favicon is declared statically per page).

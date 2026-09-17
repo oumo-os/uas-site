@@ -10,7 +10,7 @@
   <meta property="og:url" content="https://astronomy.ug/admin/resolution-builder">
   <meta name="robots" content="noindex, nofollow">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="../css/base.css?v=20260911-3">
+  <link rel="stylesheet" href="../css/base.css?v=20260911-6">
   <style>
     .change-row { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 0.75rem; }
     .vote-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; }
@@ -103,7 +103,7 @@
     <p>Uganda Astronomical Society &middot; Institutional Platform</p>
   </footer>
 
-  <script src="../js/api.js?v=20260911-5"></script>
+  <script src="../js/api.js?v=20260911-6"></script>
   <script>
     const memberOptions = [];
     const roleOptions = [];

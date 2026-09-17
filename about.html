@@ -14,7 +14,7 @@
   <link rel="canonical" href="https://astronomy.ug/about">
   <meta property="og:url" content="https://astronomy.ug/about">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="css/base.css?v=20260911-3">
+  <link rel="stylesheet" href="css/base.css?v=20260911-6">
   <style>
     .about-hero {
       position: relative; min-height: 50vh; display: flex; flex-direction: column;
@@ -394,7 +394,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260911-5"></script>
+  <script src="js/api.js?v=20260911-6"></script>
   <script>
     async function load() {
       try { await api.me(); } catch(e) {}
@@ -413,11 +413,10 @@
       committees.forEach(g => {
         const members = (g.members || []);
         const membersHtml = members.length ? '<div class="leadership-grid">' + members.map(m => {
-          const initials = (m.user_name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
           const roleHtml = m.role && m.role !== 'member' ? `<span class="role-badge governance">${esc(m.role)}</span>` : '';
           return `
             <div class="leader-card">
-              <div class="leader-avatar">${initials}</div>
+              <div class="leader-avatar">${avatarHtml(m.avatar_url, m.user_name)}</div>
               <h4>${esc(m.user_name)}</h4>
               ${roleHtml}
               ${m.institution ? `<div class="institution">${esc(m.institution)}</div>` : ''}

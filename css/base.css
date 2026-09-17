@@ -585,6 +585,16 @@ tr:hover td { background: var(--accent-glow); }
 .rte-editor img { max-width:100%; height:auto; border-radius:var(--radius); margin:0.75rem 0; display:block; }
 .rte-btn:disabled { opacity:0.45; cursor:wait; }
 
+/* Avatars: photo overlays initials fallback (see avatarHtml) */
+.member-avatar, .comment-avatar, .leader-avatar { position: relative; overflow: hidden; }
+.member-avatar img, .comment-avatar img, .leader-avatar img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+.avatar-preview {
+  width: 96px; height: 96px; border-radius: 50%; object-fit: cover;
+  border: 1px solid var(--border); display: block; background: var(--accent-glow);
+}
 /* Cover image picker (forms) */
 .cover-picker { display:grid; gap:0.5rem; }
 .cover-preview { width:100%; max-height:220px; object-fit:cover; border-radius:var(--radius); border:1px solid var(--border); display:block; }

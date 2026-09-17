@@ -10,7 +10,7 @@
   <meta property="og:url" content="https://astronomy.ug/dashboard">
   <meta name="robots" content="noindex, nofollow">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="css/base.css?v=20260911-3">
+  <link rel="stylesheet" href="css/base.css?v=20260911-6">
   <style>
     /* ── Hero ── */
     .dash-hero {
@@ -1074,7 +1074,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260911-5"></script>
+  <script src="js/api.js?v=20260911-6"></script>
   <script>
     let health = {};
     let allPendingData = [];
@@ -2964,7 +2964,7 @@
           : '';
         return `
           <div class="chat-msg${mine ? ' mine' : ''}${isReply ? ' reply' : ''}">
-            ${!mine ? `<div class="comment-avatar">${esc(chatInitials(c.user_name))}</div>` : ''}
+            ${!mine ? `<div class="comment-avatar">${avatarHtml(c.avatar_url, c.user_name)}</div>` : ''}
             <div class="chat-bubble">
               ${!mine ? `<div class="chat-name">${esc(c.user_name)}</div>` : ''}
               ${parent ? `<div class="chat-parent">↳ ${esc(parent.user_name)}${parentPreview ? `: “${esc(parentPreview)}${String(parent.body || '').length > 80 ? '…' : ''}”` : ''}</div>` : ''}

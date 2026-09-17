@@ -121,18 +121,17 @@ function clean_image_url($v): ?string {
   return null;
 }
 
-// Recompress an uploaded image in place: max 1600px wide, JPEG q80,
-// PNG level 6 (alpha preserved), WebP q80. GIFs pass through untouched
-// (animation). Returns [width, height, compressed] or null when GD is
-// unavailable or the file is not a readable image of the stated type.
-function compress_uploaded_image(string $path, string $mime): ?array {
+// Recompress an uploaded image in place: max $maxW px wide (1600 default,
+// 256 for avatars), JPEG q80, PNG level 6 (alpha preserved), WebP q80.
+// GIFs pass through untouched (animation). Returns [width, height,
+// compressed] or null when GD is unavailable or the file is unreadable.
+function compress_uploaded_image(string $path, string $mime, int $maxW = 1600): ?array {
   if (!function_exists('imagecreatetruecolor') || !function_exists('getimagesize')) return null;
   $info = @getimagesize($path);
   if (!$info || $info[0] <= 0 || $info[1] <= 0) return null;
   $w = $info[0];
   $h = $info[1];
   if ($mime === 'image/gif') return [$w, $h, false];
-  $maxW = 1600;
   $size = @filesize($path);
   if ($w <= $maxW && $size !== false && $size <= 400 * 1024 && ($mime === 'image/jpeg' || $mime === 'image/webp')) {
     return [$w, $h, false];

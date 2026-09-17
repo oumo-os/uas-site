@@ -10,7 +10,7 @@
   <meta property="og:url" content="https://astronomy.ug/profile">
   <meta name="robots" content="noindex, nofollow">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="css/base.css?v=20260911-3">
+  <link rel="stylesheet" href="css/base.css?v=20260911-6">
 </head>
 <body>
   <nav class="nav" role="navigation" aria-label="Main navigation">
@@ -42,6 +42,15 @@
             <h2 style="margin:0" id="pvName"></h2>
             <p class="text-dim" style="margin:0" id="pvMeta"></p>
           </div>
+        </div>
+        <div style="margin-bottom:1.25rem">
+          <label class="form-label">Profile photo</label>
+          <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
+            <input class="form-input" type="file" id="avatarFile" accept="image/*" style="max-width:320px">
+            <button class="btn btn-outline btn-sm" id="avatarRemove" style="display:none" onclick="removeAvatar()">Remove</button>
+          </div>
+          <input type="hidden" id="avatarUrl" value="">
+          <div class="form-help">Square photo works best. Resized to 256px and compressed on upload.</div>
         </div>
         <div class="grid-2 gap-3">
           <div>
@@ -148,7 +157,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260911-5"></script>
+  <script src="js/api.js?v=20260911-6"></script>
   <script>
     async function load() {
       try {
@@ -161,7 +170,10 @@
       updateNavUser();
       const p = api._user || {};
       const m = (prof && prof.member) || {};
-      document.getElementById('pvAvatar').textContent = (p.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+      renderPvAvatar();
+      document.getElementById('avatarUrl').value = p.avatar_url || '';
+      document.getElementById('avatarRemove').style.display = p.avatar_url ? '' : 'none';
+      document.getElementById('avatarFile').addEventListener('change', previewAvatar);
       document.getElementById('pvName').textContent = p.name;
       document.getElementById('pvMeta').textContent = (m.membership_number || '') + ' · ' + (m.class || 'Regular Member');
       document.getElementById('fName').value = p.name || '';
@@ -208,10 +220,42 @@
       } catch(e) {}
     }
 
+    function renderPvAvatar(objUrl) {
+      const el = document.getElementById('pvAvatar');
+      const name = (api._user && api._user.name) || '?';
+      if (objUrl) {
+        el.innerHTML = `${esc(name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase())}<img src="${objUrl}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">`;
+      } else {
+        el.innerHTML = avatarHtml(api._user.avatar_url, name);
+      }
+    }
+
+    function previewAvatar() {
+      const file = document.getElementById('avatarFile').files[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) { alert('Please choose an image file (JPG, PNG, GIF, WebP).'); document.getElementById('avatarFile').value = ''; return; }
+      renderPvAvatar(URL.createObjectURL(file));
+    }
+
+    function removeAvatar() {
+      document.getElementById('avatarFile').value = '';
+      document.getElementById('avatarUrl').value = '';
+      if (api._user) api._user.avatar_url = null;
+      renderPvAvatar();
+      document.getElementById('avatarRemove').style.display = 'none';
+    }
+
     async function saveProfile() {
       const msg = document.getElementById('saveMsg');
       msg.textContent = '';
       try {
+        let avatarUrl = document.getElementById('avatarUrl').value || null;
+        const avatarFile = document.getElementById('avatarFile').files[0];
+        if (avatarFile) {
+          msg.textContent = 'Uploading photo...';
+          const up = await api.uploadFile(avatarFile, { avatar: true });
+          avatarUrl = up.url;
+        }
         await api.updateProfile({
           name: document.getElementById('fName').value.trim(),
           phone: document.getElementById('fPhone').value.trim(),
@@ -221,11 +265,16 @@
           interests: document.getElementById('fInterests').value.trim(),
           contributions: document.getElementById('fContributions').value.trim(),
           profile_visible: document.getElementById('fVisible').checked,
+          avatar_url: avatarUrl,
         });
         msg.innerHTML = 'Saved <span class="icon-inline icon-sm" style="color:var(--success)"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>';
         api._user.name = document.getElementById('fName').value.trim() || api._user.name;
+        api._user.avatar_url = avatarUrl;
+        document.getElementById('avatarUrl').value = avatarUrl || '';
+        document.getElementById('avatarFile').value = '';
+        document.getElementById('avatarRemove').style.display = avatarUrl ? '' : 'none';
         document.getElementById('pvName').textContent = api._user.name;
-        document.getElementById('pvAvatar').textContent = api._user.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        renderPvAvatar();
         updateNavUser();
       } catch(e) { alert(e.error || 'Failed to save'); }
     }

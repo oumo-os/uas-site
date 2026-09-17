@@ -14,7 +14,7 @@
   <link rel="canonical" href="https://astronomy.ug/members">
   <meta property="og:url" content="https://astronomy.ug/members">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="css/base.css?v=20260911-3">
+  <link rel="stylesheet" href="css/base.css?v=20260911-6">
   <style>
     .page-hero {
       position:relative; min-height:45vh; display:flex; flex-direction:column;
@@ -216,7 +216,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260911-5"></script>
+  <script src="js/api.js?v=20260911-6"></script>
   <script>
     let allMembers = [];
     let allWgData = [];
@@ -376,12 +376,11 @@
       const groupsHtml = committees.map(g => {
         const members = g.members || [];
         const cardsHtml = members.length ? '<div class="member-grid">' + members.map(m => {
-          const initials = (m.user_name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
           const roleBadge = m.role ? `<div class="user-roles-list"><span class="role-badge governance">${esc(m.role)}</span></div>` : '';
           return `
           <div class="member-card" onclick="showMemberDetail(${m.user_id})">
             <div class="member-header">
-              <div class="member-avatar">${initials}</div>
+              <div class="member-avatar">${avatarHtml(m.avatar_url, m.user_name)}</div>
               <div>
                 <div class="member-name">${esc(m.user_name)}</div>
                 <div class="member-inst">${esc(m.email || '')}</div>
@@ -451,14 +450,13 @@
       });
       if (!users.length) return '';
       const cards = users.map(m => {
-        const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
         const rolesHtml = formatRoleBadges(m.roles);
         const interests = m.interests ? m.interests.split(',').slice(0, 3) : [];
         const joined = m.joined_date ? new Date(m.joined_date).toLocaleDateString('en', { month: 'short', year: 'numeric' }) : '';
         return `
           <div class="member-card" onclick="showMemberDetail(${m.user_id || m.id})">
             <div class="member-header">
-              <div class="member-avatar">${initials}</div>
+              <div class="member-avatar">${avatarHtml(m.avatar_url, m.name)}</div>
               <div>
                 <div class="member-name">${esc(m.name)}</div>
                 <div class="member-inst">${esc(m.institution || 'Independent')}${m.location ? ' &middot; ' + esc(m.location) : ''}</div>
@@ -489,7 +487,6 @@
       const users = members.filter(m => !committeeMembers.has(m.user_id) && !keyMemberIds.has(m.user_id));
       if (!users.length) return '';
       const cards = users.map(m => {
-        const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
         const classLabel = (m.class || 'Regular Member').replace(' Member', '');
         const rolesHtml = formatRoleBadges(m.roles);
         const interests = m.interests ? m.interests.split(',').slice(0, 3) : [];
@@ -497,7 +494,7 @@
         return `
           <div class="member-card" onclick="showMemberDetail(${m.user_id || m.id})">
             <div class="member-header">
-              <div class="member-avatar">${initials}</div>
+              <div class="member-avatar">${avatarHtml(m.avatar_url, m.name)}</div>
               <div>
                 <div class="member-name">${esc(m.name)}</div>
                 <div class="member-inst">${esc(m.institution || 'Independent')}${m.location ? ' &middot; ' + esc(m.location) : ''}</div>
@@ -527,7 +524,6 @@
     async function showMemberDetail(userId) {
       try {
         const m = await api.getMember(userId);
-        const initials = (m.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
         const interests = m.interests ? m.interests.split(',') : [];
         const roles = m.roles || [];
         const rolesHtml = roles.length ? `<div class="field"><div class="field-label">Roles</div><div style="display:flex;flex-wrap:wrap;gap:0.35rem">${roles.map(r => {
@@ -538,7 +534,7 @@
         }).join('')}</div></div>` : '';
         const html = `
           <div style="display:flex;gap:1rem;align-items:center;margin-bottom:1rem">
-            <div class="member-avatar" style="width:60px;height:60px;font-size:1.3rem">${initials}</div>
+            <div class="member-avatar" style="width:60px;height:60px;font-size:1.3rem">${avatarHtml(m.avatar_url, m.name)}</div>
             <div>
               <h3 style="margin:0">${esc(m.name)}</h3>
               <div class="text-dim">${esc(m.institution || 'Independent')}${m.location ? ' &middot; ' + esc(m.location) : ''}</div>
