@@ -341,9 +341,18 @@
     async function load() {
       try {
         const data = await api.me();
-        if (!api.hasCap('admin.system') && !api.hasCap('members.approve')) {
+        const myOffices = await api.request('/my/inboxes').catch(() => []);
+        const isAdmin = api.hasCap('admin.system') || api.hasCap('members.approve');
+        if (!isAdmin && !myOffices.length) {
           document.getElementById('adminTabs').innerHTML = '<p class="text-dim">Insufficient permissions.</p>';
           return;
+        }
+        if (!isAdmin) {
+          // Restricted inbox-only view for office grantees
+          document.querySelectorAll('#adminTabs .dash-tab').forEach(t => { if (t.dataset.panel !== 'inbox') t.style.display = 'none'; });
+          document.querySelectorAll('.dash-panel').forEach(p => { if (p.id !== 'panel-inbox') p.style.display = 'none'; });
+          document.querySelector('#adminTabs [data-panel="inbox"]').classList.add('active');
+          document.getElementById('panel-inbox').classList.add('active');
         }
         updateNavUser();
         if (api.hasCap('roles.create')) document.getElementById('createRoleBtn').style.display = '';
@@ -353,7 +362,7 @@
           api.getRoles().catch(() => []),
           api.getResolutions().catch(() => []),
           api.getAuditLog({ limit: 50 }).catch(() => []),
-          api.hasCap('admin.system') ? api.request('/contact-messages').catch(() => []) : [],
+          api.request('/contact-messages').catch(() => []),
         ]);
 
         renderMembers(members);
@@ -615,16 +624,44 @@
                 </div>
               </div>
             </div>
+            ${api.hasCap('admin.system') ? `
+            <div style="padding:0.85rem 1.25rem;border-top:1px solid var(--border)">
+              <h4 style="margin:0 0 0.15rem;font-size:0.88rem">Inbox Access</h4>
+              <p class="text-dim text-sm" style="margin:0 0 0.5rem">Office queues holders of this role may triage and reply to.</p>
+              <div id="roleInboxes" style="display:flex;flex-wrap:wrap;gap:0.4rem"></div>
+            </div>` : ''}
           </div>
         `;
         loadCapDropdown();
         loadUserDropdown();
+        if (api.hasCap('admin.system')) loadRoleInboxes(roleId);
       } catch(e) { detail.innerHTML = '<p class="text-dim">Failed to load role details</p>'; }
     }
 
     function closeRoleDetail() {
       document.getElementById('roleDetail').style.display = 'none';
       document.getElementById('rolesList').style.display = '';
+    }
+
+    const OFFICE_OPTIONS = [['info', 'Information'], ['contact', 'General'], ['membership', 'Membership'], ['programmes', 'Programmes'], ['partnerships', 'Partnerships'], ['publicity', 'Publicity'], ['secretary', 'Secretariat'], ['legal', 'Legal'], ['finance', 'Finance']];
+
+    async function loadRoleInboxes(roleId) {
+      const box = document.getElementById('roleInboxes');
+      if (!box) return;
+      const granted = await api.request('/roles/' + roleId + '/inboxes').catch(() => []);
+      box.innerHTML = OFFICE_OPTIONS.map(([v, label]) => `
+        <label style="display:inline-flex;align-items:center;gap:0.35rem;font-size:0.82rem;border:1px solid var(--border);border-radius:999px;padding:0.25rem 0.7rem;cursor:pointer">
+          <input type="checkbox" data-office="${v}"${granted.includes(v) ? ' checked' : ''} onchange="saveRoleInboxes(${roleId})"> ${esc(label)}
+        </label>`).join('');
+    }
+
+    async function saveRoleInboxes(roleId) {
+      const box = document.getElementById('roleInboxes');
+      if (!box) return;
+      const offices = [...box.querySelectorAll('input[data-office]:checked')].map(i => i.dataset.office);
+      try {
+        await api.request('/roles/' + roleId + '/inboxes', { method: 'PUT', body: { offices } });
+      } catch (e) { alert(e.error || 'Failed to save inbox access'); loadRoleInboxes(roleId); }
     }
 
     function filterCapDropdown(query) {

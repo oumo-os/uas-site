@@ -2406,12 +2406,28 @@ try {
         ->execute([$name, $email, trim($data['subject'] ?? ''), $message]);
     }
     $n = notify_capability('admin.system', 'contact_message', 'New contact message for ' . $office . ' from ' . $name, mb_substr($message, 0, 120) . (mb_strlen($message) > 120 ? '…' : ''), '/admin?tab=inbox');
+    try {
+      $stmt = db()->prepare("SELECT DISTINCT ra.user_id FROM role_inbox_access ria JOIN role_assignments ra ON ra.role_id = ria.role_id JOIN users u ON u.id = ra.user_id WHERE ria.office = ? AND ra.status = 'active' AND u.status = 'active'");
+      $stmt->execute([$office]);
+      foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $uid) {
+        $uid = (int) $uid;
+        if (user_has_cap($uid, 'admin.system')) continue; // already notified above
+        notify_user($uid, 'contact_message', 'New contact message for ' . $office . ' from ' . $name, mb_substr($message, 0, 120) . (mb_strlen($message) > 120 ? '…' : ''), '/admin?tab=inbox');
+      }
+    } catch (Exception $e) { /* migration 041 not yet imported */ }
     json_response(['ok' => true], 201);
   }
+  elseif ($path === '/my/inboxes' && $method === 'GET') {
+    $user = require_login();
+    json_response(user_inbox_offices((int) $user['id']));
+  }
   elseif ($path === '/contact-messages' && $method === 'GET') {
-    $user = require_cap('admin.system');
-    $stmt = db()->prepare('SELECT m.*, u.name AS assignee_name FROM contact_messages m LEFT JOIN users u ON u.id = m.assigned_to ORDER BY m.created_at DESC');
-    $stmt->execute();
+    $user = require_login();
+    $offices = user_inbox_offices((int) $user['id']);
+    if (!$offices) json_response([]);
+    $ph = implode(',', array_fill(0, count($offices), '?'));
+    $stmt = db()->prepare("SELECT m.*, u.name AS assignee_name FROM contact_messages m LEFT JOIN users u ON u.id = m.assigned_to WHERE m.office IN ($ph) ORDER BY m.created_at DESC");
+    $stmt->execute($offices);
     $msgs = $stmt->fetchAll();
     $byId = [];
     foreach ($msgs as $mm) $byId[(int) $mm['id']] = [];
@@ -2427,7 +2443,7 @@ try {
     json_response($msgs);
   }
   elseif (preg_match('#^/contact-messages/(\d+)/assign$#', $path, $m) && $method === 'POST') {
-    $user = require_cap('admin.system');
+    $user = require_login();
     $id = (int) $m[1];
     $data = input_json();
     $assignee = isset($data['user_id']) && $data['user_id'] ? (int) $data['user_id'] : null;
@@ -2436,21 +2452,28 @@ try {
       $stmt->execute([$assignee]);
       if (!$stmt->fetch()) json_error('Assignee must be an active user', 400);
     }
-    $stmt = db()->prepare('SELECT id FROM contact_messages WHERE id = ?');
+    $stmt = db()->prepare('SELECT id, office FROM contact_messages WHERE id = ?');
     $stmt->execute([$id]);
-    if (!$stmt->fetch()) json_error('Message not found', 404);
+    $row = $stmt->fetch();
+    if (!$row) json_error('Message not found', 404);
+    if (!in_array($row['office'], user_inbox_offices((int) $user['id']), true)) {
+      json_error('No access to this office inbox', 403);
+    }
     db()->prepare("UPDATE contact_messages SET assigned_to = ?, status = CASE WHEN ? IS NULL THEN status ELSE 'assigned' END WHERE id = ?")
       ->execute([$assignee, $assignee, $id]);
     audit_log('contact_assign', 'contact_message', $id, ['assigned_to' => $assignee]);
     json_response(['ok' => true]);
   }
   elseif (preg_match('#^/contact-messages/(\d+)/reply$#', $path, $m) && $method === 'POST') {
-    $user = require_cap('admin.system');
+    $user = require_login();
     $id = (int) $m[1];
     $stmt = db()->prepare('SELECT * FROM contact_messages WHERE id = ?');
     $stmt->execute([$id]);
     $msg = $stmt->fetch();
     if (!$msg) json_error('Message not found', 404);
+    if (!in_array($msg['office'], user_inbox_offices((int) $user['id']), true)) {
+      json_error('No access to this office inbox', 403);
+    }
     $data = input_json();
     $body = trim($data['body'] ?? '');
     if ($body === '' || mb_strlen($body) > 5000) json_error('Reply must be 1–5000 characters', 400);
@@ -2466,18 +2489,52 @@ try {
     json_response(['ok' => true, 'emailed' => $sent]);
   }
   elseif (preg_match('#^/contact-messages/(\d+)/status$#', $path, $m) && $method === 'POST') {
-    $user = require_cap('admin.system');
+    $user = require_login();
     $id = (int) $m[1];
     $data = input_json();
     $status = $data['status'] ?? '';
     if (!in_array($status, ['new', 'read', 'archived'], true)) json_error('Invalid status', 400);
+    $stmt = db()->prepare('SELECT office FROM contact_messages WHERE id = ?');
+    $stmt->execute([$id]);
+    $row = $stmt->fetch();
+    if (!$row) json_error('Message not found', 404);
+    if (!in_array($row['office'], user_inbox_offices((int) $user['id']), true)) {
+      json_error('No access to this office inbox', 403);
+    }
     db()->prepare('UPDATE contact_messages SET status = ? WHERE id = ?')->execute([$status, $id]);
     json_response(['ok' => true]);
   }
   elseif ($path === '/contact-messages/read-all' && $method === 'POST') {
-    $user = require_cap('admin.system');
-    db()->prepare("UPDATE contact_messages SET status = 'read' WHERE status = 'new'")->execute();
+    $user = require_login();
+    $offices = user_inbox_offices((int) $user['id']);
+    if ($offices) {
+      $ph = implode(',', array_fill(0, count($offices), '?'));
+      db()->prepare("UPDATE contact_messages SET status = 'read' WHERE status = 'new' AND office IN ($ph)")->execute($offices);
+    }
     json_response(['ok' => true]);
+  }
+  // --- ROLE INBOX ACCESS (which offices a role may triage) ---
+  elseif (preg_match('#^/roles/(\d+)/inboxes$#', $path, $m) && $method === 'GET') {
+    $user = require_cap('admin.system');
+    $stmt = db()->prepare('SELECT office FROM role_inbox_access WHERE role_id = ?');
+    try {
+      $stmt->execute([(int) $m[1]]);
+      json_response(array_column($stmt->fetchAll(), 'office'));
+    } catch (Exception $e) { json_response([]); }
+  }
+  elseif (preg_match('#^/roles/(\d+)/inboxes$#', $path, $m) && $method === 'PUT') {
+    $user = require_cap('admin.system');
+    $roleId = (int) $m[1];
+    $data = input_json();
+    $offices = array_values(array_intersect((array) ($data['offices'] ?? []), array_keys(office_list())));
+    try {
+      db()->prepare('DELETE FROM role_inbox_access WHERE role_id = ?')->execute([$roleId]);
+      foreach ($offices as $o) {
+        db()->prepare('INSERT INTO role_inbox_access (role_id, office, granted_by) VALUES (?, ?, ?)')->execute([$roleId, $o, $user['id']]);
+      }
+    } catch (Exception $e) { json_error('Inbox grants unavailable — import migration 041 first', 500); }
+    audit_log('role_inbox_grant', 'role', $roleId, ['offices' => $offices]);
+    json_response(['ok' => true, 'offices' => $offices]);
   }
 
   // --- SEARCH ---

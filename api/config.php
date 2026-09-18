@@ -136,7 +136,15 @@ function office_list(): array {
   ];
 }
 
-// Send an office reply through the host mail system. Returns delivery handoff
+// Office inboxes a user may triage. System admins see every office;
+// others see offices granted to their active roles.
+function user_inbox_offices(int $userId): array {
+  if (user_has_cap($userId, 'admin.system')) return array_keys(office_list());
+  $stmt = db()->prepare("SELECT DISTINCT ria.office FROM role_inbox_access ria JOIN role_assignments ra ON ra.role_id = ria.role_id WHERE ra.user_id = ? AND ra.status = 'active'");
+  $stmt->execute([$userId]);
+  $offices = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+  return array_values(array_intersect($offices, array_keys(office_list())));
+}
 // status (true = accepted by MTA, NOT proof of inbox delivery — needs SPF).
 function send_office_email(string $office, string $to, string $subject, string $body): bool {
   $list = office_list();
