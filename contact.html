@@ -167,9 +167,25 @@
                 <input type="email" id="cEmail" placeholder="john@example.com">
               </div>
             </div>
-            <div class="form-group">
-              <label>Subject</label>
-              <input type="text" id="cSubject" placeholder="What is this about?">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Office</label>
+                <select id="cOffice" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-input);color:var(--text)">
+                  <option value="contact">General enquiries</option>
+                  <option value="info">Information</option>
+                  <option value="membership">Membership</option>
+                  <option value="programmes">Programmes & events</option>
+                  <option value="partnerships">Partnerships</option>
+                  <option value="publicity">Publicity & media</option>
+                  <option value="secretary">Secretariat</option>
+                  <option value="legal">Legal</option>
+                  <option value="finance">Finance</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Subject</label>
+                <input type="text" id="cSubject" placeholder="What is this about?">
+              </div>
             </div>
             <div class="form-group">
               <label>Message *</label>
@@ -246,6 +262,7 @@
       const payload = {
         name: document.getElementById('cName').value.trim(),
         email: document.getElementById('cEmail').value.trim(),
+        office: document.getElementById('cOffice').value,
         subject: document.getElementById('cSubject').value.trim(),
         message: document.getElementById('cMessage').value.trim(),
         website: document.getElementById('cWebsite').value.trim(),

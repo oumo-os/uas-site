@@ -121,7 +121,29 @@ function clean_image_url($v): ?string {
   return null;
 }
 
-// Recompress an uploaded image in place: max $maxW px wide (1600 default,
+// Role inbox offices (must match the directory on contact.html).
+function office_list(): array {
+  return [
+    'info' => 'info@astronomy.ug',
+    'contact' => 'contact@astronomy.ug',
+    'membership' => 'membership@astronomy.ug',
+    'programmes' => 'programmes@astronomy.ug',
+    'partnerships' => 'partnerships@astronomy.ug',
+    'publicity' => 'publicity@astronomy.ug',
+    'secretary' => 'secretary@astronomy.ug',
+    'legal' => 'legal@astronomy.ug',
+    'finance' => 'finance@astronomy.ug',
+  ];
+}
+
+// Send an office reply through the host mail system. Returns delivery handoff
+// status (true = accepted by MTA, NOT proof of inbox delivery — needs SPF).
+function send_office_email(string $office, string $to, string $subject, string $body): bool {
+  $list = office_list();
+  $from = $list[$office] ?? $list['contact'];
+  $headers = "From: UAS <$from>\r\nReply-To: $from\r\nContent-Type: text/plain; charset=UTF-8\r\nX-Mailer: UAS-Platform";
+  return @mail($to, $subject, $body, $headers);
+}
 // 256 for avatars), JPEG q80, PNG level 6 (alpha preserved), WebP q80.
 // GIFs pass through untouched (animation). Returns [width, height,
 // compressed] or null when GD is unavailable or the file is unreadable.

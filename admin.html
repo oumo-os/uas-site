@@ -793,21 +793,111 @@
       } catch(e) { alert(e.error || 'Failed'); }
     }
 
+    let inboxData = [];
+    let inboxOffice = 'all';
+    let inboxUsers = null;
+    const OFFICE_LABELS = { info: 'Information', contact: 'General', membership: 'Membership', programmes: 'Programmes', partnerships: 'Partnerships', publicity: 'Publicity', secretary: 'Secretariat', legal: 'Legal', finance: 'Finance' };
+
     function renderInbox(list) {
+      inboxData = list || [];
       const div = document.getElementById('inboxList');
-      if (!list.length) { div.innerHTML = '<div class="empty-state"><p>No messages yet.</p></div>'; return; }
-      div.innerHTML = list.map(m => `
-        <div class="inbox-item ${m.status === 'new' ? 'unread' : ''}">
-          <div class="flex-between">
+      if (!inboxData.length) { div.innerHTML = '<div class="empty-state"><p>No messages yet.</p></div>'; return; }
+      const offices = ['all'].concat([...new Set(inboxData.map(m => m.office || 'contact'))]);
+      const items = inboxOffice === 'all' ? inboxData : inboxData.filter(m => (m.office || 'contact') === inboxOffice);
+      div.innerHTML = `
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem">
+          ${offices.map(o => `<button class="btn btn-sm ${o === inboxOffice ? 'btn-primary' : 'btn-outline'}" onclick="filterInboxOffice('${o}')">${o === 'all' ? 'All offices' : esc(OFFICE_LABELS[o] || o)}</button>`).join('')}
+        </div>
+        ${items.length ? items.map(m => `
+        <div class="inbox-item ${m.status === 'new' ? 'unread' : ''}" id="inbox-msg-${m.id}">
+          <div class="flex-between" style="cursor:pointer" onclick="toggleInboxMsg(${m.id})">
             <div>
               <strong>${esc(m.subject || '(no subject)')}</strong>
-              <div class="text-dim text-sm">${esc(m.name)} &lt;${esc(m.email)}&gt; &middot; ${esc(m.created_at)}</div>
+              <span class="cap-tag" style="margin-left:0.5rem">${esc(OFFICE_LABELS[m.office] || m.office || 'General')}</span>
+              <div class="text-dim text-sm">${esc(m.name)} &lt;${esc(m.email)}&gt; &middot; ${esc(m.created_at)}${m.assignee_name ? ' &middot; assigned to ' + esc(m.assignee_name) : ''}</div>
               <div class="text-sm mt-1">${esc(m.message)}</div>
             </div>
             <span class="badge ${m.status === 'new' ? 'badge-active' : 'badge-inactive'}">${esc(m.status)}</span>
           </div>
+          <div id="inbox-detail-${m.id}"></div>
         </div>
-      `).join('');
+      `).join('') : '<div class="empty-state"><p>No messages for this office.</p></div>'}`;
+    }
+
+    function filterInboxOffice(o) {
+      inboxOffice = o;
+      renderInbox(inboxData);
+    }
+
+    async function toggleInboxMsg(id) {
+      const box = document.getElementById('inbox-detail-' + id);
+      if (!box) return;
+      if (box.innerHTML) { box.innerHTML = ''; return; }
+      const m = inboxData.find(x => x.id === id);
+      if (!m) return;
+      if (!inboxUsers) inboxUsers = await api.getUsers().catch(() => []);
+      const active = (inboxUsers || []).filter(u => u.status === 'active');
+      const replies = (m.replies || []).map(r => `
+        <div style="padding:0.5rem 0;border-bottom:1px solid var(--border);font-size:0.85rem">
+          <div><strong>${esc(r.author_name)}</strong> <span class="text-dim text-sm">${esc(r.created_at)} &middot; ${r.sent_via === 'email' ? 'sent by email' : 'recorded internally'}</span></div>
+          <div style="margin-top:0.2rem;line-height:1.6">${esc(r.body)}</div>
+        </div>`).join('');
+      box.innerHTML = `
+        <div style="margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border)">
+          ${replies || '<p class="text-dim text-sm">No replies yet.</p>'}
+          <div style="display:flex;gap:0.5rem;margin-top:0.75rem;flex-wrap:wrap;align-items:center">
+            <select id="inbox-assign-${id}" class="form-select" style="max-width:220px">
+              <option value="">Unassigned</option>
+              ${active.map(u => `<option value="${u.id}"${String(m.assigned_to) === String(u.id) ? ' selected' : ''}>${esc(u.name)}</option>`).join('')}
+            </select>
+            <button class="btn btn-outline btn-sm" onclick="assignInboxMsg(${id})">Assign</button>
+            ${m.status !== 'archived' ? `<button class="btn btn-outline btn-sm" onclick="archiveInboxMsg(${id})">Archive</button>` : ''}
+          </div>
+          <div style="margin-top:0.75rem">
+            <textarea id="inbox-reply-${id}" class="form-textarea" rows="3" style="width:100%" placeholder="Write a reply — sent to ${esc(m.email)} from the ${esc((OFFICE_LABELS[m.office] || 'General').toLowerCase())} office..."></textarea>
+            <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" id="inbox-send-${id}" onclick="sendInboxReply(${id})">Send Reply</button>
+          </div>
+        </div>`;
+    }
+
+    async function refreshInbox() {
+      const inbox = await api.request('/contact-messages').catch(() => []);
+      renderInbox(inbox);
+    }
+
+    async function sendInboxReply(id) {
+      const ta = document.getElementById('inbox-reply-' + id);
+      const body = (ta.value || '').trim();
+      if (!body) { alert('Write a reply first'); return; }
+      const btn = document.getElementById('inbox-send-' + id);
+      btn.disabled = true; btn.textContent = 'Sending...';
+      try {
+        const r = await api.request('/contact-messages/' + id + '/reply', { method: 'POST', body: { body } });
+        alert(r.emailed ? 'Reply sent by email' : 'Email failed — reply recorded internally only');
+        await refreshInbox();
+        toggleInboxMsg(id);
+      } catch (e) {
+        alert(e.error || 'Failed to send reply');
+        btn.disabled = false; btn.textContent = 'Send Reply';
+      }
+    }
+
+    async function assignInboxMsg(id) {
+      const sel = document.getElementById('inbox-assign-' + id);
+      try {
+        await api.request('/contact-messages/' + id + '/assign', { method: 'POST', body: { user_id: sel.value ? parseInt(sel.value) : null } });
+        alert('Assignment updated');
+        await refreshInbox();
+      } catch (e) { alert(e.error || 'Failed to assign'); }
+    }
+
+    async function archiveInboxMsg(id) {
+      if (!confirm('Archive this message?')) return;
+      try {
+        await api.request('/contact-messages/' + id + '/status', { method: 'POST', body: { status: 'archived' } });
+        alert('Message archived');
+        await refreshInbox();
+      } catch (e) { alert(e.error || 'Failed to archive'); }
     }
 
     async function markAllRead() {

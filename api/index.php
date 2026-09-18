@@ -2394,16 +2394,85 @@ try {
       json_error('Name, valid email, and message are required', 400);
     }
     if (mb_strlen($message) > 5000) json_error('Message too long', 400);
-    db()->prepare('INSERT INTO contact_messages (name, email, subject, message) VALUES (?, ?, ?, ?)')
-      ->execute([$name, $email, trim($data['subject'] ?? ''), $message]);
-    $n = notify_capability('admin.system', 'contact_message', 'New contact message from ' . $name, mb_substr($message, 0, 120) . (mb_strlen($message) > 120 ? '…' : ''), '/admin?tab=inbox');
+    $offices = office_list();
+    $office = $data['office'] ?? 'contact';
+    if (!isset($offices[$office])) $office = 'contact';
+    try {
+      db()->prepare('INSERT INTO contact_messages (name, email, office, subject, message) VALUES (?, ?, ?, ?, ?)')
+        ->execute([$name, $email, $office, trim($data['subject'] ?? ''), $message]);
+    } catch (Exception $e) {
+      // Migration 040 not yet imported: legacy insert without office routing
+      db()->prepare('INSERT INTO contact_messages (name, email, subject, message) VALUES (?, ?, ?, ?)')
+        ->execute([$name, $email, trim($data['subject'] ?? ''), $message]);
+    }
+    $n = notify_capability('admin.system', 'contact_message', 'New contact message for ' . $office . ' from ' . $name, mb_substr($message, 0, 120) . (mb_strlen($message) > 120 ? '…' : ''), '/admin?tab=inbox');
     json_response(['ok' => true], 201);
   }
   elseif ($path === '/contact-messages' && $method === 'GET') {
     $user = require_cap('admin.system');
-    $stmt = db()->prepare('SELECT * FROM contact_messages ORDER BY created_at DESC');
+    $stmt = db()->prepare('SELECT m.*, u.name AS assignee_name FROM contact_messages m LEFT JOIN users u ON u.id = m.assigned_to ORDER BY m.created_at DESC');
     $stmt->execute();
-    json_response($stmt->fetchAll());
+    $msgs = $stmt->fetchAll();
+    $byId = [];
+    foreach ($msgs as $mm) $byId[(int) $mm['id']] = [];
+    if ($byId) {
+      $ph = implode(',', array_fill(0, count($byId), '?'));
+      $stmt = db()->prepare("SELECT r.*, u.name AS author_name FROM message_replies r JOIN users u ON u.id = r.user_id WHERE r.message_id IN ($ph) ORDER BY r.created_at");
+      try {
+        $stmt->execute(array_keys($byId));
+        foreach ($stmt->fetchAll() as $r) $byId[(int) $r['message_id']][] = $r;
+      } catch (Exception $e) { /* migration 040 not yet imported */ }
+    }
+    foreach ($msgs as &$mm) $mm['replies'] = $byId[(int) $mm['id']] ?? [];
+    json_response($msgs);
+  }
+  elseif (preg_match('#^/contact-messages/(\d+)/assign$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('admin.system');
+    $id = (int) $m[1];
+    $data = input_json();
+    $assignee = isset($data['user_id']) && $data['user_id'] ? (int) $data['user_id'] : null;
+    if ($assignee) {
+      $stmt = db()->prepare("SELECT id FROM users WHERE id = ? AND status = 'active'");
+      $stmt->execute([$assignee]);
+      if (!$stmt->fetch()) json_error('Assignee must be an active user', 400);
+    }
+    $stmt = db()->prepare('SELECT id FROM contact_messages WHERE id = ?');
+    $stmt->execute([$id]);
+    if (!$stmt->fetch()) json_error('Message not found', 404);
+    db()->prepare("UPDATE contact_messages SET assigned_to = ?, status = CASE WHEN ? IS NULL THEN status ELSE 'assigned' END WHERE id = ?")
+      ->execute([$assignee, $assignee, $id]);
+    audit_log('contact_assign', 'contact_message', $id, ['assigned_to' => $assignee]);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/contact-messages/(\d+)/reply$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('admin.system');
+    $id = (int) $m[1];
+    $stmt = db()->prepare('SELECT * FROM contact_messages WHERE id = ?');
+    $stmt->execute([$id]);
+    $msg = $stmt->fetch();
+    if (!$msg) json_error('Message not found', 404);
+    $data = input_json();
+    $body = trim($data['body'] ?? '');
+    if ($body === '' || mb_strlen($body) > 5000) json_error('Reply must be 1–5000 characters', 400);
+    $offices = office_list();
+    $from = $offices[$msg['office']] ?? $offices['contact'];
+    $subject = 'Re: ' . ($msg['subject'] ?: 'your message to UAS') . ' [UAS]';
+    $text = $body . "\n\n—\n" . $user['name'] . ', Uganda Astronomical Society (' . $from . ')';
+    $sent = send_office_email($msg['office'], $msg['email'], $subject, $text);
+    db()->prepare("INSERT INTO message_replies (message_id, user_id, body, sent_via) VALUES (?, ?, ?, ?)")
+      ->execute([$id, $user['id'], $body, $sent ? 'email' : 'internal']);
+    db()->prepare("UPDATE contact_messages SET status = 'replied' WHERE id = ?")->execute([$id]);
+    audit_log('contact_reply', 'contact_message', $id, ['emailed' => $sent]);
+    json_response(['ok' => true, 'emailed' => $sent]);
+  }
+  elseif (preg_match('#^/contact-messages/(\d+)/status$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('admin.system');
+    $id = (int) $m[1];
+    $data = input_json();
+    $status = $data['status'] ?? '';
+    if (!in_array($status, ['new', 'read', 'archived'], true)) json_error('Invalid status', 400);
+    db()->prepare('UPDATE contact_messages SET status = ? WHERE id = ?')->execute([$status, $id]);
+    json_response(['ok' => true]);
   }
   elseif ($path === '/contact-messages/read-all' && $method === 'POST') {
     $user = require_cap('admin.system');
