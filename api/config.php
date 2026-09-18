@@ -145,6 +145,120 @@ function user_inbox_offices(int $userId): array {
   $offices = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
   return array_values(array_intersect($offices, array_keys(office_list())));
 }
+
+// ---- Office mailbox (IMAP) helpers ----
+// Passwords are AES-256-CBC encrypted with MAILBOX_KEY from api/prod-env.php
+// (server-only). The key never leaves the server; officers never see passwords.
+function mailbox_key(): ?string {
+  if (!defined('MAILBOX_KEY') || strlen((string) MAILBOX_KEY) < 16) return null;
+  return (string) MAILBOX_KEY;
+}
+
+function mailbox_encrypt(string $plain): ?string {
+  $key = mailbox_key();
+  if (!$key || !function_exists('openssl_encrypt')) return null;
+  $iv = random_bytes(16);
+  $ct = openssl_encrypt($plain, 'AES-256-CBC', hash('sha256', $key, true), OPENSSL_RAW_DATA, $iv);
+  return $ct === false ? null : base64_encode($iv . $ct);
+}
+
+function mailbox_decrypt(string $stored): ?string {
+  $key = mailbox_key();
+  if (!$key || !function_exists('openssl_decrypt')) return null;
+  $raw = base64_decode($stored, true);
+  if ($raw === false || strlen($raw) <= 16) return null;
+  $pt = openssl_decrypt(substr($raw, 16), 'AES-256-CBC', hash('sha256', $key, true), OPENSSL_RAW_DATA, substr($raw, 0, 16));
+  return $pt === false ? null : $pt;
+}
+
+// Open an office mailbox over IMAP+SSL. Returns [connection, null] or [null, error].
+// Error strings are safe to show (never include credentials).
+function mailbox_open(string $office): array {
+  if (!function_exists('imap_open')) return [null, 'PHP IMAP extension missing'];
+  $offices = office_list();
+  if (!isset($offices[$office])) return [null, 'Unknown office'];
+  try {
+    $stmt = db()->prepare('SELECT * FROM office_mailboxes WHERE office = ? AND enabled = 1');
+    $stmt->execute([$office]);
+    $cfg = $stmt->fetch();
+  } catch (Exception $e) { return [null, 'Mailbox store unavailable — import migration 043']; }
+  if (!$cfg) return [null, 'Mailbox not configured'];
+  $pass = mailbox_decrypt($cfg['password_enc']);
+  if ($pass === null) return [null, 'Cannot decrypt credentials (MAILBOX_KEY?)'];
+  $host = $cfg['host'] ?: 'mail.astronomy.ug';
+  $port = (int) ($cfg['port'] ?: 993);
+  $flags = $cfg['use_ssl'] ? '/imap/ssl' : '/imap/notls';
+  $box = '{' . $host . ':' . $port . $flags . '}INBOX';
+  if (function_exists('imap_timeout')) {
+    imap_timeout(IMAP_OPENTIMEOUT, 10);
+    imap_timeout(IMAP_READTIMEOUT, 15);
+  }
+  $mbox = @imap_open($box, $cfg['username'], $pass, 0, 1);
+  if (!$mbox) return [null, 'IMAP login failed: ' . imap_last_error()];
+  return [$mbox, null];
+}
+
+// Decode a possibly MIME-encoded header to UTF-8.
+function mailbox_text(string $s): string {
+  if (function_exists('imap_mime_header_decode')) {
+    $out = '';
+    foreach (@imap_mime_header_decode($s) ?: [] as $p) {
+      $t = $p->text ?? '';
+      $cs = strtoupper($p->charset ?? 'UTF-8');
+      if ($cs !== 'UTF-8' && $cs !== 'DEFAULT' && function_exists('mb_convert_encoding')) {
+        $t = @mb_convert_encoding($t, 'UTF-8', $cs) ?: $t;
+      }
+      $out .= $t;
+    }
+    return $out;
+  }
+  return function_exists('mb_decode_mimeheader') ? mb_decode_mimeheader($s) : $s;
+}
+
+// Find the first text/plain part (skipping attachments); else first text/html.
+// Returns [body, is_html].
+function mailbox_body($mbox, int $uid): array {
+  $struct = @imap_fetchstructure($mbox, $uid, FT_UID);
+  if (!$struct) return ['', false];
+  $found = [null, null]; // [plain_part, html_part]
+  $walk = function ($parts, $prefix = '') use (&$walk, &$found) {
+    foreach ($parts as $i => $p) {
+      $num = $prefix === '' ? (string) ($i + 1) : $prefix . '.' . ($i + 1);
+      if (!empty($p->parts)) { $walk($p->parts, $num); continue; }
+      $type = strtolower($p->type == 0 ? ($p->subtype ?? '') : '');
+      $disp = strtolower($p->disposition ?? '');
+      if ($disp === 'attachment') continue;
+      if ($type === 'plain' && $found[0] === null) $found[0] = [$num, $p];
+      if ($type === 'html' && $found[1] === null) $found[1] = [$num, $p];
+    }
+  };
+  if (!empty($struct->parts)) { $walk($struct->parts); }
+  else {
+    $type = strtolower($struct->type == 0 ? ($struct->subtype ?? '') : '');
+    if ($type === 'plain') $found[0] = ['1', $struct];
+    elseif ($type === 'html') $found[1] = ['1', $struct];
+  }
+  foreach ([[$found[0], false], [$found[1], true]] as [$hit, $isHtml]) {
+    if (!$hit) continue;
+    [$num, $p] = $hit;
+    $raw = @imap_fetchbody($mbox, $uid, $num, FT_UID | FT_PEEK);
+    if ($raw === false) continue;
+    switch ($p->encoding ?? 0) {
+      case 3: $raw = base64_decode($raw); break;
+      case 4: $raw = quoted_printable_decode($raw); break;
+    }
+    $cs = 'UTF-8';
+    foreach ((array) ($p->parameters ?? []) as $param) {
+      if (strtolower($param->attribute ?? '') === 'charset') $cs = strtoupper($param->value);
+    }
+    if ($cs !== 'UTF-8' && function_exists('mb_convert_encoding')) $raw = @mb_convert_encoding($raw, 'UTF-8', $cs) ?: $raw;
+    $raw = substr($raw, 0, 200000);
+    if ($isHtml) $raw = trim(preg_replace('/\s+/', ' ', strip_tags(preg_replace('#<(script|style)[^>]*>.*?</\\1>#is', '', $raw))));
+    return [$raw, $isHtml];
+  }
+  return ['', false];
+}
+// Send an office reply through the host mail system. Returns handoff
 // status (true = accepted by MTA, NOT proof of inbox delivery — needs SPF).
 function send_office_email(string $office, string $to, string $subject, string $body): bool {
   $list = office_list();

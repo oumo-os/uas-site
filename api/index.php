@@ -2536,6 +2536,195 @@ try {
     audit_log('role_inbox_grant', 'role', $roleId, ['offices' => $offices]);
     json_response(['ok' => true, 'offices' => $offices]);
   }
+  // --- OFFICE MAILBOXES (live IMAP; credentials encrypted, officers never see them) ---
+  elseif ($path === '/mail/status' && $method === 'GET') {
+    $user = require_cap('admin.system');
+    $out = [];
+    foreach (office_list() as $key => $addr) {
+      $row = ['office' => $key, 'address' => $addr, 'configured' => false, 'enabled' => false, 'ok' => false, 'error' => null, 'checked_at' => null];
+      try {
+        $stmt = db()->prepare('SELECT username, enabled, last_check_at, last_error FROM office_mailboxes WHERE office = ?');
+        $stmt->execute([$key]);
+        $cfg = $stmt->fetch();
+      } catch (Exception $e) { $cfg = null; }
+      if ($cfg) {
+        $row['configured'] = true;
+        $row['username'] = $cfg['username'];
+        $row['enabled'] = (bool) $cfg['enabled'];
+        $row['checked_at'] = $cfg['last_check_at'];
+        $row['error'] = $cfg['last_error'];
+        if ($row['enabled'] && mailbox_key()) {
+          [$mbox, $err] = mailbox_open($key);
+          $row['ok'] = $mbox !== null;
+          $row['error'] = $err;
+          if ($mbox) imap_close($mbox);
+          $now = date('Y-m-d H:i:s');
+          db()->prepare('UPDATE office_mailboxes SET last_check_at = ?, last_error = ? WHERE office = ?')
+            ->execute([$now, $err, $key]);
+          $row['checked_at'] = $now;
+        } elseif (!mailbox_key()) {
+          $row['error'] = 'MAILBOX_KEY missing in api/prod-env.php';
+        }
+      }
+      $out[] = $row;
+    }
+    json_response($out);
+  }
+  elseif (preg_match('#^/mail/mailboxes/([^/]+)$#', $path, $m) && $method === 'PUT') {
+    $user = require_cap('admin.system');
+    $office = $m[1];
+    $offices = office_list();
+    if (!isset($offices[$office])) json_error('Unknown office', 400);
+    $data = input_json();
+    try {
+      $stmt = db()->prepare('SELECT office FROM office_mailboxes WHERE office = ?');
+      $stmt->execute([$office]);
+      $exists = (bool) $stmt->fetch();
+    } catch (Exception $e) { json_error('Mailbox store unavailable — import migration 043 first', 500); }
+    if (!mailbox_key()) json_error('MAILBOX_KEY missing in api/prod-env.php', 500);
+    $host = trim($data['host'] ?? 'mail.astronomy.ug') ?: 'mail.astronomy.ug';
+    $port = (int) ($data['port'] ?? 993) ?: 993;
+    $username = trim($data['username'] ?? '');
+    if ($username === '') json_error('Username is required', 400);
+    $useSsl = empty($data) || !isset($data['use_ssl']) ? 1 : (!empty($data['use_ssl']) ? 1 : 0);
+    $enabled = !isset($data['enabled']) || !empty($data['enabled']) ? 1 : 0;
+    $pass = $data['password'] ?? '';
+    if (!$exists && $pass === '') json_error('Password is required for a new mailbox', 400);
+    if ($exists) {
+      if ($pass !== '') {
+        $enc = mailbox_encrypt($pass);
+        if ($enc === null) json_error('Encryption unavailable', 500);
+        db()->prepare('UPDATE office_mailboxes SET host = ?, port = ?, username = ?, password_enc = ?, use_ssl = ?, enabled = ? WHERE office = ?')
+          ->execute([$host, $port, $username, $enc, $useSsl, $enabled, $office]);
+      } else {
+        db()->prepare('UPDATE office_mailboxes SET host = ?, port = ?, username = ?, use_ssl = ?, enabled = ? WHERE office = ?')
+          ->execute([$host, $port, $username, $useSsl, $enabled, $office]);
+      }
+    } else {
+      $enc = mailbox_encrypt($pass);
+      if ($enc === null) json_error('Encryption unavailable', 500);
+      db()->prepare('INSERT INTO office_mailboxes (office, host, port, username, password_enc, use_ssl, enabled) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$office, $host, $port, $username, $enc, $useSsl, $enabled]);
+    }
+    audit_log('mailbox_configure', 'office', 0, ['office' => $office, 'username' => $username]);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/mail/([^/]+)/messages$#', $path, $m) && $method === 'GET') {
+    $user = require_login();
+    $office = $m[1];
+    if (!in_array($office, user_inbox_offices((int) $user['id']), true)) {
+      json_error('No access to this office inbox', 403);
+    }
+    [$mbox, $err] = mailbox_open($office);
+    if (!$mbox) json_error('Mailbox unavailable: ' . $err, 502);
+    $limit = max(1, min(50, (int) ($_GET['limit'] ?? 25)));
+    $offset = max(0, (int) ($_GET['offset'] ?? 0));
+    $uids = @imap_sort($mbox, SORTDATE, 1) ?: [];
+    $uids = array_slice($uids, $offset, $limit);
+    $out = [];
+    if ($uids) {
+      $ov = @imap_fetch_overview($mbox, implode(',', $uids), FT_UID) ?: [];
+      foreach ($ov as $o) {
+        $out[] = [
+          'uid' => (int) $o->uid,
+          'from' => mailbox_text($o->from ?? ''),
+          'subject' => mailbox_text($o->subject ?? '(no subject)'),
+          'date' => date('Y-m-d H:i:s', strtotime($o->date ?? 'now') ?: time()),
+          'seen' => !empty($o->seen),
+        ];
+      }
+      usort($out, fn($a, $b) => $b['uid'] <=> $a['uid']);
+    }
+    imap_close($mbox);
+    json_response($out);
+  }
+  elseif (preg_match('#^/mail/([^/]+)/messages/(\d+)$#', $path, $m) && $method === 'GET') {
+    $user = require_login();
+    $office = $m[1];
+    $uid = (int) $m[2];
+    if (!in_array($office, user_inbox_offices((int) $user['id']), true)) {
+      json_error('No access to this office inbox', 403);
+    }
+    [$mbox, $err] = mailbox_open($office);
+    if (!$mbox) json_error('Mailbox unavailable: ' . $err, 502);
+    $ov = @imap_fetch_overview($mbox, (string) $uid, FT_UID);
+    if (!$ov) { imap_close($mbox); json_error('Message not found', 404); }
+    $o = $ov[0];
+    [$body] = mailbox_body($mbox, $uid);
+    $msg = [
+      'uid' => $uid,
+      'from' => mailbox_text($o->from ?? ''),
+      'to' => mailbox_text($o->to ?? ''),
+      'subject' => mailbox_text($o->subject ?? '(no subject)'),
+      'date' => date('Y-m-d H:i:s', strtotime($o->date ?? 'now') ?: time()),
+      'seen' => !empty($o->seen),
+      'body' => $body,
+    ];
+    imap_close($mbox);
+    json_response($msg);
+  }
+  elseif (preg_match('#^/mail/([^/]+)/messages/(\d+)/seen$#', $path, $m) && $method === 'POST') {
+    $user = require_login();
+    $office = $m[1];
+    $uid = (int) $m[2];
+    if (!in_array($office, user_inbox_offices((int) $user['id']), true)) {
+      json_error('No access to this office inbox', 403);
+    }
+    [$mbox, $err] = mailbox_open($office);
+    if (!$mbox) json_error('Mailbox unavailable: ' . $err, 502);
+    $data = input_json();
+    $ok = !empty($data['seen'])
+      ? @imap_setflag_full($mbox, (string) $uid, '\\Seen', FT_UID)
+      : @imap_clearflag_full($mbox, (string) $uid, '\\Seen', FT_UID);
+    imap_close($mbox);
+    if (!$ok) json_error('Could not update flags', 500);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/mail/([^/]+)/messages/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    $user = require_login();
+    $office = $m[1];
+    $uid = (int) $m[2];
+    if (!in_array($office, user_inbox_offices((int) $user['id']), true)) {
+      json_error('No access to this office inbox', 403);
+    }
+    [$mbox, $err] = mailbox_open($office);
+    if (!$mbox) json_error('Mailbox unavailable: ' . $err, 502);
+    $ok = @imap_delete($mbox, (string) $uid, FT_UID);
+    if ($ok) @imap_expunge($mbox);
+    imap_close($mbox);
+    if (!$ok) json_error('Could not delete message', 500);
+    audit_log('mail_delete', 'office', 0, ['office' => $office, 'uid' => $uid]);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/mail/([^/]+)/messages/(\d+)/reply$#', $path, $m) && $method === 'POST') {
+    $user = require_login();
+    $office = $m[1];
+    $uid = (int) $m[2];
+    if (!in_array($office, user_inbox_offices((int) $user['id']), true)) {
+      json_error('No access to this office inbox', 403);
+    }
+    $data = input_json();
+    $body = trim($data['body'] ?? '');
+    if ($body === '' || mb_strlen($body) > 10000) json_error('Reply must be 1–10000 characters', 400);
+    [$mbox, $err] = mailbox_open($office);
+    if (!$mbox) json_error('Mailbox unavailable: ' . $err, 502);
+    $ov = @imap_fetch_overview($mbox, (string) $uid, FT_UID);
+    if (!$ov) { imap_close($mbox); json_error('Message not found', 404); }
+    $orig = $ov[0];
+    $to = mailbox_text($orig->reply_to ?? $orig->from ?? '');
+    if (!preg_match('/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i', $to, $mm)) {
+      imap_close($mbox);
+      json_error('No replyable sender address', 400);
+    }
+    $origSubject = mailbox_text($orig->subject ?? '');
+    $subject = (stripos($origSubject, 're:') === 0 ? $origSubject : 'Re: ' . $origSubject);
+    $text = $body . "\n\n—\n" . $user['name'] . ', Uganda Astronomical Society';
+    $sent = send_office_email($office, $mm[0], $subject, $text);
+    @imap_setflag_full($mbox, (string) $uid, '\\Seen', FT_UID);
+    imap_close($mbox);
+    audit_log('mail_reply', 'office', 0, ['office' => $office, 'uid' => $uid, 'emailed' => $sent]);
+    json_response(['ok' => true, 'emailed' => $sent]);
+  }
 
   // --- SEARCH ---
   elseif ($path === '/search' && $method === 'GET') {

@@ -194,6 +194,7 @@
       <button class="dash-tab" data-panel="resolutions">Resolutions</button>
       <button class="dash-tab" data-panel="operations">Operations</button>
       <button class="dash-tab" data-panel="inbox">Inbox</button>
+      <button class="dash-tab" data-panel="mail">Mail</button>
       <button class="dash-tab" data-panel="audit">Audit Log</button>
       <button class="dash-tab" data-panel="backups">Backups</button>
     </div>
@@ -293,6 +294,21 @@
       <div id="inboxList"></div>
     </div>
 
+    <!-- Office Mail (live mailboxes) -->
+    <div class="dash-panel" id="panel-mail">
+      <div class="flex-between mb-2">
+        <h3 class="section-title" style="margin:0">Office Mail</h3>
+        <button class="btn btn-outline btn-sm" onclick="loadMailPanel()">Refresh</button>
+      </div>
+      <div id="mailKeyWarn"></div>
+      <div id="mailSetup"></div>
+      <div id="mailReader" style="margin-top:1rem">
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem" id="mailOfficeTabs"></div>
+        <div id="mailList"></div>
+        <div id="mailReading" style="margin-top:1rem"></div>
+      </div>
+    </div>
+
     <!-- Groups -->
     <div class="dash-panel" id="panel-groups">
       <div class="flex-between mb-2">
@@ -348,9 +364,9 @@
           return;
         }
         if (!isAdmin) {
-          // Restricted inbox-only view for office grantees
-          document.querySelectorAll('#adminTabs .dash-tab').forEach(t => { if (t.dataset.panel !== 'inbox') t.style.display = 'none'; });
-          document.querySelectorAll('.dash-panel').forEach(p => { if (p.id !== 'panel-inbox') p.style.display = 'none'; });
+          // Restricted inbox-only view for office grantees (contact inbox + mail)
+          document.querySelectorAll('#adminTabs .dash-tab').forEach(t => { if (t.dataset.panel !== 'inbox' && t.dataset.panel !== 'mail') t.style.display = 'none'; });
+          document.querySelectorAll('.dash-panel').forEach(p => { if (p.id !== 'panel-inbox' && p.id !== 'panel-mail') p.style.display = 'none'; });
           document.querySelector('#adminTabs [data-panel="inbox"]').classList.add('active');
           document.getElementById('panel-inbox').classList.add('active');
         }
@@ -937,6 +953,163 @@
       } catch (e) { alert(e.error || 'Failed to archive'); }
     }
 
+    // ---- Office Mail (live IMAP) ----
+    let mailOffices = [];
+    let mailOffice = '';
+    let mailMsgs = [];
+
+    async function loadMailPanel() {
+      if (api.hasCap('admin.system')) {
+        const status = await api.request('/mail/status').catch(() => null);
+        renderMailSetup(status);
+      }
+      mailOffices = await api.request('/my/inboxes').catch(() => []);
+      if (mailOffices.length && !mailOffices.includes(mailOffice)) mailOffice = mailOffices[0];
+      renderMailOfficeTabs();
+      if (mailOffice) loadMailList();
+      else document.getElementById('mailList').innerHTML = '<div class="empty-state"><p>No office inbox access. Ask a system administrator to grant it on your role.</p></div>';
+    }
+
+    function renderMailSetup(status) {
+      const box = document.getElementById('mailSetup');
+      const warn = document.getElementById('mailKeyWarn');
+      if (!status) { box.innerHTML = '<p class="text-dim">Mailbox store unavailable — import migration 043.</p>'; return; }
+      if (status.some(s => (s.error || '').indexOf('MAILBOX_KEY') !== -1)) {
+        warn.innerHTML = '<p style="padding:0.75rem;border:1px solid var(--gold);border-radius:var(--radius);background:rgba(184,134,11,0.08);font-size:0.85rem">Server key missing: add <code>define(\'MAILBOX_KEY\', \'paste-64-hex-chars\');</code> to <code>api/prod-env.php</code>, then configure the accounts below.</p>';
+      } else { warn.innerHTML = ''; }
+      box.innerHTML = '<h4 style="margin:1rem 0 0.5rem">Mailbox accounts <span class="text-dim" style="font-weight:400">(passwords stored encrypted, never displayed)</span></h4>' +
+        '<div style="overflow-x:auto"><table class="fin-table" style="width:100%"><thead><tr><th>Office</th><th>Username</th><th>Status</th><th></th></tr></thead><tbody>' +
+        status.map(s => `
+          <tr>
+            <td><strong>${esc(OFFICE_LABELS[s.office] || s.office)}</strong><br><span class="text-dim text-sm">${esc(s.address)}</span></td>
+            <td class="text-sm">${esc(s.username || '—')}</td>
+            <td>${!s.configured ? '<span class="badge badge-inactive">not set</span>' : !s.enabled ? '<span class="badge badge-inactive">disabled</span>' : s.ok ? '<span class="badge badge-active">connected</span>' : `<span class="badge badge-inactive" title="${esc(s.error || '')}">error</span>`}</td>
+            <td><button class="btn btn-outline btn-xs" onclick="toggleMailboxForm('${s.office}')">Configure</button></td>
+          </tr>
+          <tr id="mbox-form-${s.office}" style="display:none"><td colspan="4">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;max-width:560px">
+              <label class="text-sm">Host<input class="form-input" id="mbox-host-${s.office}" value="mail.astronomy.ug" placeholder="mail.astronomy.ug"></label>
+              <label class="text-sm">Port<input class="form-input" id="mbox-port-${s.office}" value="993"></label>
+              <label class="text-sm">Username<input class="form-input" id="mbox-user-${s.office}" placeholder="info@astronomy.ug"></label>
+              <label class="text-sm">New password<input class="form-input" id="mbox-pass-${s.office}" type="password" placeholder="(blank keeps current)"></label>
+              <label class="text-sm" style="display:flex;align-items:center;gap:0.4rem"><input type="checkbox" id="mbox-ssl-${s.office}" checked> SSL</label>
+              <label class="text-sm" style="display:flex;align-items:center;gap:0.4rem"><input type="checkbox" id="mbox-on-${s.office}" checked> Enabled</label>
+            </div>
+            <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" onclick="saveMailbox('${s.office}')">Save Account</button>
+          </td></tr>`).join('') + '</tbody></table></div>';
+    }
+
+    function toggleMailboxForm(office) {
+      const row = document.getElementById('mbox-form-' + office);
+      if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
+    }
+
+    async function saveMailbox(office) {
+      const v = id => (document.getElementById(id) || {}).value;
+      try {
+        await api.request('/mail/mailboxes/' + office, { method: 'PUT', body: {
+          host: v('mbox-host-' + office),
+          port: parseInt(v('mbox-port-' + office)) || 993,
+          username: (v('mbox-user-' + office) || '').trim(),
+          password: v('mbox-pass-' + office),
+          use_ssl: document.getElementById('mbox-ssl-' + office).checked,
+          enabled: document.getElementById('mbox-on-' + office).checked,
+        }});
+        alert('Mailbox saved — testing connection…');
+        await loadMailPanel();
+      } catch (e) { alert(e.error || 'Failed to save mailbox'); }
+    }
+
+    function renderMailOfficeTabs() {
+      const box = document.getElementById('mailOfficeTabs');
+      box.innerHTML = mailOffices.map(o => `<button class="btn btn-sm ${o === mailOffice ? 'btn-primary' : 'btn-outline'}" onclick="switchMailOffice('${o}')">${esc(OFFICE_LABELS[o] || o)}</button>`).join('');
+    }
+
+    async function switchMailOffice(o) {
+      mailOffice = o;
+      document.getElementById('mailReading').innerHTML = '';
+      renderMailOfficeTabs();
+      await loadMailList();
+    }
+
+    async function loadMailList() {
+      const box = document.getElementById('mailList');
+      box.innerHTML = '<p class="text-dim">Loading mailbox…</p>';
+      try {
+        mailMsgs = await api.request(`/mail/${mailOffice}/messages?limit=25`);
+      } catch (e) {
+        box.innerHTML = `<div class="empty-state"><p>Mailbox unavailable.</p><p class="text-dim text-sm">${esc(e.error || '')}</p></div>`;
+        mailMsgs = [];
+        return;
+      }
+      if (!mailMsgs.length) { box.innerHTML = '<div class="empty-state"><p>Inbox is empty.</p></div>'; return; }
+      box.innerHTML = mailMsgs.map(m => `
+        <div class="inbox-item ${m.seen ? '' : 'unread'}" style="cursor:pointer" onclick="openMailMsg(${m.uid})">
+          <div class="flex-between">
+            <div style="min-width:0">
+              <strong style="${m.seen ? 'font-weight:400' : ''}">${esc(m.subject)}</strong>
+              <div class="text-dim text-sm">${esc(m.from)} &middot; ${esc(m.date)}</div>
+            </div>
+          </div>
+        </div>`).join('');
+    }
+
+    async function openMailMsg(uid) {
+      const pane = document.getElementById('mailReading');
+      pane.innerHTML = '<p class="text-dim">Loading…</p>';
+      try {
+        const m = await api.request(`/mail/${mailOffice}/messages/${uid}`);
+        pane.innerHTML = `
+          <div class="card" style="padding:1.25rem">
+            <h4 style="margin-top:0">${esc(m.subject)}</h4>
+            <div class="text-dim text-sm" style="margin-bottom:0.75rem">From ${esc(m.from)} &middot; To ${esc(m.to)} &middot; ${esc(m.date)}</div>
+            <pre style="white-space:pre-wrap;font-family:inherit;font-size:0.9rem;line-height:1.65;margin:0">${esc(m.body) || '(no readable text content)'}</pre>
+            <div style="display:flex;gap:0.5rem;margin-top:1rem;flex-wrap:wrap">
+              <button class="btn btn-outline btn-sm" onclick="document.getElementById('mail-replybox').style.display='';this.style.display='none'">Reply</button>
+              <button class="btn btn-outline btn-sm" onclick="mailMarkSeen(${uid}, false)">Mark unread</button>
+              <button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="mailDeleteMsg(${uid})">Delete</button>
+            </div>
+            <div id="mail-replybox" style="display:none;margin-top:0.75rem">
+              <textarea id="mail-reply-${uid}" class="form-textarea" rows="4" style="width:100%" placeholder="Write a reply from the ${esc(mailOffice)} office..."></textarea>
+              <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" id="mail-send-${uid}" onclick="sendMailReply(${uid})">Send Reply</button>
+            </div>
+          </div>`;
+      } catch (e) { pane.innerHTML = `<p class="text-dim">Could not load message. ${esc(e.error || '')}</p>`; }
+    }
+
+    async function sendMailReply(uid) {
+      const ta = document.getElementById('mail-reply-' + uid);
+      const body = (ta.value || '').trim();
+      if (!body) { alert('Write a reply first'); return; }
+      const btn = document.getElementById('mail-send-' + uid);
+      btn.disabled = true; btn.textContent = 'Sending...';
+      try {
+        const r = await api.request(`/mail/${mailOffice}/messages/${uid}/reply`, { method: 'POST', body: { body } });
+        alert(r.emailed ? 'Reply sent' : 'Email failed — reply not recorded for mailbox mail');
+        await loadMailList();
+        openMailMsg(uid);
+      } catch (e) {
+        alert(e.error || 'Failed to send reply');
+        btn.disabled = false; btn.textContent = 'Send Reply';
+      }
+    }
+
+    async function mailMarkSeen(uid, seen) {
+      try {
+        await api.request(`/mail/${mailOffice}/messages/${uid}/seen`, { method: 'POST', body: { seen } });
+        await loadMailList();
+      } catch (e) { alert(e.error || 'Failed to update message'); }
+    }
+
+    async function mailDeleteMsg(uid) {
+      if (!confirm('Delete this message from the mailbox? This cannot be undone.')) return;
+      try {
+        await api.request(`/mail/${mailOffice}/messages/${uid}`, { method: 'DELETE' });
+        document.getElementById('mailReading').innerHTML = '';
+        await loadMailList();
+      } catch (e) { alert(e.error || 'Failed to delete message'); }
+    }
+
     async function markAllRead() {
       try {
         await api.request('/contact-messages/read-all', { method: 'POST' });
@@ -1492,6 +1665,7 @@
         document.querySelectorAll('.dash-tab').forEach(t => t.classList.toggle('active', t.dataset.panel === tab.dataset.panel));
         document.querySelectorAll('.dash-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab.dataset.panel));
         if (tab.dataset.panel === 'groups') loadGroups();
+        if (tab.dataset.panel === 'mail') loadMailPanel();
       });
     }
     load();
