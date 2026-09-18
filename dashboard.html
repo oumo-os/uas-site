@@ -677,6 +677,7 @@
     <div class="dash-tabs" id="dashTabs">
       <button class="dash-tab active" data-panel="overview">Overview</button>
       <button class="dash-tab" data-panel="inbox">Inbox <span class="tab-count" id="inboxTabCount"></span></button>
+      <button class="dash-tab" data-panel="mail" id="mailTab" style="display:none">Mail</button>
       <button class="dash-tab" data-panel="pending">Pending <span class="tab-count" id="pendingTabCount"></span></button>
       <button class="dash-tab" data-panel="governance">Votes & Decisions</button>
       <button class="dash-tab" data-panel="finance">Finance</button>
@@ -987,6 +988,19 @@
       </div>
     </div>
 
+    <!-- Office Mail Panel (reader — setup lives in Admin) -->
+    <div class="dash-panel" id="panel-mail">
+      <div class="dash-card">
+        <div class="dash-card-header">
+          <h4>Office Mail</h4>
+          <button class="btn btn-outline btn-xs" onclick="loadDashMail()">Refresh</button>
+        </div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem" id="dashMailOffices"></div>
+        <div id="dashMailList"></div>
+        <div id="dashMailReading" style="margin-top:1rem"></div>
+      </div>
+    </div>
+
     <!-- Profile Panel (summary — editing lives on /profile) -->
     <div class="dash-panel" id="panel-profile">
       <div class="dash-card">
@@ -1095,7 +1109,7 @@
           document.getElementById('createResBtn').style.display = '';
         }
 
-        const [healthData, pending, resolutions, myAsg, mySubs, calItems, finData, budgetData, wgData, activityData, meetingsData, pollsData, delData, users] = await Promise.all([
+        const [healthData, pending, resolutions, myAsg, mySubs, calItems, finData, budgetData, wgData, activityData, meetingsData, pollsData, delData, users, myOffices] = await Promise.all([
           api.getDashboard().catch(() => ({})),
           api.getPending({ scope: pendingScope }).catch(() => []),
           api.getResolutions().catch(() => []),
@@ -1110,6 +1124,7 @@
           api.request('/polls').catch(() => []),
           api.request('/delegations').catch(() => ({ outgoing: [], incoming: [] })),
           api.hasCap('roles.manage') ? api.request('/users').catch(() => []) : Promise.resolve([]),
+          api.request('/my/inboxes').catch(() => []),
         ]);
 
         health = healthData;
@@ -1126,6 +1141,11 @@
         renderPolls(pollsData);
         delegationsData = delData || { outgoing: [], incoming: [] };
         usersData = users || [];
+        mailOffices = myOffices || [];
+        if (mailOffices.length) {
+          const mt = document.getElementById('mailTab');
+          if (mt) mt.style.display = '';
+        }
         renderDelegations();
         renderRoles(roles);
         renderQuickActions();
@@ -3593,6 +3613,7 @@
       if (panel === 'inbox') loadDashInbox();
       if (panel === 'profile') loadDashProfile();
       if (panel === 'members') loadMembersPanel();
+      if (panel === 'mail') loadDashMail();
     }
 
     function goGov(sub) {
@@ -3653,6 +3674,101 @@
       document.querySelectorAll('#dashInbox .inbox-item.unread').forEach(el => el.classList.remove('unread'));
       const badge = document.getElementById('inboxTabCount');
       if (badge) { badge.textContent = ''; badge.style.display = 'none'; }
+    }
+
+    // ── Office Mail (reader; account setup lives in Admin) ──
+    let mailOffices = [];
+    let dashMailOffice = '';
+    let dashMailMsgs = [];
+    const MAIL_OFFICE_LABELS = { info: 'Information', contact: 'General', membership: 'Membership', programmes: 'Programmes', partnerships: 'Partnerships', publicity: 'Publicity', secretary: 'Secretariat', legal: 'Legal', finance: 'Finance' };
+
+    async function loadDashMail() {
+      if (!mailOffices.length) mailOffices = await api.request('/my/inboxes').catch(() => []);
+      if (mailOffices.length && !mailOffices.includes(dashMailOffice)) dashMailOffice = mailOffices[0];
+      const tabs = document.getElementById('dashMailOffices');
+      tabs.innerHTML = mailOffices.map(o => `<button class="btn btn-sm ${o === dashMailOffice ? 'btn-primary' : 'btn-outline'}" onclick="switchDashMailOffice('${o}')">${esc(MAIL_OFFICE_LABELS[o] || o)}</button>`).join('');
+      if (dashMailOffice) loadDashMailList();
+      else document.getElementById('dashMailList').innerHTML = '<div class="empty-state"><p>No office inbox access.</p></div>';
+    }
+
+    async function switchDashMailOffice(o) {
+      dashMailOffice = o;
+      document.getElementById('dashMailReading').innerHTML = '';
+      loadDashMail();
+    }
+
+    async function loadDashMailList() {
+      const box = document.getElementById('dashMailList');
+      box.innerHTML = '<p class="text-dim">Loading mailbox…</p>';
+      try {
+        dashMailMsgs = await api.request(`/mail/${dashMailOffice}/messages?limit=25`);
+      } catch (e) {
+        box.innerHTML = `<div class="empty-state"><p>Mailbox unavailable.</p><p class="text-dim text-sm">${esc(e.error || '')}</p></div>`;
+        dashMailMsgs = [];
+        return;
+      }
+      if (!dashMailMsgs.length) { box.innerHTML = '<div class="empty-state"><p>Inbox is empty.</p></div>'; return; }
+      box.innerHTML = dashMailMsgs.map(m => `
+        <div class="inbox-item ${m.seen ? '' : 'unread'}" style="cursor:pointer" onclick="openDashMailMsg(${m.uid})">
+          <div style="font-weight:${m.seen ? '400' : '600'};font-size:0.9rem">${esc(m.subject)}</div>
+          <div class="text-dim text-sm">${esc(m.from)} &middot; ${esc(m.date)}</div>
+        </div>`).join('');
+    }
+
+    async function openDashMailMsg(uid) {
+      const pane = document.getElementById('dashMailReading');
+      pane.innerHTML = '<p class="text-dim">Loading…</p>';
+      try {
+        const m = await api.request(`/mail/${dashMailOffice}/messages/${uid}`);
+        pane.innerHTML = `
+          <div class="dash-card" style="padding:1.25rem">
+            <h4 style="margin-top:0">${esc(m.subject)}</h4>
+            <div class="text-dim text-sm" style="margin-bottom:0.75rem">From ${esc(m.from)} &middot; ${esc(m.date)}</div>
+            <pre style="white-space:pre-wrap;font-family:inherit;font-size:0.9rem;line-height:1.65;margin:0">${esc(m.body) || '(no readable text content)'}</pre>
+            <div style="display:flex;gap:0.5rem;margin-top:1rem;flex-wrap:wrap">
+              <button class="btn btn-outline btn-sm" onclick="document.getElementById('dash-mail-replybox').style.display='';this.style.display='none'">Reply</button>
+              <button class="btn btn-outline btn-sm" onclick="dashMailMarkSeen(${uid}, false)">Mark unread</button>
+              <button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="dashMailDeleteMsg(${uid})">Delete</button>
+            </div>
+            <div id="dash-mail-replybox" style="display:none;margin-top:0.75rem">
+              <textarea id="dash-mail-reply-${uid}" class="form-textarea" rows="4" style="width:100%" placeholder="Write a reply..."></textarea>
+              <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" id="dash-mail-send-${uid}" onclick="sendDashMailReply(${uid})">Send Reply</button>
+            </div>
+          </div>`;
+      } catch (e) { pane.innerHTML = `<p class="text-dim">Could not load message. ${esc(e.error || '')}</p>`; }
+    }
+
+    async function sendDashMailReply(uid) {
+      const ta = document.getElementById('dash-mail-reply-' + uid);
+      const body = (ta.value || '').trim();
+      if (!body) { toast('Write a reply first', 'warning'); return; }
+      const btn = document.getElementById('dash-mail-send-' + uid);
+      btn.disabled = true; btn.textContent = 'Sending...';
+      try {
+        const r = await api.request(`/mail/${dashMailOffice}/messages/${uid}/reply`, { method: 'POST', body: { body } });
+        toast(r.emailed ? 'Reply sent' : 'Email failed — reply not recorded for mailbox mail', r.emailed ? 'success' : 'warning');
+        await loadDashMailList();
+        openDashMailMsg(uid);
+      } catch (e) {
+        toast(e.error || 'Failed to send reply', 'error');
+        btn.disabled = false; btn.textContent = 'Send Reply';
+      }
+    }
+
+    async function dashMailMarkSeen(uid, seen) {
+      try {
+        await api.request(`/mail/${dashMailOffice}/messages/${uid}/seen`, { method: 'POST', body: { seen } });
+        await loadDashMailList();
+      } catch (e) { toast(e.error || 'Failed to update message', 'error'); }
+    }
+
+    async function dashMailDeleteMsg(uid) {
+      if (!confirm('Delete this message from the mailbox? This cannot be undone.')) return;
+      try {
+        await api.request(`/mail/${dashMailOffice}/messages/${uid}`, { method: 'DELETE' });
+        document.getElementById('dashMailReading').innerHTML = '';
+        await loadDashMailList();
+      } catch (e) { toast(e.error || 'Failed to delete message', 'error'); }
     }
 
     // ── Profile ──
