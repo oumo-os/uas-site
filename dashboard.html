@@ -993,11 +993,13 @@
       <div class="dash-card">
         <div class="dash-card-header">
           <h4>Office Mail</h4>
-          <button class="btn btn-outline btn-xs" onclick="loadDashMail()">Refresh</button>
+          <div style="display:flex;gap:0.5rem">
+            <button class="btn btn-primary btn-xs" onclick="showMailCompose()">Compose</button>
+            <button class="btn btn-outline btn-xs" onclick="loadDashMail()">Refresh</button>
+          </div>
         </div>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem" id="dashMailOffices"></div>
         <div id="dashMailList"></div>
-        <div id="dashMailReading" style="margin-top:1rem"></div>
       </div>
     </div>
 
@@ -3693,7 +3695,6 @@
 
     async function switchDashMailOffice(o) {
       dashMailOffice = o;
-      document.getElementById('dashMailReading').innerHTML = '';
       loadDashMail();
     }
 
@@ -3716,26 +3717,24 @@
     }
 
     async function openDashMailMsg(uid) {
-      const pane = document.getElementById('dashMailReading');
-      pane.innerHTML = '<p class="text-dim">Loading…</p>';
+      let m;
       try {
-        const m = await api.request(`/mail/${dashMailOffice}/messages/${uid}`);
-        pane.innerHTML = `
-          <div class="dash-card" style="padding:1.25rem">
-            <h4 style="margin-top:0">${esc(m.subject)}</h4>
-            <div class="text-dim text-sm" style="margin-bottom:0.75rem">From ${esc(m.from)} &middot; ${esc(m.date)}</div>
-            <pre style="white-space:pre-wrap;font-family:inherit;font-size:0.9rem;line-height:1.65;margin:0">${esc(m.body) || '(no readable text content)'}</pre>
-            <div style="display:flex;gap:0.5rem;margin-top:1rem;flex-wrap:wrap">
-              <button class="btn btn-outline btn-sm" onclick="document.getElementById('dash-mail-replybox').style.display='';this.style.display='none'">Reply</button>
-              <button class="btn btn-outline btn-sm" onclick="dashMailMarkSeen(${uid}, false)">Mark unread</button>
-              <button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="dashMailDeleteMsg(${uid})">Delete</button>
-            </div>
-            <div id="dash-mail-replybox" style="display:none;margin-top:0.75rem">
-              <textarea id="dash-mail-reply-${uid}" class="form-textarea" rows="4" style="width:100%" placeholder="Write a reply..."></textarea>
-              <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" id="dash-mail-send-${uid}" onclick="sendDashMailReply(${uid})">Send Reply</button>
-            </div>
-          </div>`;
-      } catch (e) { pane.innerHTML = `<p class="text-dim">Could not load message. ${esc(e.error || '')}</p>`; }
+        m = await api.request(`/mail/${dashMailOffice}/messages/${uid}`);
+      } catch (e) { toast(e.error || 'Could not load message', 'error'); return; }
+      openModal(m.subject, `
+        <div class="text-dim text-sm" style="margin-bottom:0.75rem">From ${esc(m.from)} &middot; ${esc(m.date)}</div>
+        <pre style="white-space:pre-wrap;font-family:inherit;font-size:0.9rem;line-height:1.65;margin:0;max-height:40vh;overflow-y:auto">${esc(m.body) || '(no readable text content)'}</pre>
+        <div style="display:flex;gap:0.5rem;margin-top:1rem;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" id="dash-mail-reply-toggle" onclick="document.getElementById('dash-mail-replybox').style.display='';this.style.display='none'">Reply</button>
+          <button class="btn btn-outline btn-sm" onclick="dashMailMarkSeen(${uid}, false);closeModal()">Mark unread</button>
+          <button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="dashMailDeleteMsg(${uid})">Delete</button>
+        </div>
+        <div id="dash-mail-replybox" style="display:none;margin-top:0.75rem">
+          <textarea id="dash-mail-reply-${uid}" class="form-textarea" rows="4" style="width:100%" placeholder="Write a reply..."></textarea>
+          <p class="text-dim text-sm" style="margin:0.3rem 0 0">Your institutional signature is added automatically.</p>
+          <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" id="dash-mail-send-${uid}" onclick="sendDashMailReply(${uid})">Send Reply</button>
+        </div>
+      `);
     }
 
     async function sendDashMailReply(uid) {
@@ -3747,8 +3746,8 @@
       try {
         const r = await api.request(`/mail/${dashMailOffice}/messages/${uid}/reply`, { method: 'POST', body: { body } });
         toast(r.emailed ? 'Reply sent' : 'Email failed — reply not recorded for mailbox mail', r.emailed ? 'success' : 'warning');
+        closeModal();
         await loadDashMailList();
-        openDashMailMsg(uid);
       } catch (e) {
         toast(e.error || 'Failed to send reply', 'error');
         btn.disabled = false; btn.textContent = 'Send Reply';
@@ -3766,9 +3765,49 @@
       if (!confirm('Delete this message from the mailbox? This cannot be undone.')) return;
       try {
         await api.request(`/mail/${dashMailOffice}/messages/${uid}`, { method: 'DELETE' });
-        document.getElementById('dashMailReading').innerHTML = '';
+        closeModal();
         await loadDashMailList();
       } catch (e) { toast(e.error || 'Failed to delete message', 'error'); }
+    }
+
+    function showMailCompose() {
+      if (!mailOffices.length) { toast('No office inbox access', 'warning'); return; }
+      const defOffice = mailOffices.includes(dashMailOffice) ? dashMailOffice : mailOffices[0];
+      openModal('Compose Email', `
+        <div style="display:flex;flex-direction:column;gap:0.75rem">
+          <div class="form-group" style="margin:0"><label class="form-label">From office</label>
+            <select id="composeOffice" class="form-select">${mailOffices.map(o => `<option value="${o}"${o === defOffice ? ' selected' : ''}>${esc(MAIL_OFFICE_LABELS[o] || o)}</option>`).join('')}</select>
+          </div>
+          <div class="form-group" style="margin:0"><label class="form-label">To</label>
+            <input id="composeTo" class="form-input" type="email" placeholder="recipient@example.com">
+          </div>
+          <div class="form-group" style="margin:0"><label class="form-label">Subject</label>
+            <input id="composeSubject" class="form-input" placeholder="Subject">
+          </div>
+          <div class="form-group" style="margin:0"><label class="form-label">Message</label>
+            <textarea id="composeBody" class="form-textarea" rows="6" placeholder="Write your message..."></textarea>
+          </div>
+          <p class="text-dim text-sm" style="margin:0">Your institutional signature (name, roles, committees) is added automatically.</p>
+          <div><button class="btn btn-primary" id="composeSendBtn" onclick="sendMailCompose()">Send Email</button></div>
+        </div>
+      `);
+    }
+
+    async function sendMailCompose() {
+      const office = document.getElementById('composeOffice').value;
+      const to = (document.getElementById('composeTo').value || '').trim();
+      const subject = (document.getElementById('composeSubject').value || '').trim();
+      const body = (document.getElementById('composeBody').value || '').trim();
+      if (!to || !subject || !body) { toast('To, subject and message are all required', 'warning'); return; }
+      const btn = document.getElementById('composeSendBtn');
+      btn.disabled = true; btn.textContent = 'Sending...';
+      try {
+        await api.request(`/mail/${office}/compose`, { method: 'POST', body: { to, subject, body } });
+        closeModal(); toast('Email sent', 'success');
+      } catch (e) {
+        toast(e.error || 'Failed to send email', 'error');
+        btn.disabled = false; btn.textContent = 'Send Email';
+      }
     }
 
     // ── Profile ──

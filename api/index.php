@@ -2480,7 +2480,7 @@ try {
     $offices = office_list();
     $from = $offices[$msg['office']] ?? $offices['contact'];
     $subject = 'Re: ' . ($msg['subject'] ?: 'your message to UAS') . ' [UAS]';
-    $text = $body . "\n\n—\n" . $user['name'] . ', Uganda Astronomical Society (' . $from . ')';
+    $text = $body . "\n\n—\n" . mail_signature((int) $user['id'], $user['name']);
     $sent = send_office_email($msg['office'], $msg['email'], $subject, $text);
     db()->prepare("INSERT INTO message_replies (message_id, user_id, body, sent_via) VALUES (?, ?, ?, ?)")
       ->execute([$id, $user['id'], $body, $sent ? 'email' : 'internal']);
@@ -2718,12 +2718,35 @@ try {
     }
     $origSubject = mailbox_text($orig->subject ?? '');
     $subject = (stripos($origSubject, 're:') === 0 ? $origSubject : 'Re: ' . $origSubject);
-    $text = $body . "\n\n—\n" . $user['name'] . ', Uganda Astronomical Society';
+    $text = $body . "\n\n—\n" . mail_signature((int) $user['id'], $user['name']);
     $sent = send_office_email($office, $mm[0], $subject, $text);
     @imap_setflag_full($mbox, (string) $uid, '\\Seen', FT_UID);
     imap_close($mbox);
     audit_log('mail_reply', 'office', 0, ['office' => $office, 'uid' => $uid, 'emailed' => $sent]);
     json_response(['ok' => true, 'emailed' => $sent]);
+  }
+  elseif (preg_match('#^/mail/([^/]+)/compose$#', $path, $m) && $method === 'POST') {
+    $user = require_login();
+    if ($user['status'] !== 'active') json_error('Account is not active', 403);
+    $office = $m[1];
+    if (!in_array($office, user_inbox_offices((int) $user['id']), true)) {
+      json_error('No access to this office inbox', 403);
+    }
+    $data = input_json();
+    $to = trim($data['to'] ?? '');
+    $subject = trim($data['subject'] ?? '');
+    $body = trim($data['body'] ?? '');
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) json_error('A valid recipient email is required', 400);
+    if ($subject === '' || mb_strlen($subject) > 255) json_error('Subject is required (max 255 characters)', 400);
+    if ($body === '' || mb_strlen($body) > 10000) json_error('Message must be 1–10000 characters', 400);
+    if (!rate_limit('mail-compose:' . $user['id'], 'mail-compose', 20, 3600)) {
+      json_error('Too many messages sent. Try again later.', 429);
+    }
+    $text = $body . "\n\n—\n" . mail_signature((int) $user['id'], $user['name']);
+    $sent = send_office_email($office, $to, $subject . ' [UAS]', $text);
+    audit_log('mail_compose', 'office', 0, ['office' => $office, 'to' => $to, 'emailed' => $sent]);
+    if (!$sent) json_error('Mail server refused the message', 502);
+    json_response(['ok' => true, 'emailed' => true]);
   }
 
   // --- SEARCH ---

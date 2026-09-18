@@ -198,6 +198,28 @@ function mailbox_open(string $office): array {
   return [$mbox, null];
 }
 
+// Forced institutional signature appended server-side to every outgoing
+// office email: author name, governance/administrative roles, committees,
+// then the standard organisation block.
+function mail_signature(int $userId, string $userName): string {
+  $lines = [$userName];
+  try {
+    $roles = [];
+    foreach (user_roles($userId) as $r) {
+      if (in_array($r['role_type'] ?? '', ['governance', 'administrative'], true)) $roles[] = $r['title'];
+    }
+    $roles = array_values(array_unique($roles));
+    if ($roles) $lines[] = implode(', ', $roles);
+    $stmt = db()->prepare("SELECT wg.name FROM working_group_members wgm JOIN working_groups wg ON wg.id = wgm.group_id WHERE wgm.user_id = ? AND wgm.status = 'active' AND wg.status = 'active' AND wg.type = 'committee' ORDER BY wg.name");
+    $stmt->execute([$userId]);
+    $committees = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    if ($committees) $lines[] = implode(', ', $committees);
+  } catch (Exception $e) { /* roles unavailable — name + org block still apply */ }
+  $lines[] = 'Uganda Astronomical Society';
+  $lines[] = 'https://astronomy.ug';
+  return implode("\n", $lines);
+}
+
 // Decode a possibly MIME-encoded header to UTF-8.
 function mailbox_text(string $s): string {
   if (function_exists('imap_mime_header_decode')) {

@@ -298,14 +298,26 @@
     <div class="dash-panel" id="panel-mail">
       <div class="flex-between mb-2">
         <h3 class="section-title" style="margin:0">Office Mail</h3>
-        <button class="btn btn-outline btn-sm" onclick="loadMailPanel()">Refresh</button>
+        <div style="display:flex;gap:0.5rem">
+          <button class="btn btn-primary btn-sm" onclick="showMailCompose()">Compose</button>
+          <button class="btn btn-outline btn-sm" onclick="loadMailPanel()">Refresh</button>
+        </div>
       </div>
       <div id="mailKeyWarn"></div>
       <div id="mailSetup"></div>
       <div id="mailReader" style="margin-top:1rem">
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem" id="mailOfficeTabs"></div>
         <div id="mailList"></div>
-        <div id="mailReading" style="margin-top:1rem"></div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="mailOverlay">
+      <div class="modal">
+        <div class="modal-header">
+          <h3 id="mailModalTitle"></h3>
+          <button class="modal-close" onclick="closeMailModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="mailModalBody"></div>
       </div>
     </div>
 
@@ -1027,7 +1039,6 @@
 
     async function switchMailOffice(o) {
       mailOffice = o;
-      document.getElementById('mailReading').innerHTML = '';
       renderMailOfficeTabs();
       await loadMailList();
     }
@@ -1054,27 +1065,36 @@
         </div>`).join('');
     }
 
+    function closeMailModal() {
+      document.getElementById('mailOverlay').classList.remove('open');
+    }
+    document.getElementById('mailOverlay').addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeMailModal();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && document.getElementById('mailOverlay')?.classList.contains('open')) closeMailModal();
+    });
+
     async function openMailMsg(uid) {
-      const pane = document.getElementById('mailReading');
-      pane.innerHTML = '<p class="text-dim">Loading…</p>';
+      let m;
       try {
-        const m = await api.request(`/mail/${mailOffice}/messages/${uid}`);
-        pane.innerHTML = `
-          <div class="card" style="padding:1.25rem">
-            <h4 style="margin-top:0">${esc(m.subject)}</h4>
-            <div class="text-dim text-sm" style="margin-bottom:0.75rem">From ${esc(m.from)} &middot; To ${esc(m.to)} &middot; ${esc(m.date)}</div>
-            <pre style="white-space:pre-wrap;font-family:inherit;font-size:0.9rem;line-height:1.65;margin:0">${esc(m.body) || '(no readable text content)'}</pre>
-            <div style="display:flex;gap:0.5rem;margin-top:1rem;flex-wrap:wrap">
-              <button class="btn btn-outline btn-sm" onclick="document.getElementById('mail-replybox').style.display='';this.style.display='none'">Reply</button>
-              <button class="btn btn-outline btn-sm" onclick="mailMarkSeen(${uid}, false)">Mark unread</button>
-              <button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="mailDeleteMsg(${uid})">Delete</button>
-            </div>
-            <div id="mail-replybox" style="display:none;margin-top:0.75rem">
-              <textarea id="mail-reply-${uid}" class="form-textarea" rows="4" style="width:100%" placeholder="Write a reply from the ${esc(mailOffice)} office..."></textarea>
-              <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" id="mail-send-${uid}" onclick="sendMailReply(${uid})">Send Reply</button>
-            </div>
-          </div>`;
-      } catch (e) { pane.innerHTML = `<p class="text-dim">Could not load message. ${esc(e.error || '')}</p>`; }
+        m = await api.request(`/mail/${mailOffice}/messages/${uid}`);
+      } catch (e) { alert(e.error || 'Could not load message'); return; }
+      document.getElementById('mailModalTitle').textContent = m.subject;
+      document.getElementById('mailModalBody').innerHTML = `
+        <div class="text-dim text-sm" style="margin-bottom:0.75rem">From ${esc(m.from)} &middot; To ${esc(m.to)} &middot; ${esc(m.date)}</div>
+        <pre style="white-space:pre-wrap;font-family:inherit;font-size:0.9rem;line-height:1.65;margin:0;max-height:45vh;overflow-y:auto">${esc(m.body) || '(no readable text content)'}</pre>
+        <div style="display:flex;gap:0.5rem;margin-top:1rem;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('mail-replybox').style.display='';this.style.display='none'">Reply</button>
+          <button class="btn btn-outline btn-sm" onclick="mailMarkSeen(${uid}, false);closeMailModal()">Mark unread</button>
+          <button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="mailDeleteMsg(${uid})">Delete</button>
+        </div>
+        <div id="mail-replybox" style="display:none;margin-top:0.75rem">
+          <textarea id="mail-reply-${uid}" class="form-textarea" rows="4" style="width:100%" placeholder="Write a reply from the ${esc(mailOffice)} office..."></textarea>
+          <p class="text-dim text-sm" style="margin:0.3rem 0 0">Your institutional signature is added automatically.</p>
+          <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" id="mail-send-${uid}" onclick="sendMailReply(${uid})">Send Reply</button>
+        </div>`;
+      document.getElementById('mailOverlay').classList.add('open');
     }
 
     async function sendMailReply(uid) {
@@ -1086,8 +1106,8 @@
       try {
         const r = await api.request(`/mail/${mailOffice}/messages/${uid}/reply`, { method: 'POST', body: { body } });
         alert(r.emailed ? 'Reply sent' : 'Email failed — reply not recorded for mailbox mail');
+        closeMailModal();
         await loadMailList();
-        openMailMsg(uid);
       } catch (e) {
         alert(e.error || 'Failed to send reply');
         btn.disabled = false; btn.textContent = 'Send Reply';
@@ -1105,9 +1125,50 @@
       if (!confirm('Delete this message from the mailbox? This cannot be undone.')) return;
       try {
         await api.request(`/mail/${mailOffice}/messages/${uid}`, { method: 'DELETE' });
-        document.getElementById('mailReading').innerHTML = '';
+        closeMailModal();
         await loadMailList();
       } catch (e) { alert(e.error || 'Failed to delete message'); }
+    }
+
+    function showMailCompose() {
+      if (!mailOffices.length) { alert('No office inbox access'); return; }
+      const defOffice = mailOffices.includes(mailOffice) ? mailOffice : mailOffices[0];
+      document.getElementById('mailModalTitle').textContent = 'Compose Email';
+      document.getElementById('mailModalBody').innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:0.75rem">
+          <div class="form-group" style="margin:0"><label class="form-label">From office</label>
+            <select id="composeOffice" class="form-select">${mailOffices.map(o => `<option value="${o}"${o === defOffice ? ' selected' : ''}>${esc(OFFICE_LABELS[o] || o)}</option>`).join('')}</select>
+          </div>
+          <div class="form-group" style="margin:0"><label class="form-label">To</label>
+            <input id="composeTo" class="form-input" type="email" placeholder="recipient@example.com">
+          </div>
+          <div class="form-group" style="margin:0"><label class="form-label">Subject</label>
+            <input id="composeSubject" class="form-input" placeholder="Subject">
+          </div>
+          <div class="form-group" style="margin:0"><label class="form-label">Message</label>
+            <textarea id="composeBody" class="form-textarea" rows="6" placeholder="Write your message..."></textarea>
+          </div>
+          <p class="text-dim text-sm" style="margin:0">Your institutional signature (name, roles, committees) is added automatically.</p>
+          <div><button class="btn btn-primary" id="composeSendBtn" onclick="sendMailCompose()">Send Email</button></div>
+        </div>`;
+      document.getElementById('mailOverlay').classList.add('open');
+    }
+
+    async function sendMailCompose() {
+      const office = document.getElementById('composeOffice').value;
+      const to = (document.getElementById('composeTo').value || '').trim();
+      const subject = (document.getElementById('composeSubject').value || '').trim();
+      const body = (document.getElementById('composeBody').value || '').trim();
+      if (!to || !subject || !body) { alert('To, subject and message are all required'); return; }
+      const btn = document.getElementById('composeSendBtn');
+      btn.disabled = true; btn.textContent = 'Sending...';
+      try {
+        await api.request(`/mail/${office}/compose`, { method: 'POST', body: { to, subject, body } });
+        closeMailModal(); alert('Email sent');
+      } catch (e) {
+        alert(e.error || 'Failed to send email');
+        btn.disabled = false; btn.textContent = 'Send Email';
+      }
     }
 
     async function markAllRead() {
