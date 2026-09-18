@@ -1149,9 +1149,17 @@
             <textarea id="composeBody" class="form-textarea" rows="6" placeholder="Write your message..."></textarea>
           </div>
           <p class="text-dim text-sm" style="margin:0">Your institutional signature (name, roles, committees) is added automatically.</p>
+          <div id="composeResult"></div>
           <div><button class="btn btn-primary" id="composeSendBtn" onclick="sendMailCompose()">Send Email</button></div>
         </div>`;
       document.getElementById('mailOverlay').classList.add('open');
+    }
+
+    function composeSetLocked(locked) {
+      ['composeOffice', 'composeTo', 'composeSubject', 'composeBody', 'composeSendBtn'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = locked;
+      });
     }
 
     async function sendMailCompose() {
@@ -1160,14 +1168,28 @@
       const subject = (document.getElementById('composeSubject').value || '').trim();
       const body = (document.getElementById('composeBody').value || '').trim();
       if (!to || !subject || !body) { alert('To, subject and message are all required'); return; }
-      const btn = document.getElementById('composeSendBtn');
-      btn.disabled = true; btn.textContent = 'Sending...';
+      composeSetLocked(true);
+      document.getElementById('composeResult').innerHTML = '<p class="text-dim text-sm">Sending…</p>';
       try {
         const r = await api.request(`/mail/${office}/compose`, { method: 'POST', body: { to, subject, body } });
-        closeMailModal(); alert('Email sent' + (r.via && r.via !== 'smtp' ? ' (' + r.via + ')' : ''));
+        const extra = (r.via && r.via !== 'smtp') ? `<br><span class="text-dim text-sm">Delivery path: ${esc(r.via)}</span>` : '';
+        document.getElementById('composeResult').innerHTML = `
+          <div style="padding:0.75rem;border:1px solid var(--success);border-radius:var(--radius);background:rgba(45,106,79,0.08);font-size:0.88rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem">
+              <strong>Email sent.</strong>
+              <button class="btn btn-outline btn-xs" onclick="document.getElementById('composeResult').innerHTML=''">Dismiss</button>
+            </div>${extra}
+            <div style="margin-top:0.5rem"><button class="btn btn-outline btn-sm" onclick="closeMailModal()">Close</button></div>
+          </div>`;
       } catch (e) {
-        alert(e.error || 'Failed to send email');
-        btn.disabled = false; btn.textContent = 'Send Email';
+        composeSetLocked(false);
+        document.getElementById('composeResult').innerHTML = `
+          <div style="padding:0.75rem;border:1px solid var(--danger);border-radius:var(--radius);background:rgba(185,28,28,0.06);font-size:0.88rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem">
+              <strong>Could not send: ${esc(e.error || 'Mail server refused the message')}</strong>
+              <button class="btn btn-outline btn-xs" onclick="document.getElementById('composeResult').innerHTML=''">Dismiss</button>
+            </div>
+          </div>`;
       }
     }
 

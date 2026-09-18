@@ -300,7 +300,9 @@ function send_office_email(string $office, string $to, string $subject, string $
 }
 
 // Authenticated SMTP submission using the office mailbox credentials.
-// Returns [sent, note] — the note names the failing step for diagnostics.
+// Tries transports in order: office host over SSL, then localhost
+// submission (same machine, no auth needed). Returns [sent, note] —
+// the note names the failing step across all transports for diagnostics.
 function smtp_office_email(string $office, string $to, string $subject, string $body): array {
   try {
     $offices = office_list();
@@ -314,33 +316,7 @@ function smtp_office_email(string $office, string $to, string $subject, string $
     $from = $offices[$office];
     $host = $cfg['host'] ?: 'astronomy.ug';
     $port = (int) ($cfg['port'] ?: 465);
-    $fp = @stream_socket_client('ssl://' . $host . ':' . $port, $errno, $errstr, 10);
-    if (!$fp) return [false, 'connect failed: ' . $errstr];
-    stream_set_timeout($fp, 15);
-    $talk = function (string $cmd) use ($fp) {
-      if ($cmd !== '') @fwrite($fp, $cmd . "\r\n");
-      $resp = '';
-      while (($line = @fgets($fp, 512)) !== false) {
-        $resp .= $line;
-        if (preg_match('/^\d{3} /', $line)) break;
-      }
-      return $resp;
-    };
-    $greet = $talk('');
-    if (strpos($greet, '220') !== 0) { fclose($fp); return [false, 'no SMTP greeting']; }
-    $talk('EHLO astronomy.ug');
-    $r = $talk('AUTH LOGIN');
-    if (strpos($r, '334') !== 0) { fclose($fp); return [false, 'AUTH not offered']; }
-    $r = $talk(base64_encode($cfg['username']));
-    if (strpos($r, '334') !== 0) { fclose($fp); return [false, 'username rejected']; }
-    $r = $talk(base64_encode($pass));
-    if (strpos($r, '235') !== 0) { fclose($fp); return [false, 'password rejected']; }
-    $r = $talk('MAIL FROM:<' . $from . '>');
-    if (strpos($r, '250') !== 0) { fclose($fp); return [false, 'sender rejected']; }
-    $r = $talk('RCPT TO:<' . $to . '>');
-    if (strpos($r, '250') !== 0 && strpos($r, '251') !== 0) { fclose($fp); return [false, 'recipient rejected']; }
-    $r = $talk('DATA');
-    if (strpos($r, '354') !== 0) { fclose($fp); return [false, 'DATA rejected']; }
+    @set_time_limit(90);
     $subj = function_exists('mb_encode_mimeheader')
       ? mb_encode_mimeheader($subject, 'UTF-8', 'B', "\r\n") : $subject;
     $lines = preg_split('/\r\n|\r|\n/', $body);
@@ -348,7 +324,7 @@ function smtp_office_email(string $office, string $to, string $subject, string $
     foreach ($lines as $ln) {
       $stuffed[] = (isset($ln[0]) && $ln[0] === '.') ? '.' . $ln : $ln;
     }
-    $data = 'From: UAS <' . $from . '>' . "\r\n"
+    $payload = 'From: UAS <' . $from . '>' . "\r\n"
       . 'Reply-To: ' . $from . "\r\n"
       . 'To: ' . $to . "\r\n"
       . 'Subject: ' . $subj . "\r\n"
@@ -358,11 +334,87 @@ function smtp_office_email(string $office, string $to, string $subject, string $
       . 'Content-Type: text/plain; charset=UTF-8' . "\r\n"
       . 'Content-Transfer-Encoding: 8bit' . "\r\n"
       . 'X-Mailer: UAS-Platform' . "\r\n"
-      . "\r\n" . implode("\r\n", $stuffed) . "\r\n.";
-    $r = $talk($data);
-    $talk('QUIT');
-    fclose($fp);
-    return strpos($r, '250') === 0 ? [true, 'smtp: accepted'] : [false, 'not accepted: ' . trim($r)];
+      . "\r\n" . implode("\r\n", $stuffed);
+
+    // One submission attempt over a single transport.
+    $attempt = function (string $target, bool $implicitTls, ?array $auth, string $label, array $creds) use ($from, $to, $payload) {
+      $fp = @stream_socket_client($target, $errno, $errstr, 4);
+      if (!$fp) return [false, $label . ': connect failed' . ($errstr ? " ($errstr)" : '')];
+      stream_set_timeout($fp, 8);
+      $talk = function (string $cmd) use ($fp) {
+        if ($cmd !== '') @fwrite($fp, $cmd . "\r\n");
+        $resp = '';
+        while (($line = @fgets($fp, 512)) !== false) {
+          $resp .= $line;
+          if (preg_match('/^\d{3} /', $line)) break;
+        }
+        return $resp;
+      };
+      $close = function () use ($fp) { @fwrite($fp, "QUIT\r\n"); @fclose($fp); };
+      $greet = $talk('');
+      if (strpos($greet, '220') !== 0) { $close(); return [false, $label . ': no greeting']; }
+      $ehlo = $talk('EHLO astronomy.ug');
+      $isLocal = strpos($target, '127.0.0.1') !== false;
+      if (!$implicitTls && stripos($ehlo, 'STARTTLS') !== false && function_exists('stream_socket_enable_crypto')) {
+        $r = $talk('STARTTLS');
+        if (strpos($r, '220') === 0 && @stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
+          $ehlo = $talk('EHLO astronomy.ug');
+        } elseif (!$isLocal) { $close(); return [false, $label . ': STARTTLS failed']; }
+      }
+      if ($auth) {
+        $r = $talk('AUTH LOGIN');
+        if (strpos($r, '334') !== 0) { $close(); return [false, $label . ': AUTH not offered']; }
+        $r = $talk(base64_encode($auth[0]));
+        if (strpos($r, '334') !== 0) { $close(); return [false, $label . ': username rejected']; }
+        $r = $talk(base64_encode($auth[1]));
+        if (strpos($r, '235') !== 0) { $close(); return [false, $label . ': password rejected']; }
+      }
+      $send = function () use ($talk, $from, $to, $payload) {
+        $r = $talk('MAIL FROM:<' . $from . '>');
+        if (strpos($r, '250') !== 0) return [false, 'sender rejected'];
+        $r = $talk('RCPT TO:<' . $to . '>');
+        if (strpos($r, '250') !== 0 && strpos($r, '251') !== 0) return [false, 'recipient rejected'];
+        $r = $talk('DATA');
+        if (strpos($r, '354') !== 0) return [false, 'DATA rejected'];
+        $r = $talk($payload . "\r\n.");
+        return strpos($r, '250') === 0 ? [true, 'accepted'] : [false, 'not accepted'];
+      };
+      [$sent, $note] = $send();
+      if (!$sent && stripos($note, 'auth') !== false && $auth === null && $isLocal && $creds) {
+        // Localhost wants credentials after all — retry with mailbox login.
+        $r = $talk('AUTH LOGIN');
+        if (strpos($r, '334') === 0) {
+          $r = $talk(base64_encode($creds[0]));
+          if (strpos($r, '334') === 0) $r = $talk(base64_encode($creds[1]));
+          if (strpos($r, '235') === 0) {
+            [$sent, $note] = $send();
+            if ($sent) { $close(); return [true, $label . '-auth: accepted']; }
+            $note .= ' (after auth)';
+          } else { $note = 'auth rejected'; }
+        }
+      }
+      $close();
+      return $sent ? [true, $label . ': accepted'] : [false, $label . ' (' . $note . ')'];
+    };
+
+    $creds = [$cfg['username'], $pass];
+    $candidates = [
+      ['ssl://' . $host . ':' . $port, true, $creds, 'smtp-ssl'],
+      ['tcp://127.0.0.1:25', false, null, 'smtp-localhost'],
+      ['tcp://127.0.0.1:587', false, null, 'smtp-localhost587'],
+    ];
+    $notes = [];
+    $authBroken = false;
+    foreach ($candidates as [$target, $tls, $auth, $label]) {
+      if ($authBroken && $auth !== null) { $notes[] = $label . ' (skipped: credentials rejected elsewhere)'; continue; }
+      [$sent, $note] = $attempt($target, $tls, $auth, $label, $creds);
+      if ($sent) return [true, $note];
+      $notes[] = $note;
+      if ($auth !== null && (stripos($note, 'password rejected') !== false || stripos($note, 'username rejected') !== false)) {
+        $authBroken = true; // same credentials everywhere — don't retry them
+      }
+    }
+    return [false, implode('; ', $notes)];
   } catch (Exception $e) {
     return [false, 'exception: ' . $e->getMessage()];
   }
