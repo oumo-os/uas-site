@@ -393,7 +393,6 @@ function smtp_office_email(string $office, string $to, string $subject, string $
           } else { $note = 'auth rejected: ' . trim(preg_replace('/\s+/', ' ', $r)); }
         } else { $note .= ' (AUTH not offered)'; }
       }
-      }
       $close();
       return $sent ? [true, $label . ': accepted'] : [false, $label . ' (' . $note . ')'];
     };
