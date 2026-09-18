@@ -2753,6 +2753,46 @@
       renderPending(pending);
     }
 
+    async function approveProgApplication(id) {
+      if (!confirm('Approve this application? The applicant joins the programme team.')) return;
+      try {
+        await api.request('/programmes/applications/' + id + '/approve', { method: 'POST' });
+        toast('Application approved', 'success');
+        load();
+      } catch (e) { toast(e.error || 'Failed', 'error'); }
+    }
+
+    async function rejectProgApplication(id) {
+      if (!confirm('Reject this application? The applicant will be notified.')) return;
+      try {
+        await api.request('/programmes/applications/' + id + '/reject', { method: 'POST' });
+        toast('Application rejected', 'success');
+        load();
+      } catch (e) { toast(e.error || 'Failed', 'error'); }
+    }
+
+    async function showProgApplications(programmeId) {
+      if (!programmeId) return;
+      try {
+        const [prog, apps] = await Promise.all([
+          api.getPublicProgramme(programmeId).catch(() => null),
+          api.request('/programmes/' + programmeId + '/applications').catch(() => []),
+        ]);
+        const title = prog ? prog.title : 'Programme';
+        const rows = (apps || []).length ? apps.map(a => `
+          <div style="padding:0.6rem 0;border-bottom:1px solid var(--border);font-size:0.88rem">
+            <div style="font-weight:600">${esc(a.applicant_name)} <span class="text-dim" style="font-weight:400">${esc(a.applicant_email || '')}</span></div>
+            <div class="text-dim text-sm">Applied ${a.created_at ? new Date(String(a.created_at).replace(' ', 'T')).toLocaleDateString('en', { year: 'numeric', month: 'short', day: 'numeric' }) : ''}</div>
+            ${a.message ? `<div style="margin-top:0.3rem;line-height:1.6">${esc(a.message)}</div>` : ''}
+            <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+              <button class="btn btn-primary btn-xs" onclick="approveProgApplication(${a.id});closeModal()">Approve</button>
+              <button class="btn btn-outline btn-xs" onclick="rejectProgApplication(${a.id});closeModal()">Reject</button>
+            </div>
+          </div>`).join('') : '<p class="text-dim">No pending applications.</p>';
+        openModal('Applications: ' + title, rows);
+      } catch (e) { toast(e.error || 'Failed to load applications', 'error'); }
+    }
+
     function renderPendingItem(item) {
       const ageDays = item.created_at ? Math.floor((Date.now() - new Date(item.created_at)) / 86400000) : 0;
       const overdue = ageDays > 7;
@@ -2762,6 +2802,8 @@
       const itemType = item.item_type || 'article';
       const click = itemType === 'poll'
         ? `onclick="goGov('polls')"`
+        : itemType === 'progapply'
+        ? `onclick="showProgApplications(${item.related_id || 0})"`
         : `onclick="showItemDetail('${esc(itemType)}', ${item.id})"`;
       return `
         <div class="pending-item" style="cursor:pointer" ${click}>
@@ -2799,6 +2841,10 @@
       }
       if (item.item_type === 'poll' && api.hasCap('governance.poll.vote')) {
         out.push(`<button class="btn btn-success btn-xs" onclick="goGov('polls')">Vote</button>`);
+      }
+      if (item.item_type === 'progapply' && api.hasCap('programmes.manage')) {
+        out.push(`<button class="btn btn-primary btn-xs" onclick="approveProgApplication(${item.id})">Approve</button>`);
+        out.push(`<button class="btn btn-outline btn-xs" onclick="rejectProgApplication(${item.id})">Reject</button>`);
       }
       return out.join('');
     }

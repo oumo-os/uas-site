@@ -117,6 +117,10 @@
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Team Members</h3>
             <div id="pTeam"></div>
           </div>
+          <div class="card-section" id="pApplySection">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg></span> Get Involved</h3>
+            <div id="pApply"></div>
+          </div>
           <div class="card-section">
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span> Projects</h3>
             <div id="pProjects"></div>
@@ -168,9 +172,24 @@
       updateNavUser();
       var id = new URLSearchParams(location.search).get('id') || (location.pathname.match(/\/(\d+)$/) || [])[1];
       if (!id) { document.getElementById('pTitle').textContent = 'Programme not found'; return; }
+      window._progId = parseInt(id, 10);
       var p = await api.getPublicProgramme(id).catch(function(){ return null; });
       if (!p) { document.getElementById('pTitle').textContent = 'Programme not found'; return; }
       render(p);
+    }
+
+    async function applyToProgramme() {
+      var btn = document.getElementById('applyBtn');
+      var message = prompt('Anything the coordinators should know? (optional)');
+      if (message === null) return;
+      if (btn) { btn.disabled = true; btn.textContent = 'Applying...'; }
+      try {
+        await api.request('/programmes/' + window._progId + '/apply', { method: 'POST', body: { message: (message || '').trim() || null } });
+        document.getElementById('pApply').innerHTML = '<p class="text-dim" style="font-size:0.9rem">Application sent — a coordinator will review it and you will be notified here.</p>';
+      } catch (e) {
+        alert(e.error || 'Application failed');
+        if (btn) { btn.disabled = false; btn.textContent = 'Apply to join this programme'; }
+      }
     }
 
     function render(p) {
@@ -258,6 +277,24 @@
             '</div></div>';
         }).join('');
       }
+
+      // Join / apply CTA
+      (function () {
+        var box = document.getElementById('pApply');
+        if (!box) return;
+        var me = null;
+        try { me = api._user || null; } catch (e) {}
+        var members = p.members || [];
+        var isMember = me && members.some(function (m) { return m.user_id === me.id; });
+        if (isMember) {
+          box.innerHTML = '<p class="text-dim" style="font-size:0.9rem">You are a member of this programme team.</p>';
+        } else if (!me) {
+          box.innerHTML = '<a href="/login" class="btn btn-outline">Login to apply to join this programme</a>';
+        } else {
+          box.innerHTML = '<button class="btn btn-primary" id="applyBtn" onclick="applyToProgramme()">Apply to join this programme</button>' +
+            '<p class="text-dim" style="font-size:0.82rem;margin-top:0.4rem">A programme coordinator will review your application.</p>';
+        }
+      })();
 
       // Projects
       var projDiv = document.getElementById('pProjects');

@@ -2719,8 +2719,82 @@ try {
   }
   elseif (preg_match('#^/programmes/(\d+)/members/(\d+)$#', $path, $m) && $method === 'DELETE') {
     require_cap_for('programmes.manage', 'programme', (int)$m[1]);
-    db()->prepare('DELETE FROM programme_members WHERE programme_id = ? AND user_id = ?')->execute([(int) $m[1], (int) $m[2]]);
-    audit_log('programme_member_remove', 'programme', (int) $m[1], ['user_id' => (int) $m[2]]);
+    db()->prepare('DELETE FROM programme_members WHERE programme_id = ? AND user_id = ?')->execute([(int)$m[1], (int)$m[2]]);
+    audit_log('programme_member_remove', 'programme', (int)$m[1], ['user_id' => (int)$m[2]]);
+    json_response(['ok' => true]);
+  }
+  // --- PROGRAMME APPLICATIONS (self-service join requests) ---
+  elseif (preg_match('#^/programmes/(\d+)/apply$#', $path, $m) && $method === 'POST') {
+    $user = require_login();
+    if ($user['status'] !== 'active') json_error('Account is not active', 403);
+    $pid = (int) $m[1];
+    $stmt = db()->prepare('SELECT id, title FROM programmes WHERE id = ? AND status = "active"');
+    $stmt->execute([$pid]);
+    $prog = $stmt->fetch();
+    if (!$prog) json_error('Programme not found', 404);
+    $stmt = db()->prepare('SELECT id FROM programme_members WHERE programme_id = ? AND user_id = ? AND status = "active"');
+    $stmt->execute([$pid, $user['id']]);
+    if ($stmt->fetch()) json_error('You are already a member of this programme', 409);
+    if (!rate_limit('progapply:' . $user['id'], 'progapply', 5, 3600)) {
+      json_error('Too many requests. Try again later.', 429);
+    }
+    $data = input_json();
+    $message = trim($data['message'] ?? '');
+    if (mb_strlen($message) > 1000) json_error('Message too long (max 1000 characters)', 400);
+    $stmt = db()->prepare('SELECT id, status FROM programme_applications WHERE programme_id = ? AND user_id = ?');
+    $stmt->execute([$pid, $user['id']]);
+    $existing = $stmt->fetch();
+    if ($existing && $existing['status'] === 'pending') json_error('Your application is already pending review', 409);
+    if ($existing) {
+      db()->prepare("UPDATE programme_applications SET message = ?, status = 'pending', reviewed_by = NULL, reviewed_at = NULL WHERE id = ?")
+        ->execute([$message ?: null, $existing['id']]);
+      $appId = (int) $existing['id'];
+    } else {
+      db()->prepare('INSERT INTO programme_applications (programme_id, user_id, message) VALUES (?, ?, ?)')
+        ->execute([$pid, $user['id'], $message ?: null]);
+      $appId = (int) db()->lastInsertId();
+    }
+    audit_log('programme_apply', 'programme', $pid, ['user_id' => $user['id']]);
+    notify_capability('programmes.manage', 'programme_application', 'New application: ' . $prog['title'],
+      $user['name'] . ' (' . $user['email'] . ') applied to join ' . $prog['title'] . '.', '/dashboard');
+    json_response(['id' => $appId], 201);
+  }
+  elseif (preg_match('#^/programmes/(\d+)/applications$#', $path, $m) && $method === 'GET') {
+    $user = require_cap_for('programmes.manage', 'programme', (int)$m[1]);
+    $stmt = db()->prepare('SELECT pa.*, u.name AS applicant_name, u.email AS applicant_email FROM programme_applications pa JOIN users u ON u.id = pa.user_id WHERE pa.programme_id = ? AND pa.status = "pending" ORDER BY pa.created_at');
+    $stmt->execute([(int)$m[1]]);
+    json_response($stmt->fetchAll());
+  }
+  elseif (preg_match('#^/programmes/applications/(\d+)/approve$#', $path, $m) && $method === 'POST') {
+    $aid = (int) $m[1];
+    $stmt = db()->prepare('SELECT pa.*, p.title AS programme_title FROM programme_applications pa JOIN programmes p ON p.id = pa.programme_id WHERE pa.id = ?');
+    $stmt->execute([$aid]);
+    $app = $stmt->fetch();
+    if (!$app) json_error('Application not found', 404);
+    if ($app['status'] !== 'pending') json_error('Application already decided', 409);
+    $user = require_cap_for('programmes.manage', 'programme', (int)$app['programme_id']);
+    $data = input_json();
+    db()->prepare('INSERT INTO programme_members (programme_id, user_id, role_in_programme, status, joined_date) VALUES (?, ?, ?, "active", CURDATE())
+      ON DUPLICATE KEY UPDATE role_in_programme = VALUES(role_in_programme), status = "active"')
+      ->execute([(int)$app['programme_id'], (int)$app['user_id'], $data['role_in_programme'] ?? null]);
+    db()->prepare("UPDATE programme_applications SET status = 'approved', reviewed_by = ?, reviewed_at = NOW() WHERE id = ?")
+      ->execute([$user['id'], $aid]);
+    audit_log('programme_application_approve', 'programme', (int)$app['programme_id'], ['user_id' => (int)$app['user_id']]);
+    notify_user((int)$app['user_id'], 'programme_application_approved', 'Welcome to ' . $app['programme_title'], 'Your application to join ' . $app['programme_title'] . ' was approved.', '/dashboard');
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/programmes/applications/(\d+)/reject$#', $path, $m) && $method === 'POST') {
+    $aid = (int) $m[1];
+    $stmt = db()->prepare('SELECT pa.*, p.title AS programme_title FROM programme_applications pa JOIN programmes p ON p.id = pa.programme_id WHERE pa.id = ?');
+    $stmt->execute([$aid]);
+    $app = $stmt->fetch();
+    if (!$app) json_error('Application not found', 404);
+    if ($app['status'] !== 'pending') json_error('Application already decided', 409);
+    $user = require_cap_for('programmes.manage', 'programme', (int)$app['programme_id']);
+    db()->prepare("UPDATE programme_applications SET status = 'rejected', reviewed_by = ?, reviewed_at = NOW() WHERE id = ?")
+      ->execute([$user['id'], $aid]);
+    audit_log('programme_application_reject', 'programme', (int)$app['programme_id'], ['user_id' => (int)$app['user_id']]);
+    notify_user((int)$app['user_id'], 'programme_application_rejected', 'Application update: ' . $app['programme_title'], 'Your application to join ' . $app['programme_title'] . ' was not approved this time.', '/dashboard');
     json_response(['ok' => true]);
   }
   // --- MEMBER CALENDAR ---

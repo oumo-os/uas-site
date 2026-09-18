@@ -297,6 +297,17 @@ function get_pending_items(?int $userId = null): array {
     $stmt->execute($params);
     $items = array_merge($items, $stmt->fetchAll());
 
+    // Programme applications by user
+    $sql = "SELECT pa.id, CONCAT('Application: ', p.title) AS title, pa.status, pa.created_at, u.name AS author_name,
+            'progapply' AS item_type, pa.programme_id AS related_id
+            FROM programme_applications pa
+            JOIN programmes p ON p.id = pa.programme_id
+            JOIN users u ON u.id = pa.user_id
+            WHERE pa.user_id = ? AND pa.status = 'pending'";
+    $stmt = db()->prepare($sql);
+    $stmt->execute([$userId]);
+    $items = array_merge($items, $stmt->fetchAll());
+
   } else {
     // ORG WIDE: all pending items
     // Articles pending review/approval
@@ -334,6 +345,17 @@ function get_pending_items(?int $userId = null): array {
             FROM documents d
             JOIN users u ON u.id = d.owner_id
             WHERE d.status IN ('submitted','draft')";
+    $stmt = db()->prepare($sql);
+    $stmt->execute();
+    $items = array_merge($items, $stmt->fetchAll());
+
+    // Programme applications awaiting review
+    $sql = "SELECT pa.id, CONCAT(u.name, ' applied: ', p.title) AS title, pa.status, pa.created_at, u.name AS author_name,
+            'progapply' AS item_type, pa.programme_id AS related_id
+            FROM programme_applications pa
+            JOIN programmes p ON p.id = pa.programme_id
+            JOIN users u ON u.id = pa.user_id
+            WHERE pa.status = 'pending'";
     $stmt = db()->prepare($sql);
     $stmt->execute();
     $items = array_merge($items, $stmt->fetchAll());
