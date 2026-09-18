@@ -336,15 +336,21 @@ function smtp_office_email(string $office, string $to, string $subject, string $
       . 'X-Mailer: UAS-Platform' . "\r\n"
       . "\r\n" . implode("\r\n", $stuffed);
 
-    // One submission attempt over a single transport.
-    $attempt = function (string $target, bool $implicitTls, ?array $auth, string $label, array $creds) use ($from, $to, $payload) {
-      $fp = @stream_socket_client($target, $errno, $errstr, 4);
+    // One submission attempt over a single transport. $deadline bounds the
+    // whole cascade so slow hosts fail gracefully instead of killing PHP.
+    $globalDeadline = time() + 22;
+    $attempt = function (string $target, bool $implicitTls, ?array $auth, string $label, array $creds, int $deadline) use ($from, $to, $payload) {
+      $fp = @stream_socket_client($target, $errno, $errstr, 3);
       if (!$fp) return [false, $label . ': connect failed' . ($errstr ? " ($errstr)" : '')];
-      stream_set_timeout($fp, 8);
-      $talk = function (string $cmd) use ($fp) {
+      stream_set_timeout($fp, 5);
+      $deadline = min($deadline, time() + 18);
+      $talk = function (string $cmd) use ($fp, $deadline) {
         if ($cmd !== '') @fwrite($fp, $cmd . "\r\n");
         $resp = '';
-        while (($line = @fgets($fp, 512)) !== false) {
+        $n = 0;
+        while (time() < $deadline && $n++ < 60) {
+          $line = @fgets($fp, 512);
+          if ($line === false || $line === '') break;
           $resp .= $line;
           if (preg_match('/^\d{3} /', $line)) break;
         }
@@ -406,8 +412,9 @@ function smtp_office_email(string $office, string $to, string $subject, string $
     $notes = [];
     $authBroken = false;
     foreach ($candidates as [$target, $tls, $auth, $label]) {
+      if (time() >= $globalDeadline) { $notes[] = $label . ' (skipped: time budget exhausted)'; continue; }
       if ($authBroken && $auth !== null) { $notes[] = $label . ' (skipped: credentials rejected elsewhere)'; continue; }
-      [$sent, $note] = $attempt($target, $tls, $auth, $label, $creds);
+      [$sent, $note] = $attempt($target, $tls, $auth, $label, $creds, $globalDeadline);
       if ($sent) return [true, $note];
       $notes[] = $note;
       if ($auth !== null && (stripos($note, 'password rejected') !== false || stripos($note, 'username rejected') !== false)) {
@@ -415,7 +422,7 @@ function smtp_office_email(string $office, string $to, string $subject, string $
       }
     }
     return [false, implode('; ', $notes)];
-  } catch (Exception $e) {
+  } catch (Throwable $e) {
     return [false, 'exception: ' . $e->getMessage()];
   }
 }
