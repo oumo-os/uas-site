@@ -5,7 +5,7 @@
 
 CREATE TABLE IF NOT EXISTS office_mailboxes (
   office VARCHAR(50) PRIMARY KEY,
-  host VARCHAR(255) NOT NULL DEFAULT 'mail.astronomy.ug',
+  host VARCHAR(255) NOT NULL DEFAULT 'astronomy.ug',
   port INT NOT NULL DEFAULT 993,
   username VARCHAR(255) NOT NULL,
   password_enc TEXT NOT NULL,

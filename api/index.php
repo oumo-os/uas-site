@@ -2582,7 +2582,7 @@ try {
       $exists = (bool) $stmt->fetch();
     } catch (Exception $e) { json_error('Mailbox store unavailable — import migration 043 first', 500); }
     if (!mailbox_key()) json_error('MAILBOX_KEY missing in api/prod-env.php', 500);
-    $host = trim($data['host'] ?? 'mail.astronomy.ug') ?: 'mail.astronomy.ug';
+    $host = trim($data['host'] ?? 'astronomy.ug') ?: 'astronomy.ug';
     $port = (int) ($data['port'] ?? 993) ?: 993;
     $username = trim($data['username'] ?? '');
     if ($username === '') json_error('Username is required', 400);

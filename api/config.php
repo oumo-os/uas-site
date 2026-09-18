@@ -185,7 +185,7 @@ function mailbox_open(string $office): array {
   if (!$cfg) return [null, 'Mailbox not configured'];
   $pass = mailbox_decrypt($cfg['password_enc']);
   if ($pass === null) return [null, 'Cannot decrypt credentials (MAILBOX_KEY?)'];
-  $host = $cfg['host'] ?: 'mail.astronomy.ug';
+  $host = $cfg['host'] ?: 'astronomy.ug';
   $port = (int) ($cfg['port'] ?: 993);
   $flags = $cfg['use_ssl'] ? '/imap/ssl' : '/imap/notls';
   $box = '{' . $host . ':' . $port . $flags . '}INBOX';
