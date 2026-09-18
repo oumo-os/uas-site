@@ -293,7 +293,9 @@ function send_office_email(string $office, string $to, string $subject, string $
   $headers = "From: UAS <$from>\r\nReply-To: $from\r\nContent-Type: text/plain; charset=UTF-8\r\nX-Mailer: UAS-Platform";
   // Envelope sender = office address so SPF/DKIM align (no "on behalf of").
   // Falls back to server default if the host rejects custom senders.
-  $sent = @mail($to, $subject, $body, $headers, '-f' . $from);
+  // -odb queues in background so a slow remote MTA can't kill the request.
+  $params = '-f' . $from . ' -odb';
+  $sent = @mail($to, $subject, $body, $headers, $params);
   if (!$sent) $sent = @mail($to, $subject, $body, $headers);
   if (!$sent) $via = 'failed';
   return $sent;
