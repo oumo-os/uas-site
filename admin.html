@@ -938,7 +938,7 @@
       btn.disabled = true; btn.textContent = 'Sending...';
       try {
         const r = await api.request('/contact-messages/' + id + '/reply', { method: 'POST', body: { body } });
-        alert(r.emailed ? 'Reply sent by email' : 'Email failed — reply recorded internally only');
+        alert((r.emailed ? 'Reply sent by email' : 'Email failed — reply recorded internally only') + (r.emailed && r.via && r.via !== 'smtp' ? ' (' + r.via + ')' : ''));
         await refreshInbox();
         toggleInboxMsg(id);
       } catch (e) {
@@ -1105,7 +1105,7 @@
       btn.disabled = true; btn.textContent = 'Sending...';
       try {
         const r = await api.request(`/mail/${mailOffice}/messages/${uid}/reply`, { method: 'POST', body: { body } });
-        alert(r.emailed ? 'Reply sent' : 'Email failed — reply not recorded for mailbox mail');
+        alert((r.emailed ? 'Reply sent' : 'Email failed — reply not recorded for mailbox mail') + (r.emailed && r.via && r.via !== 'smtp' ? ' (' + r.via + ')' : ''));
         closeMailModal();
         await loadMailList();
       } catch (e) {
@@ -1163,8 +1163,8 @@
       const btn = document.getElementById('composeSendBtn');
       btn.disabled = true; btn.textContent = 'Sending...';
       try {
-        await api.request(`/mail/${office}/compose`, { method: 'POST', body: { to, subject, body } });
-        closeMailModal(); alert('Email sent');
+        const r = await api.request(`/mail/${office}/compose`, { method: 'POST', body: { to, subject, body } });
+        closeMailModal(); alert('Email sent' + (r.via && r.via !== 'smtp' ? ' (' + r.via + ')' : ''));
       } catch (e) {
         alert(e.error || 'Failed to send email');
         btn.disabled = false; btn.textContent = 'Send Email';

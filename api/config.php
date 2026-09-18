@@ -282,10 +282,12 @@ function mailbox_body($mbox, int $uid): array {
 }
 // Send an office reply through the host mail system. Returns handoff
 // status (true = accepted by MTA, NOT proof of inbox delivery — needs SPF).
-function send_office_email(string $office, string $to, string $subject, string $body): bool {
+function send_office_email(string $office, string $to, string $subject, string $body, ?string &$via = null): bool {
   // Preferred path: authenticated SMTP as the office itself, so the
   // envelope sender matches From (no "on behalf of", SPF/DKIM align).
-  if (smtp_office_email($office, $to, $subject, $body)) return true;
+  [$ok, $note] = smtp_office_email($office, $to, $subject, $body);
+  if ($ok) { $via = 'smtp'; return true; }
+  $via = 'sendmail-fallback(' . $note . ')';
   $list = office_list();
   $from = $list[$office] ?? $list['contact'];
   $headers = "From: UAS <$from>\r\nReply-To: $from\r\nContent-Type: text/plain; charset=UTF-8\r\nX-Mailer: UAS-Platform";
@@ -293,26 +295,27 @@ function send_office_email(string $office, string $to, string $subject, string $
   // Falls back to server default if the host rejects custom senders.
   $sent = @mail($to, $subject, $body, $headers, '-f' . $from);
   if (!$sent) $sent = @mail($to, $subject, $body, $headers);
+  if (!$sent) $via = 'failed';
   return $sent;
 }
 
 // Authenticated SMTP submission using the office mailbox credentials.
-// Returns true on acceptance, false on any failure (caller falls back).
-function smtp_office_email(string $office, string $to, string $subject, string $body): bool {
+// Returns [sent, note] — the note names the failing step for diagnostics.
+function smtp_office_email(string $office, string $to, string $subject, string $body): array {
   try {
     $offices = office_list();
-    if (!isset($offices[$office])) return false;
+    if (!isset($offices[$office])) return [false, 'unknown office'];
     $stmt = db()->prepare('SELECT * FROM office_mailboxes WHERE office = ? AND enabled = 1');
     $stmt->execute([$office]);
     $cfg = $stmt->fetch();
-    if (!$cfg) return false;
+    if (!$cfg) return [false, 'mailbox not configured'];
     $pass = mailbox_decrypt($cfg['password_enc']);
-    if ($pass === null || $pass === '') return false;
+    if ($pass === null || $pass === '') return [false, 'cannot decrypt credentials'];
     $from = $offices[$office];
     $host = $cfg['host'] ?: 'astronomy.ug';
     $port = (int) ($cfg['port'] ?: 465);
     $fp = @stream_socket_client('ssl://' . $host . ':' . $port, $errno, $errstr, 10);
-    if (!$fp) return false;
+    if (!$fp) return [false, 'connect failed: ' . $errstr];
     stream_set_timeout($fp, 15);
     $talk = function (string $cmd) use ($fp) {
       if ($cmd !== '') @fwrite($fp, $cmd . "\r\n");
@@ -324,20 +327,20 @@ function smtp_office_email(string $office, string $to, string $subject, string $
       return $resp;
     };
     $greet = $talk('');
-    if (strpos($greet, '220') !== 0) { fclose($fp); return false; }
+    if (strpos($greet, '220') !== 0) { fclose($fp); return [false, 'no SMTP greeting']; }
     $talk('EHLO astronomy.ug');
     $r = $talk('AUTH LOGIN');
-    if (strpos($r, '334') !== 0) { fclose($fp); return false; }
+    if (strpos($r, '334') !== 0) { fclose($fp); return [false, 'AUTH not offered']; }
     $r = $talk(base64_encode($cfg['username']));
-    if (strpos($r, '334') !== 0) { fclose($fp); return false; }
+    if (strpos($r, '334') !== 0) { fclose($fp); return [false, 'username rejected']; }
     $r = $talk(base64_encode($pass));
-    if (strpos($r, '235') !== 0) { fclose($fp); return false; }
+    if (strpos($r, '235') !== 0) { fclose($fp); return [false, 'password rejected']; }
     $r = $talk('MAIL FROM:<' . $from . '>');
-    if (strpos($r, '250') !== 0) { fclose($fp); return false; }
+    if (strpos($r, '250') !== 0) { fclose($fp); return [false, 'sender rejected']; }
     $r = $talk('RCPT TO:<' . $to . '>');
-    if (strpos($r, '250') !== 0 && strpos($r, '251') !== 0) { fclose($fp); return false; }
+    if (strpos($r, '250') !== 0 && strpos($r, '251') !== 0) { fclose($fp); return [false, 'recipient rejected']; }
     $r = $talk('DATA');
-    if (strpos($r, '354') !== 0) { fclose($fp); return false; }
+    if (strpos($r, '354') !== 0) { fclose($fp); return [false, 'DATA rejected']; }
     $subj = function_exists('mb_encode_mimeheader')
       ? mb_encode_mimeheader($subject, 'UTF-8', 'B', "\r\n") : $subject;
     $lines = preg_split('/\r\n|\r|\n/', $body);
@@ -359,11 +362,13 @@ function smtp_office_email(string $office, string $to, string $subject, string $
     $r = $talk($data);
     $talk('QUIT');
     fclose($fp);
-    return strpos($r, '250') === 0;
+    return strpos($r, '250') === 0 ? [true, 'smtp: accepted'] : [false, 'not accepted: ' . trim($r)];
   } catch (Exception $e) {
-    return false;
+    return [false, 'exception: ' . $e->getMessage()];
   }
 }
+
+// Recompress an uploaded image in place: max $maxW px wide (1600 default,
 // 256 for avatars), JPEG q80, PNG level 6 (alpha preserved), WebP q80.
 // GIFs pass through untouched (animation). Returns [width, height,
 // compressed] or null when GD is unavailable or the file is unreadable.

@@ -3745,7 +3745,7 @@
       btn.disabled = true; btn.textContent = 'Sending...';
       try {
         const r = await api.request(`/mail/${dashMailOffice}/messages/${uid}/reply`, { method: 'POST', body: { body } });
-        toast(r.emailed ? 'Reply sent' : 'Email failed — reply not recorded for mailbox mail', r.emailed ? 'success' : 'warning');
+        toast((r.emailed ? 'Reply sent' : 'Email failed — reply not recorded for mailbox mail') + (r.emailed && r.via && r.via !== 'smtp' ? ' (' + r.via + ')' : ''), r.emailed ? 'success' : 'warning');
         closeModal();
         await loadDashMailList();
       } catch (e) {
@@ -3802,8 +3802,8 @@
       const btn = document.getElementById('composeSendBtn');
       btn.disabled = true; btn.textContent = 'Sending...';
       try {
-        await api.request(`/mail/${office}/compose`, { method: 'POST', body: { to, subject, body } });
-        closeModal(); toast('Email sent', 'success');
+        const r = await api.request(`/mail/${office}/compose`, { method: 'POST', body: { to, subject, body } });
+        closeModal(); toast('Email sent' + (r.via && r.via !== 'smtp' ? ' (' + r.via + ')' : ''), 'success');
       } catch (e) {
         toast(e.error || 'Failed to send email', 'error');
         btn.disabled = false; btn.textContent = 'Send Email';
