@@ -371,17 +371,17 @@ function smtp_office_email(string $office, string $to, string $subject, string $
       }
       $send = function () use ($talk, $from, $to, $payload) {
         $r = $talk('MAIL FROM:<' . $from . '>');
-        if (strpos($r, '250') !== 0) return [false, 'sender rejected'];
+        if (strpos($r, '250') !== 0) return [false, 'sender rejected: ' . trim(preg_replace('/\s+/', ' ', $r))];
         $r = $talk('RCPT TO:<' . $to . '>');
-        if (strpos($r, '250') !== 0 && strpos($r, '251') !== 0) return [false, 'recipient rejected'];
+        if (strpos($r, '250') !== 0 && strpos($r, '251') !== 0) return [false, 'recipient rejected: ' . trim(preg_replace('/\s+/', ' ', $r))];
         $r = $talk('DATA');
-        if (strpos($r, '354') !== 0) return [false, 'DATA rejected'];
+        if (strpos($r, '354') !== 0) return [false, 'DATA rejected: ' . trim(preg_replace('/\s+/', ' ', $r))];
         $r = $talk($payload . "\r\n.");
-        return strpos($r, '250') === 0 ? [true, 'accepted'] : [false, 'not accepted'];
+        return strpos($r, '250') === 0 ? [true, 'accepted'] : [false, 'not accepted: ' . trim(preg_replace('/\s+/', ' ', $r))];
       };
       [$sent, $note] = $send();
-      if (!$sent && stripos($note, 'auth') !== false && $auth === null && $isLocal && $creds) {
-        // Localhost wants credentials after all — retry with mailbox login.
+      if (!$sent && $auth === null && $isLocal && $creds) {
+        // Localhost refused anonymous submission — retry with mailbox login.
         $r = $talk('AUTH LOGIN');
         if (strpos($r, '334') === 0) {
           $r = $talk(base64_encode($creds[0]));
@@ -390,8 +390,9 @@ function smtp_office_email(string $office, string $to, string $subject, string $
             [$sent, $note] = $send();
             if ($sent) { $close(); return [true, $label . '-auth: accepted']; }
             $note .= ' (after auth)';
-          } else { $note = 'auth rejected'; }
-        }
+          } else { $note = 'auth rejected: ' . trim(preg_replace('/\s+/', ' ', $r)); }
+        } else { $note .= ' (AUTH not offered)'; }
+      }
       }
       $close();
       return $sent ? [true, $label . ': accepted'] : [false, $label . ' (' . $note . ')'];
