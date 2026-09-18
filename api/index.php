@@ -1424,6 +1424,7 @@ try {
     $stmt = db()->prepare('SELECT COUNT(*) AS total, SUM(IF(status="attended",1,0)) AS attended FROM event_registrations WHERE event_id = ? AND status != "cancelled"');
     $stmt->execute([$eventId]);
     $regs = $stmt->fetch();
+    $regs['total'] = (int) $regs['total'] + event_guest_count($eventId);
 
     $is_manager = false;
     $my_rsvp = null;
@@ -1501,7 +1502,8 @@ try {
 
     $stmt = db()->prepare("SELECT COUNT(*) FROM event_registrations WHERE event_id = ? AND status = 'registered'");
     $stmt->execute([$eventId]);
-    if ((int) $stmt->fetchColumn() < (int) $event['capacity']) json_error('Event has space — RSVP directly instead', 400);
+    // Waitlist only makes sense while the event (members + guests) has space
+    if (event_guest_count($eventId) + (int) $stmt->fetchColumn() < (int) $event['capacity']) json_error('Event has space — RSVP directly instead', 400);
 
     try {
       db()->prepare('INSERT INTO event_waitlist (event_id, user_id) VALUES (?, ?)')->execute([$eventId, $user['id']]);
@@ -1537,7 +1539,7 @@ try {
 
     $stmt = db()->prepare("SELECT COUNT(*) FROM event_registrations WHERE event_id = ? AND status = 'registered'");
     $stmt->execute([$eventId]);
-    if ((int) $stmt->fetchColumn() >= (int) $event['capacity']) json_error('Event is at capacity', 400);
+    if (event_guest_count($eventId) + (int) $stmt->fetchColumn() >= (int) $event['capacity']) json_error('Event is at capacity', 400);
 
     db()->prepare('DELETE FROM event_waitlist WHERE id = ?')->execute([$wlId]);
     $stmt = db()->prepare("SELECT id FROM event_registrations WHERE event_id = ? AND user_id = ?");
@@ -1567,20 +1569,16 @@ try {
     $existing = $stmt->fetch();
     if ($existing) {
       if ($existing['status'] === 'registered') json_error('Already registered for this event', 409);
-      if ($event['capacity']) {
-        $stmt = db()->prepare("SELECT COUNT(*) FROM event_registrations WHERE event_id = ? AND status = 'registered'");
-        $stmt->execute([$eventId]);
-        if ((int) $stmt->fetchColumn() >= (int) $event['capacity']) json_error('Event is full — join the waitlist instead', 400);
+      if ($event['capacity'] && event_headcount($eventId) >= (int) $event['capacity']) {
+        json_error('Event is full — join the waitlist instead', 400);
       }
       db()->prepare("UPDATE event_registrations SET status = 'registered', registered_at = NOW() WHERE id = ?")->execute([$existing['id']]);
       audit_log('event_rsvp', 'event', $eventId, ['user_id' => $user['id']]);
       json_response(['ok' => true], 201);
     }
 
-    if ($event['capacity']) {
-      $stmt = db()->prepare("SELECT COUNT(*) FROM event_registrations WHERE event_id = ? AND status = 'registered'");
-      $stmt->execute([$eventId]);
-      if ((int) $stmt->fetchColumn() >= (int) $event['capacity']) json_error('Event is full', 400);
+    if ($event['capacity'] && event_headcount($eventId) >= (int) $event['capacity']) {
+      json_error('Event is full', 400);
     }
 
     db()->prepare('INSERT INTO event_registrations (event_id, user_id, status) VALUES (?, ?, ?)')
@@ -1607,9 +1605,69 @@ try {
     if (!user_has_cap($user['id'], 'events.manage_rsvps') && $event['organizer_id'] != $user['id']) {
       json_error('Insufficient permissions: events.manage_rsvps', 403);
     }
-    $stmt = db()->prepare("SELECT r.*, u.name, u.email FROM event_registrations r JOIN users u ON u.id = r.user_id WHERE r.event_id = ? ORDER BY r.registered_at");
+    $stmt = db()->prepare("SELECT r.*, u.name, u.email, 0 AS is_guest FROM event_registrations r JOIN users u ON u.id = r.user_id WHERE r.event_id = ? ORDER BY r.registered_at");
     $stmt->execute([$eventId]);
-    json_response($stmt->fetchAll());
+    $rows = $stmt->fetchAll();
+    try {
+      $g = db()->prepare("SELECT id, event_id, NULL AS user_id, status, created_at AS registered_at, name, email, phone, 1 AS is_guest FROM event_guests WHERE event_id = ? ORDER BY created_at");
+      $g->execute([$eventId]);
+      $rows = array_merge($rows, $g->fetchAll());
+    } catch (Exception $e) { /* migration 039 not yet imported */ }
+    json_response($rows);
+  }
+
+  // --- GUEST EVENT SIGNUPS (no account needed) ---
+  elseif (preg_match('#^/events/(\d+)/guest-rsvp$#', $path, $m) && $method === 'POST') {
+    $eventId = (int) $m[1];
+    $data = input_json();
+    if (!empty($data['website'])) json_response(['ok' => true], 201); // honeypot — pretend success
+    $name = trim($data['name'] ?? '');
+    $email = trim(mb_strtolower($data['email'] ?? ''));
+    $phone = trim($data['phone'] ?? '');
+    if (mb_strlen($name) < 2) json_error('Please provide your name', 400);
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) json_error('A valid email address is required', 400);
+    if (mb_strlen($phone) > 30) json_error('Phone number too long', 400);
+    if (!rate_limit('guest-rsvp:' . client_ip(), 'guest-rsvp', 5, 3600)) {
+      json_error('Too many requests. Try again later.', 429);
+    }
+    $stmt = db()->prepare('SELECT id, title, capacity, date, organizer_id FROM events WHERE id = ? AND status = "published"');
+    $stmt->execute([$eventId]);
+    $event = $stmt->fetch();
+    if (!$event) json_error('Event not found', 404);
+    if ($event['date'] < date('Y-m-d H:i:s')) json_error('Event has already taken place', 400);
+    $stmt = db()->prepare('SELECT id, status FROM event_guests WHERE event_id = ? AND email = ?');
+    $stmt->execute([$eventId, $email]);
+    $existing = $stmt->fetch();
+    if ($existing && $existing['status'] === 'registered') json_error('This email is already registered for this event', 409);
+    if ($event['capacity'] && event_headcount($eventId) >= (int) $event['capacity']) {
+      json_error('This event is fully booked. Members can still join the waitlist — consider joining UAS!', 400);
+    }
+    if ($existing) {
+      db()->prepare("UPDATE event_guests SET name = ?, phone = ?, status = 'registered' WHERE id = ?")
+        ->execute([$name, $phone ?: null, $existing['id']]);
+    } else {
+      db()->prepare('INSERT INTO event_guests (event_id, name, email, phone) VALUES (?, ?, ?, ?)')
+        ->execute([$eventId, $name, $email, $phone ?: null]);
+    }
+    audit_log('event_guest_rsvp', 'event', $eventId, ['email' => $email]);
+    if (!empty($event['organizer_id'])) {
+      notify_user((int) $event['organizer_id'], 'event_guest_rsvp', 'Guest signup: ' . $event['title'], $name . ' (' . $email . ') signed up as a guest.', '/event/' . $eventId);
+    }
+    json_response(['ok' => true], 201);
+  }
+  elseif (preg_match('#^/events/guests/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    $user = require_login();
+    $gid = (int) $m[1];
+    $stmt = db()->prepare('SELECT g.*, e.organizer_id FROM event_guests g JOIN events e ON e.id = g.event_id WHERE g.id = ?');
+    $stmt->execute([$gid]);
+    $guest = $stmt->fetch();
+    if (!$guest) json_error('Guest entry not found', 404);
+    if (!user_has_cap($user['id'], 'events.manage_rsvps') && $guest['organizer_id'] != $user['id']) {
+      json_error('Insufficient permissions: events.manage_rsvps', 403);
+    }
+    db()->prepare('DELETE FROM event_guests WHERE id = ?')->execute([$gid]);
+    audit_log('event_guest_remove', 'event', (int) $guest['event_id'], ['email' => $guest['email']]);
+    json_response(['ok' => true]);
   }
 
   // --- ARTICLES ---
@@ -2534,14 +2592,18 @@ try {
       (SELECT COUNT(*) FROM event_registrations r WHERE r.event_id = e.id AND r.status = 'registered') AS rsvp_count
       FROM events e WHERE (e.status = 'published' AND e.date >= NOW()) OR e.status = 'cancelled' ORDER BY e.date ASC");
     $stmt->execute();
-    json_response($stmt->fetchAll());
+    $events = $stmt->fetchAll();
+    foreach ($events as &$e) $e['rsvp_count'] = (int) $e['rsvp_count'] + event_guest_count((int) $e['id']);
+    json_response($events);
   }
   elseif ($path === '/public/past-events' && $method === 'GET') {
     $stmt = db()->prepare("SELECT e.id, e.title, e.description, e.date, e.end_date, e.location, e.status, e.capacity, e.image_url, e.category, e.organizer_id,
       (SELECT COUNT(*) FROM event_registrations r WHERE r.event_id = e.id AND r.status = 'registered') AS rsvp_count
       FROM events e WHERE e.status = 'published' AND e.date < NOW() ORDER BY e.date DESC LIMIT 20");
     $stmt->execute();
-    json_response($stmt->fetchAll());
+    $events = $stmt->fetchAll();
+    foreach ($events as &$e) $e['rsvp_count'] = (int) $e['rsvp_count'] + event_guest_count((int) $e['id']);
+    json_response($events);
   }
   elseif ($path === '/public/programmes' && $method === 'GET') {
     $stmt = db()->prepare('SELECT p.id, p.title, p.description, p.status FROM programmes p WHERE p.status = "active" ORDER BY p.title');

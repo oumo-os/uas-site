@@ -240,6 +240,22 @@ function notify_capability(string $capability, string $type, string $title, stri
 }
 
 // Event waitlist: promote the earliest waitlisted member when capacity frees up.
+// Guest headcount for an event (0 when migration 039 not yet imported).
+function event_guest_count(int $eventId): int {
+  try {
+    $stmt = db()->prepare("SELECT COUNT(*) FROM event_guests WHERE event_id = ? AND status = 'registered'");
+    $stmt->execute([$eventId]);
+    return (int) $stmt->fetchColumn();
+  } catch (Exception $e) { return 0; }
+}
+
+// Total registered headcount: member RSVPs + guest signups.
+function event_headcount(int $eventId): int {
+  $stmt = db()->prepare("SELECT COUNT(*) FROM event_registrations WHERE event_id = ? AND status = 'registered'");
+  $stmt->execute([$eventId]);
+  return (int) $stmt->fetchColumn() + event_guest_count($eventId);
+}
+
 function promote_from_waitlist(int $eventId): ?array {
   $stmt = db()->prepare('SELECT id, capacity, date FROM events WHERE id = ?');
   $stmt->execute([$eventId]);
@@ -248,7 +264,7 @@ function promote_from_waitlist(int $eventId): ?array {
 
   $stmt = db()->prepare("SELECT COUNT(*) FROM event_registrations WHERE event_id = ? AND status = 'registered'");
   $stmt->execute([$eventId]);
-  if ((int) $stmt->fetchColumn() >= (int) $event['capacity']) return null;
+  if (event_guest_count($eventId) + (int) $stmt->fetchColumn() >= (int) $event['capacity']) return null;
 
   $stmt = db()->prepare('SELECT * FROM event_waitlist WHERE event_id = ? ORDER BY created_at ASC, id ASC LIMIT 1');
   $stmt->execute([$eventId]);

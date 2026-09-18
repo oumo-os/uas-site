@@ -4032,7 +4032,7 @@
             <div class="field"><div class="field-label">Capacity</div>${data.capacity ? data.capacity + ' attendees' : 'Unlimited'}</div>
             ${data.image_url ? `<div class="field"><div class="field-label">Cover</div><img src="${esc(publicCover(data.image_url, ''))}" alt="" style="max-width:100%;border-radius:var(--radius);border:1px solid var(--border)"></div>` : ''}
             ${data.description ? `<div class="field"><div class="field-label">Description</div><div style="max-height:200px;overflow-y:auto;padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${data.description}</div></div>` : ''}
-            ${rsvps.length ? `<div class="field"><div class="field-label">RSVPs (${rsvps.length})</div><div style="max-height:120px;overflow-y:auto">${rsvps.map(r => `<div style="padding:0.25rem 0;font-size:0.85rem">• ${esc(r.user_name)} <span class="text-dim">${esc(r.status)}</span></div>`).join('')}</div></div>` : ''}`}
+            ${rsvps.length ? `<div class="field"><div class="field-label">RSVPs (${rsvps.length})</div><div style="max-height:120px;overflow-y:auto">${rsvps.map(r => `<div style="padding:0.25rem 0;font-size:0.85rem">• ${esc(r.user_name || r.name)} <span class="text-dim">${esc(r.status)}</span>${r.is_guest ? ' <span class="cap-tag">guest</span>' : ''}</div>`).join('')}</div></div>` : ''}`}
             ${actions.length ? `<div class="modal-actions">${actions.join('')}</div>` : ''}
           `;
 

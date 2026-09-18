@@ -338,7 +338,22 @@
           '<p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:1rem">' + d.stats.total + ' / ' + e.capacity + ' spots filled</p>';
       }
 
-      if (!api._user) { el.innerHTML += '<a href="/login" class="btn btn-primary" style="width:100%">Sign in to RSVP</a>'; return; }
+      if (!api._user) {
+        el.innerHTML += '<a href="/login" class="btn btn-primary" style="width:100%">Sign in to RSVP</a>';
+        if (!past && e.status !== 'cancelled' && !full) {
+          el.innerHTML += '<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">' +
+            '<p style="font-size:0.88rem;font-weight:600;margin-bottom:0.5rem">No account? Sign up as a guest</p>' +
+            '<input class="form-input" id="guestName" placeholder="Full name" style="width:100%;margin-bottom:0.5rem">' +
+            '<input class="form-input" id="guestEmail" type="email" placeholder="Email" style="width:100%;margin-bottom:0.5rem">' +
+            '<input class="form-input" id="guestPhone" placeholder="Phone (optional)" style="width:100%;margin-bottom:0.5rem">' +
+            '<input type="text" id="guestWebsite" style="display:none" tabindex="-1" autocomplete="off">' +
+            '<button class="btn btn-outline" style="width:100%" id="guestBtn" onclick="guestRsvp()">Sign Up as Guest</button>' +
+            '<p class="text-dim" id="guestMsg" style="font-size:0.82rem;margin-top:0.5rem"></p></div>';
+        } else if (!past && e.status !== 'cancelled') {
+          el.innerHTML += '<p class="text-dim" style="font-size:0.88rem;margin-top:0.75rem">This event is fully booked.</p>';
+        }
+        return;
+      }
       if (!api.hasCap('events.rsvp')) return;
       if (past || e.status === 'cancelled') { el.innerHTML += '<p class="text-dim" style="font-size:0.88rem">Registration closed.</p>'; return; }
 
@@ -355,6 +370,25 @@
         }
       } else {
         el.innerHTML += '<button class="btn btn-primary" style="width:100%" onclick="rsvp()">Register Now</button>';
+      }
+    }
+
+    async function guestRsvp() {
+      var btn = document.getElementById('guestBtn');
+      var msg = document.getElementById('guestMsg');
+      var name = (document.getElementById('guestName').value || '').trim();
+      var email = (document.getElementById('guestEmail').value || '').trim();
+      var phone = (document.getElementById('guestPhone').value || '').trim();
+      var website = document.getElementById('guestWebsite').value || '';
+      if (!name || !email) { msg.textContent = 'Name and email are required.'; return; }
+      btn.disabled = true; btn.textContent = 'Signing up...';
+      try {
+        await api.request('/events/' + eventId + '/guest-rsvp', { method: 'POST', body: { name: name, email: email, phone: phone || null, website: website } });
+        msg.innerHTML = '<span class="text-success">You are signed up! See you there.</span>';
+        setTimeout(load, 1200);
+      } catch (e) {
+        msg.textContent = e.error || 'Signup failed';
+        btn.disabled = false; btn.textContent = 'Sign Up as Guest';
       }
     }
 
@@ -378,10 +412,21 @@
         var list = await api.getEventRsvps(eventId);
         el.innerHTML = '<div class="card-section"><h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Attendees (' + list.length + ')</h3>' +
           (list.length ? list.map(function(r){
-            return '<div class="attendee-item"><div><strong>' + esc(r.name) + '</strong> <span class="text-dim">' + esc(r.email) + '</span></div>' +
-              '<span class="badge badge-' + (r.status === 'attended' ? 'active' : r.status === 'cancelled' ? 'inactive' : 'pending') + '">' + esc(r.status) + '</span></div>';
+            return '<div class="attendee-item"><div><strong>' + esc(r.name) + '</strong> <span class="text-dim">' + esc(r.email) + '</span>' + (r.is_guest ? ' <span class="cap-tag">guest</span>' : '') + '</div>' +
+              '<span style="display:flex;gap:0.4rem;align-items:center"><span class="badge badge-' + (r.status === 'attended' ? 'active' : r.status === 'cancelled' ? 'inactive' : 'pending') + '">' + esc(r.status) + '</span>' +
+              (r.is_guest ? '<button class="btn btn-outline btn-xs" onclick="removeGuest(' + r.id + ')">Remove</button>' : '') + '</span></div>';
           }).join('') : '<p class="text-dim" style="font-size:0.88rem">No attendees yet.</p>') + '</div>';
       } catch(e) { el.innerHTML = '<p class="text-dim">Could not load attendees.</p>'; }
+    }
+
+    async function removeGuest(id) {
+      if (!confirm('Remove this guest signup?')) return;
+      try {
+        await api.request('/events/guests/' + id, { method: 'DELETE' });
+        document.getElementById('eAttendeesSection').innerHTML = '';
+        toggleAttendees();
+        load();
+      } catch (e) { alert(e.error || 'Failed to remove guest'); }
     }
 
     function parseTags(t) {

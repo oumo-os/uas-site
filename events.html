@@ -508,10 +508,10 @@
         const list = await api.getEventRsvps(id);
         box.innerHTML = list.length ? list.map(r => `
           <div style="display:flex;justify-content:space-between;align-items:center;padding:0.35rem 0;font-size:0.85rem">
-            <span>${esc(r.name)} <span class="text-dim">${esc(r.email)}</span></span>
+            <span>${esc(r.name)} <span class="text-dim">${esc(r.email)}</span>${r.is_guest ? ' <span class="cap-tag">guest</span>' : ''}</span>
             <span style="display:flex;gap:0.5rem;align-items:center">
               <span class="badge badge-${r.status === 'registered' ? 'active' : (r.status === 'attended' ? 'active' : 'inactive')}">${esc(r.status)}</span>
-              ${r.status === 'registered' ? `<button class="btn btn-outline btn-xs" onclick="markAttended(${id}, ${r.id})">Attended</button>` : ''}
+              ${r.status === 'registered' && !r.is_guest ? `<button class="btn btn-outline btn-xs" onclick="markAttended(${id}, ${r.id})">Attended</button>` : ''}
             </span>
           </div>`).join('')
         : '<p class="text-dim" style="font-size:0.85rem">No attendees yet.</p>';
