@@ -356,7 +356,13 @@ function smtp_office_email(string $office, string $to, string $subject, string $
         }
         return $resp;
       };
-      $close = function () use ($fp) { @fwrite($fp, "QUIT\r\n"); @fclose($fp); };
+      $close = function () use ($fp) {
+        @fwrite($fp, "QUIT\r\n");
+        // Non-blocking close: fclose() on TLS streams can otherwise hang
+        // waiting for close_notify and kill the request AFTER sending.
+        @stream_set_blocking($fp, false);
+        @fclose($fp);
+      };
       $greet = $talk('');
       if (strpos($greet, '220') !== 0) { $close(); return [false, $label . ': no greeting']; }
       $ehlo = $talk('EHLO astronomy.ug');
