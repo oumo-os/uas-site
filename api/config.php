@@ -286,7 +286,11 @@ function send_office_email(string $office, string $to, string $subject, string $
   $list = office_list();
   $from = $list[$office] ?? $list['contact'];
   $headers = "From: UAS <$from>\r\nReply-To: $from\r\nContent-Type: text/plain; charset=UTF-8\r\nX-Mailer: UAS-Platform";
-  return @mail($to, $subject, $body, $headers);
+  // Envelope sender = office address so SPF/DKIM align (no "on behalf of").
+  // Falls back to server default if the host rejects custom senders.
+  $sent = @mail($to, $subject, $body, $headers, '-f' . $from);
+  if (!$sent) $sent = @mail($to, $subject, $body, $headers);
+  return $sent;
 }
 // 256 for avatars), JPEG q80, PNG level 6 (alpha preserved), WebP q80.
 // GIFs pass through untouched (animation). Returns [width, height,
