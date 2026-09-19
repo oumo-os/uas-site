@@ -254,19 +254,24 @@ function mail_signature_parts(int $userId, string $userName): array {
 }
 
 // Styled HTML signature block (matches the plain-text signature content).
+// Logo is embedded via CID (see mail_mime) so it displays offline.
 function mail_signature_html(int $userId, string $userName): string {
   $p = mail_signature_parts($userId, $userName);
   $h = fn($s) => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
   $html = '<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:16px;padding-top:12px;border-top:1px solid #d8dde5;font-family:Arial,Helvetica,sans-serif;">'
-    . '<tr><td style="font-size:14px;font-weight:bold;color:#1a2332;">' . $h($p['name']) . '</td></tr>';
+    . '<tr>'
+    . '<td style="vertical-align:top;padding-right:12px;"><img src="cid:uas-emblem" width="72" alt="UAS" style="display:block;border:0;"></td>'
+    . '<td style="vertical-align:top;">'
+    . '<div style="font-size:14px;font-weight:bold;color:#1a2332;">' . $h($p['name']) . '</div>';
   if ($p['roles'] !== '') {
-    $html .= '<tr><td style="font-size:12px;color:#4a5568;padding-top:2px;">' . $h($p['roles']) . '</td></tr>';
+    $html .= '<div style="font-size:12px;color:#4a5568;padding-top:2px;">' . $h($p['roles']) . '</div>';
   }
   if ($p['committees'] !== '') {
-    $html .= '<tr><td style="font-size:12px;color:#4a5568;">' . $h($p['committees']) . '</td></tr>';
+    $html .= '<div style="font-size:12px;color:#4a5568;">' . $h($p['committees']) . '</div>';
   }
-  $html .= '<tr><td style="font-size:12px;color:#1b4965;font-weight:bold;padding-top:6px;">Uganda Astronomical Society</td></tr>'
-    . '<tr><td style="font-size:12px;"><a href="https://astronomy.ug" style="color:#1b4965;">astronomy.ug</a></td></tr>'
+  $html .= '<div style="font-size:12px;color:#1b4965;font-weight:bold;padding-top:6px;">Uganda Astronomical Society</div>'
+    . '<div style="font-size:12px;"><a href="https://astronomy.ug" style="color:#1b4965;">astronomy.ug</a></div>'
+    . '</td></tr>'
     . '</table>';
   return $html;
 }
@@ -288,7 +293,7 @@ function mail_mime(string $textBody, string $htmlSigBlock): array {
   // Drop any signature lines that followed the separator in plain text.
   $headers = 'MIME-Version: 1.0' . "\r\n"
     . 'Content-Type: multipart/alternative; boundary="' . $boundary . '"' . "\r\n";
-  $raw = '--' . $boundary . "\r\n"
+  $alt = '--' . $boundary . "\r\n"
     . 'Content-Type: text/plain; charset=UTF-8' . "\r\n"
     . 'Content-Transfer-Encoding: 8bit' . "\r\n\r\n"
     . $textBody . "\r\n\r\n"
@@ -297,9 +302,28 @@ function mail_mime(string $textBody, string $htmlSigBlock): array {
     . 'Content-Transfer-Encoding: 8bit' . "\r\n\r\n"
     . '<div style="font-family:Arial,Helvetica,sans-serif;">' . $htmlBody . $htmlSigBlock . '</div>' . "\r\n\r\n"
     . '--' . $boundary . '--';
+  // Embed the emblem so it displays without remote fetching.
+  $logoData = @is_file(__DIR__ . '/../img/uas-emblem-mail.png') ? @file_get_contents(__DIR__ . '/../img/uas-emblem-mail.png') : false;
+  if ($logoData === false || $logoData === '') {
+    $body = $alt;
+  } else {
+    $rel = 'uas_rel_' . bin2hex(random_bytes(8));
+    $headers = 'MIME-Version: 1.0' . "\r\n"
+      . 'Content-Type: multipart/related; boundary="' . $rel . '"' . "\r\n";
+    $body = '--' . $rel . "\r\n"
+      . 'Content-Type: multipart/alternative; boundary="' . $boundary . '"' . "\r\n\r\n"
+      . $alt . "\r\n\r\n"
+      . '--' . $rel . "\r\n"
+      . 'Content-Type: image/png; name="uas-emblem.png"' . "\r\n"
+      . 'Content-Transfer-Encoding: base64' . "\r\n"
+      . 'Content-ID: <uas-emblem>' . "\r\n"
+      . 'Content-Disposition: inline; filename="uas-emblem.png"' . "\r\n\r\n"
+      . chunk_split(base64_encode($logoData)) . "\r\n"
+      . '--' . $rel . '--';
+  }
   // Dot-stuff for SMTP DATA transparency.
   $stuffed = [];
-  foreach (preg_split('/\r\n|\r|\n/', $raw) as $ln) {
+  foreach (preg_split('/\r\n|\r|\n/', $raw ?? $body) as $ln) {
     $stuffed[] = (isset($ln[0]) && $ln[0] === '.') ? '.' . $ln : $ln;
   }
   $body = implode("\r\n", $stuffed);
