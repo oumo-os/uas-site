@@ -2481,9 +2481,11 @@ try {
     $from = $offices[$msg['office']] ?? $offices['contact'];
     $subject = 'Re: ' . ($msg['subject'] ?: 'your message to UAS') . ' [UAS]';
     $text = $body . "\n\n—\n" . mail_signature((int) $user['id'], $user['name']);
-    $sent = send_office_email($msg['office'], $msg['email'], $subject, $text, $via);
+    $sent = send_office_email($msg['office'], $msg['email'], $subject, $text, $via, $msgId);
     db()->prepare("INSERT INTO message_replies (message_id, user_id, body, sent_via) VALUES (?, ?, ?, ?)")
       ->execute([$id, $user['id'], $body, $sent ? 'email' : 'internal']);
+    db()->prepare("UPDATE contact_messages SET status = 'replied' WHERE id = ?")->execute([$id]);
+    if ($sent) record_sent($msg['office'], $msg['email'], $subject, $text, $msgId, 'contact-reply', $id, (int) $user['id'], $via);
     db()->prepare("UPDATE contact_messages SET status = 'replied' WHERE id = ?")->execute([$id]);
     audit_log('contact_reply', 'contact_message', $id, ['emailed' => $sent, 'via' => $via]);
     json_response(['ok' => true, 'emailed' => $sent, 'via' => $via]);
@@ -2669,6 +2671,18 @@ try {
     imap_close($mbox);
     json_response($msg);
   }
+  elseif (preg_match('#^/mail/([^/]+)/sent$#', $path, $m) && $method === 'GET') {
+    $user = require_login();
+    $office = $m[1];
+    if (!in_array($office, user_inbox_offices((int) $user['id']), true)) {
+      json_error('No access to this office inbox', 403);
+    }
+    try {
+      $stmt = db()->prepare('SELECT s.*, u.name AS sender_name FROM mail_sent s LEFT JOIN users u ON u.id = s.sent_by WHERE s.office = ? ORDER BY s.created_at DESC LIMIT 50');
+      $stmt->execute([$office]);
+      json_response($stmt->fetchAll());
+    } catch (Exception $e) { json_response([]); }
+  }
   elseif (preg_match('#^/mail/([^/]+)/messages/(\d+)/seen$#', $path, $m) && $method === 'POST') {
     $user = require_login();
     $office = $m[1];
@@ -2725,7 +2739,10 @@ try {
     $origSubject = mailbox_text($orig->subject ?? '');
     $subject = (stripos($origSubject, 're:') === 0 ? $origSubject : 'Re: ' . $origSubject);
     $text = $body . "\n\n—\n" . mail_signature((int) $user['id'], $user['name']);
-    $sent = send_office_email($office, $mm[0], $subject, $text, $via);
+    $origMsgId = isset($orig->message_id) && trim($orig->message_id) !== '' ? trim($orig->message_id) : null;
+    $threadHeaders = $origMsgId ? ['In-Reply-To' => $origMsgId, 'References' => $origMsgId] : [];
+    $sent = send_office_email($office, $mm[0], $subject, $text, $via, $msgId, $threadHeaders);
+    if ($sent) record_sent($office, $mm[0], $subject, $text, $msgId, 'mailbox-reply', $uid, (int) $user['id'], $via, $origMsgId);
     @imap_setflag_full($mbox, (string) $uid, '\\Seen', FT_UID);
     imap_close($mbox);
     audit_log('mail_reply', 'office', 0, ['office' => $office, 'uid' => $uid, 'emailed' => $sent, 'via' => $via]);
@@ -2749,7 +2766,8 @@ try {
       json_error('Too many messages sent. Try again later.', 429);
     }
     $text = $body . "\n\n—\n" . mail_signature((int) $user['id'], $user['name']);
-    $sent = send_office_email($office, $to, $subject . ' [UAS]', $text, $via);
+    $sent = send_office_email($office, $to, $subject . ' [UAS]', $text, $via, $msgId);
+    if ($sent) record_sent($office, $to, $subject . ' [UAS]', $text, $msgId, 'compose', null, (int) $user['id'], $via);
     audit_log('mail_compose', 'office', 0, ['office' => $office, 'to' => $to, 'emailed' => $sent, 'via' => $via]);
     if (!$sent) json_error('Mail server refused the message', 502);
     json_response(['ok' => true, 'emailed' => true, 'via' => $via]);

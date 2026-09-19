@@ -94,6 +94,17 @@
     }
     .inbox-item:hover { border-color: var(--border-focus); }
     .inbox-item.unread { border-left: 3px solid var(--gold); }
+    /* Conversation bubbles (mirror dashboard chatroom) */
+    .chat-msg { display: flex; gap: 0.5rem; max-width: 88%; align-items: flex-end; margin-bottom: 0.6rem; }
+    .chat-msg.mine { align-self: flex-end; flex-direction: row-reverse; margin-left: auto; }
+    .chat-bubble { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 0.5rem 0.75rem; min-width: 0; }
+    .chat-msg.mine .chat-bubble { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .chat-name { font-size: 0.72rem; font-weight: 700; color: var(--accent); margin-bottom: 0.1rem; }
+    .chat-text { font-size: 0.88rem; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .chat-meta { font-size: 0.7rem; color: var(--text-faint); margin-top: 0.25rem; }
+    .chat-msg.mine .chat-meta { color: rgba(255, 255, 255, 0.8); }
+    .chat-reply-btn { border: none; background: none; padding: 0; font-size: 0.7rem; font-weight: 600; color: var(--accent); cursor: pointer; font-family: inherit; }
+    .chat-msg.mine .chat-reply-btn { color: #fff; text-decoration: underline; }
     .ops-section {
       padding: 1.25rem; background: var(--bg-card); border: 1px solid var(--border);
       border-radius: var(--radius-lg); transition: border-color 0.15s, box-shadow 0.15s;
@@ -302,6 +313,10 @@
           <button class="btn btn-primary btn-sm" onclick="showMailCompose()">Compose</button>
           <button class="btn btn-outline btn-sm" onclick="loadMailPanel()">Refresh</button>
         </div>
+      </div>
+      <div style="display:flex;gap:0.5rem;margin-bottom:1rem">
+        <button class="btn btn-sm btn-primary" id="mailTabInbox" onclick="switchMailView('inbox')">Inbox</button>
+        <button class="btn btn-sm btn-outline" id="mailTabSent" onclick="switchMailView('sent')">Sent</button>
       </div>
       <div id="mailKeyWarn"></div>
       <div id="mailSetup"></div>
@@ -969,6 +984,9 @@
     let mailOffices = [];
     let mailOffice = '';
     let mailMsgs = [];
+    let mailView = 'inbox';
+    let mailSent = [];
+    let mailSentOffice = '';
 
     async function loadMailPanel() {
       if (api.hasCap('admin.system')) {
@@ -1061,8 +1079,47 @@
       await loadMailList();
     }
 
+    function switchMailView(v) {
+      mailView = v;
+      document.getElementById('mailTabInbox').className = 'btn btn-sm ' + (v === 'inbox' ? 'btn-primary' : 'btn-outline');
+      document.getElementById('mailTabSent').className = 'btn btn-sm ' + (v === 'sent' ? 'btn-primary' : 'btn-outline');
+      loadMailList();
+    }
+
+    async function mailSentItems() {
+      if (mailSentOffice !== mailOffice) {
+        mailSent = await api.request(`/mail/${mailOffice}/sent`).catch(() => []);
+        mailSentOffice = mailOffice;
+      }
+      return mailSent;
+    }
+
+    // One conversation bubble with collapsible quoted history.
+    function mailBubbleHtml(it) {
+      const parts = mailSplitQuote(it.body);
+      return `<div class="chat-msg${it.mine ? ' mine' : ''}">
+        <div class="chat-bubble">
+          <div class="chat-name">${esc(it.mine ? 'Me' : it.name)}</div>
+          <div class="chat-text">${esc(parts.head)}</div>
+          ${parts.quoted ? `<button class="chat-reply-btn" onclick="this.nextElementSibling.style.display='';this.style.display='none'">Show quoted history</button><div class="chat-quoted" style="display:none;font-size:0.8rem;opacity:0.75;margin-top:0.35rem;border-left:2px solid var(--border);padding-left:0.5rem;white-space:pre-wrap">${esc(parts.quoted)}</div>` : ''}
+          <div class="chat-meta"><span>${esc(it.date)}</span></div>
+        </div>
+      </div>`;
+    }
+
     async function loadMailList() {
       const box = document.getElementById('mailList');
+      if (mailView === 'sent') {
+        box.innerHTML = '<p class="text-dim">Loading sent mail…</p>';
+        const items = await mailSentItems();
+        if (!items.length) { box.innerHTML = '<div class="empty-state"><p>No sent mail from this office yet.</p></div>'; return; }
+        box.innerHTML = items.map(s => `
+          <div class="inbox-item" style="cursor:pointer" onclick="openSentMsg(${s.id})">
+            <div style="font-size:0.9rem">${esc(s.subject)}</div>
+            <div class="text-dim text-sm">To ${esc(s.to_email)} &middot; ${esc(s.created_at)}</div>
+          </div>`).join('');
+        return;
+      }
       box.innerHTML = '<p class="text-dim">Loading mailbox…</p>';
       try {
         mailMsgs = await api.request(`/mail/${mailOffice}/messages?limit=25`);
@@ -1098,11 +1155,24 @@
       try {
         m = await api.request(`/mail/${mailOffice}/messages/${uid}`);
       } catch (e) { alert(e.error || 'Could not load message'); return; }
+      const key = mailThreadKey(m.subject, m.from);
+      const sentItems = await mailSentItems();
+      const kin = (mailMsgs || []).filter(x => x.uid !== uid && mailThreadKey(x.subject, x.from) === key).slice(0, 8);
+      const kinBodies = await Promise.all(kin.map(x => api.request(`/mail/${mailOffice}/messages/${x.uid}`).catch(() => null)));
+      const items = [];
+      kinBodies.forEach(b => { if (b) items.push({ mine: false, name: b.from, date: b.date, body: b.body }); });
+      sentItems.filter(s => mailThreadKey(s.subject, s.to_email) === key).forEach(s => {
+        items.push({ mine: true, name: 'Me', date: s.created_at, body: s.body });
+      });
+      items.push({ mine: false, name: m.from, date: m.date, body: m.body });
+      items.sort((a, b) => new Date(a.date) - new Date(b.date));
       document.getElementById('mailModalTitle').textContent = m.subject;
       document.getElementById('mailModalBody').innerHTML = `
-        <div class="text-dim text-sm" style="margin-bottom:0.75rem">From ${esc(m.from)} &middot; To ${esc(m.to)} &middot; ${esc(m.date)}</div>
-        <pre style="white-space:pre-wrap;font-family:inherit;font-size:0.9rem;line-height:1.65;margin:0;max-height:45vh;overflow-y:auto">${esc(m.body) || '(no readable text content)'}</pre>
-        <div style="display:flex;gap:0.5rem;margin-top:1rem;flex-wrap:wrap">
+        <div style="display:flex;flex-direction:column;max-height:45vh;overflow-y:auto;margin-bottom:0.75rem" id="mailThread">
+          ${items.map(mailBubbleHtml).join('')}
+        </div>
+        <div class="text-dim text-sm" style="margin-bottom:0.75rem">From ${esc(m.from)} &middot; ${esc(m.date)}</div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
           <button class="btn btn-outline btn-sm" onclick="document.getElementById('mail-replybox').style.display='';this.style.display='none'">Reply</button>
           <button class="btn btn-outline btn-sm" onclick="mailMarkSeen(${uid}, false);closeMailModal()">Mark unread</button>
           <button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="mailDeleteMsg(${uid})">Delete</button>
@@ -1112,6 +1182,18 @@
           <p class="text-dim text-sm" style="margin:0.3rem 0 0">Your institutional signature is added automatically.</p>
           <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" id="mail-send-${uid}" onclick="sendMailReply(${uid})">Send Reply</button>
         </div>`;
+      document.getElementById('mailOverlay').classList.add('open');
+      const thread = document.getElementById('mailThread');
+      if (thread) thread.scrollTop = thread.scrollHeight;
+    }
+
+    async function openSentMsg(id) {
+      const s = (mailSent || []).find(x => x.id === id);
+      if (!s) return;
+      document.getElementById('mailModalTitle').textContent = s.subject;
+      document.getElementById('mailModalBody').innerHTML = `
+        <div class="text-dim text-sm" style="margin-bottom:0.75rem">To ${esc(s.to_email)} &middot; ${esc(s.created_at)} &middot; by ${esc(s.sender_name || '')}</div>
+        <pre style="white-space:pre-wrap;font-family:inherit;font-size:0.9rem;line-height:1.65;margin:0;max-height:45vh;overflow-y:auto">${esc(s.body)}</pre>`;
       document.getElementById('mailOverlay').classList.add('open');
     }
 

@@ -268,6 +268,15 @@ function smtp_probe(string $office): array {
   return $out;
 }
 
+// Record a sent office email for the Sent view + threading. Silently skips
+// when migration 045 is not yet imported.
+function record_sent(string $office, string $to, string $subject, string $body, ?string $msgId, string $kind, ?int $refId, ?int $userId, ?string $via, ?string $inReplyTo = null): void {
+  try {
+    db()->prepare('INSERT INTO mail_sent (office, to_email, subject, body, message_id, in_reply_to, kind, ref_id, sent_by, via) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      ->execute([$office, $to, $subject, $body, $msgId, $inReplyTo, $kind, $refId, $userId, $via]);
+  } catch (Exception $e) { /* table missing — skip */ }
+}
+
 // Decode a possibly MIME-encoded header to UTF-8.
 function mailbox_text(string $s): string {
   if (function_exists('imap_mime_header_decode')) {
@@ -330,11 +339,13 @@ function mailbox_body($mbox, int $uid): array {
 }
 // Send an office reply through the host mail system. Returns handoff
 // status (true = accepted by MTA, NOT proof of inbox delivery — needs SPF).
-function send_office_email(string $office, string $to, string $subject, string $body, ?string &$via = null): bool {
+function send_office_email(string $office, string $to, string $subject, string $body, ?string &$via = null, ?string &$msgId = null, array $extraHeaders = []): bool {
   // Preferred path: authenticated SMTP as the office itself, so the
   // envelope sender matches From (no "on behalf of", SPF/DKIM align).
-  [$ok, $note] = smtp_office_email($office, $to, $subject, $body);
+  $msgId = bin2hex(random_bytes(12)) . '@astronomy.ug';
+  [$ok, $note] = smtp_office_email($office, $to, $subject, $body, $msgId, $extraHeaders);
   if ($ok) { $via = 'smtp'; return true; }
+  $msgId = null; // sendmail path generates its own Message-ID server-side
   $via = 'sendmail-fallback(' . $note . ')';
   $list = office_list();
   $from = $list[$office] ?? $list['contact'];
@@ -353,7 +364,7 @@ function send_office_email(string $office, string $to, string $subject, string $
 // Tries transports in order: office host over SSL, then localhost
 // submission (same machine, no auth needed). Returns [sent, note] —
 // the note names the failing step across all transports for diagnostics.
-function smtp_office_email(string $office, string $to, string $subject, string $body, ?array &$transcript = null): array {
+function smtp_office_email(string $office, string $to, string $subject, string $body, ?string $msgId = null, array $extraHeaders = []): array {
   try {
     $offices = office_list();
     if (!isset($offices[$office])) return [false, 'unknown office'];
@@ -373,12 +384,16 @@ function smtp_office_email(string $office, string $to, string $subject, string $
     foreach ($lines as $ln) {
       $stuffed[] = (isset($ln[0]) && $ln[0] === '.') ? '.' . $ln : $ln;
     }
+    if ($msgId === null) $msgId = bin2hex(random_bytes(12)) . '@astronomy.ug';
+    $extra = '';
+    foreach ($extraHeaders as $k => $v) $extra .= $k . ': ' . $v . "\r\n";
     $payload = 'From: UAS <' . $from . '>' . "\r\n"
       . 'Reply-To: ' . $from . "\r\n"
       . 'To: ' . $to . "\r\n"
       . 'Subject: ' . $subj . "\r\n"
       . 'Date: ' . date('r') . "\r\n"
-      . 'Message-ID: <' . bin2hex(random_bytes(12)) . '@astronomy.ug>' . "\r\n"
+      . 'Message-ID: <' . $msgId . '>' . "\r\n"
+      . $extra
       . 'MIME-Version: 1.0' . "\r\n"
       . 'Content-Type: text/plain; charset=UTF-8' . "\r\n"
       . 'Content-Transfer-Encoding: 8bit' . "\r\n"

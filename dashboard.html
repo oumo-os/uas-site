@@ -999,6 +999,10 @@
           </div>
         </div>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem" id="dashMailOffices"></div>
+        <div style="display:flex;gap:0.5rem;margin-bottom:1rem">
+          <button class="btn btn-sm btn-primary" id="dashMailTabInbox" onclick="switchDashMailView('inbox')">Inbox</button>
+          <button class="btn btn-sm btn-outline" id="dashMailTabSent" onclick="switchDashMailView('sent')">Sent</button>
+        </div>
         <div id="dashMailList"></div>
       </div>
     </div>
@@ -3682,6 +3686,9 @@
     let mailOffices = [];
     let dashMailOffice = '';
     let dashMailMsgs = [];
+    let dashMailView = 'inbox';
+    let dashMailSent = [];
+    let dashMailSentOffice = '';
     const MAIL_OFFICE_LABELS = { info: 'Information', contact: 'General', membership: 'Membership', programmes: 'Programmes', partnerships: 'Partnerships', publicity: 'Publicity', secretary: 'Secretariat', legal: 'Legal', finance: 'Finance' };
 
     async function loadDashMail() {
@@ -3700,6 +3707,17 @@
 
     async function loadDashMailList() {
       const box = document.getElementById('dashMailList');
+      if (dashMailView === 'sent') {
+        box.innerHTML = '<p class="text-dim">Loading sent mail…</p>';
+        const items = await dashMailSentItems();
+        if (!items.length) { box.innerHTML = '<div class="empty-state"><p>No sent mail from this office yet.</p></div>'; return; }
+        box.innerHTML = items.map(s => `
+          <div class="inbox-item" style="cursor:pointer" onclick="openDashSentMsg(${s.id})">
+            <div style="font-size:0.9rem">${esc(s.subject)}</div>
+            <div class="text-dim text-sm">To ${esc(s.to_email)} &middot; ${esc(s.created_at)}</div>
+          </div>`).join('');
+        return;
+      }
       box.innerHTML = '<p class="text-dim">Loading mailbox…</p>';
       try {
         dashMailMsgs = await api.request(`/mail/${dashMailOffice}/messages?limit=25`);
@@ -3716,15 +3734,57 @@
         </div>`).join('');
     }
 
+    function switchDashMailView(v) {
+      dashMailView = v;
+      document.getElementById('dashMailTabInbox').className = 'btn btn-sm ' + (v === 'inbox' ? 'btn-primary' : 'btn-outline');
+      document.getElementById('dashMailTabSent').className = 'btn btn-sm ' + (v === 'sent' ? 'btn-primary' : 'btn-outline');
+      loadDashMailList();
+    }
+
+    async function dashMailSentItems() {
+      if (dashMailSentOffice !== dashMailOffice) {
+        dashMailSent = await api.request(`/mail/${dashMailOffice}/sent`).catch(() => []);
+        dashMailSentOffice = dashMailOffice;
+      }
+      return dashMailSent;
+    }
+
+    // One conversation bubble with collapsible quoted history.
+    function dashMailBubbleHtml(it) {
+      const parts = mailSplitQuote(it.body);
+      return `<div class="chat-msg${it.mine ? ' mine' : ''}">
+        <div class="chat-bubble">
+          <div class="chat-name">${esc(it.mine ? 'Me' : it.name)}</div>
+          <div class="chat-text">${esc(parts.head)}</div>
+          ${parts.quoted ? `<button class="chat-reply-btn" onclick="this.nextElementSibling.style.display='';this.style.display='none'">Show quoted history</button><div class="chat-quoted" style="display:none;font-size:0.8rem;opacity:0.75;margin-top:0.35rem;border-left:2px solid var(--border);padding-left:0.5rem;white-space:pre-wrap">${esc(parts.quoted)}</div>` : ''}
+          <div class="chat-meta"><span>${esc(chatTime(it.date))}</span></div>
+        </div>
+      </div>`;
+    }
+
     async function openDashMailMsg(uid) {
       let m;
       try {
         m = await api.request(`/mail/${dashMailOffice}/messages/${uid}`);
       } catch (e) { toast(e.error || 'Could not load message', 'error'); return; }
+      // Conversation: same normalized subject + counterpart across inbox + sent
+      const key = mailThreadKey(m.subject, m.from);
+      const sentItems = await dashMailSentItems();
+      const kin = (dashMailMsgs || []).filter(x => x.uid !== uid && mailThreadKey(x.subject, x.from) === key).slice(0, 8);
+      const kinBodies = await Promise.all(kin.map(x => api.request(`/mail/${dashMailOffice}/messages/${x.uid}`).catch(() => null)));
+      const items = [];
+      kinBodies.forEach(b => { if (b) items.push({ mine: false, name: b.from, date: b.date, body: b.body }); });
+      sentItems.filter(s => mailThreadKey(s.subject, s.to_email) === key).forEach(s => {
+        items.push({ mine: true, name: 'Me', date: s.created_at, body: s.body });
+      });
+      items.push({ mine: false, name: m.from, date: m.date, body: m.body, current: true });
+      items.sort((a, b) => new Date(a.date) - new Date(b.date));
       openModal(m.subject, `
+        <div class="chat-thread" style="max-height:45vh;overflow-y:auto;display:flex;flex-direction:column;gap:0.6rem;margin-bottom:0.75rem">
+          ${items.map(dashMailBubbleHtml).join('')}
+        </div>
         <div class="text-dim text-sm" style="margin-bottom:0.75rem">From ${esc(m.from)} &middot; ${esc(m.date)}</div>
-        <pre style="white-space:pre-wrap;font-family:inherit;font-size:0.9rem;line-height:1.65;margin:0;max-height:40vh;overflow-y:auto">${esc(m.body) || '(no readable text content)'}</pre>
-        <div style="display:flex;gap:0.5rem;margin-top:1rem;flex-wrap:wrap">
+        <div style="display:flex;gap:0.5rem;margin-top:0.25rem;flex-wrap:wrap">
           <button class="btn btn-outline btn-sm" id="dash-mail-reply-toggle" onclick="document.getElementById('dash-mail-replybox').style.display='';this.style.display='none'">Reply</button>
           <button class="btn btn-outline btn-sm" onclick="dashMailMarkSeen(${uid}, false);closeModal()">Mark unread</button>
           <button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="dashMailDeleteMsg(${uid})">Delete</button>
@@ -3734,6 +3794,17 @@
           <p class="text-dim text-sm" style="margin:0.3rem 0 0">Your institutional signature is added automatically.</p>
           <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" id="dash-mail-send-${uid}" onclick="sendDashMailReply(${uid})">Send Reply</button>
         </div>
+      `);
+      const thread = document.querySelector('#detailModal .chat-thread');
+      if (thread) thread.scrollTop = thread.scrollHeight;
+    }
+
+    async function openDashSentMsg(id) {
+      const s = (dashMailSent || []).find(x => x.id === id);
+      if (!s) return;
+      openModal(s.subject, `
+        <div class="text-dim text-sm" style="margin-bottom:0.75rem">To ${esc(s.to_email)} &middot; ${esc(s.created_at)} &middot; by ${esc(s.sender_name || '')}</div>
+        <pre style="white-space:pre-wrap;font-family:inherit;font-size:0.9rem;line-height:1.65;margin:0;max-height:40vh;overflow-y:auto">${esc(s.body)}</pre>
       `);
     }
 

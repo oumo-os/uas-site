@@ -665,6 +665,59 @@ window.absImg = function (image) {
   return window.location.origin + base + p;
 };
 
+// --- Mail threads: group inbox + sent by normalized subject + counterpart,
+// and collapse quoted history (Outlook blocks, "On ... wrote:", > quotes).
+window.mailNormSubject = function (s) {
+  let t = String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  for (let i = 0; i < 5; i++) {
+    const n = t.replace(/^(re|fw|fwd)\s*:\s*/, '').trim();
+    if (n === t) break;
+    t = n;
+  }
+  return t.replace(/\s*\[uas\]\s*$/, '').trim();
+};
+window.mailCounterpart = function (addr) {
+  const m = String(addr || '').match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return m ? m[0].toLowerCase() : String(addr || '').toLowerCase().trim();
+};
+window.mailThreadKey = function (subject, counterpart) {
+  return window.mailNormSubject(subject) + ' ‖ ' + window.mailCounterpart(counterpart);
+};
+window.mailSplitQuote = function (text) {
+  const t = String(text || '');
+  const lines = t.split('\n');
+  // Outlook-style header block quote: 3+ consecutive From/Sent/To/Cc/Subject lines
+  let headEnd = lines.length;
+  let run = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\s*(From|Sent|To|Cc|Subject)\s*:/i.test(lines[i])) {
+      run++;
+      if (run >= 3) { headEnd = i - run + 1; break; }
+    } else if (lines[i].trim() === '') {
+      continue;
+    } else {
+      run = 0;
+    }
+  }
+  let head = lines.slice(0, headEnd).join('\n').trim();
+  let quoted = lines.slice(headEnd).join('\n').trim();
+  if (!quoted) {
+    const m = head.match(/\n\s*On .* wrote:\s*\n/i);
+    if (m && m.index > 20) {
+      quoted = head.slice(m.index).trim();
+      head = head.slice(0, m.index).trim();
+    }
+  }
+  if (!quoted) {
+    const qIdx = lines.findIndex(l => /^\s*>/.test(l));
+    if (qIdx > 0) {
+      quoted = lines.slice(qIdx).join('\n').trim();
+      head = lines.slice(0, qIdx).join('\n').trim();
+    }
+  }
+  return { head: head || t, quoted };
+};
+
 // --- Global nav helpers ---
 window.updateNavUser = function () {
   const el = document.getElementById('navUser');
