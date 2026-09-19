@@ -2545,6 +2545,41 @@ try {
     if (!in_array($office, array_keys(office_list()), true)) json_error('Unknown office', 400);
     json_response(smtp_probe($office));
   }
+  // --- Deliverability: SPF / DMARC / DKIM DNS checks ---
+  elseif ($path === '/mail/deliverability' && $method === 'GET') {
+    $user = require_cap('admin.system');
+    $domain = 'astronomy.ug';
+    $records = ['spf' => null, 'dmarc' => null, 'dkim' => null, 'dns_ok' => function_exists('dns_get_record')];
+    if ($records['dns_ok']) {
+      $txt = function ($name) {
+        try {
+          $rr = @dns_get_record($name, DNS_TXT);
+          if (!$rr) return null;
+          $vals = [];
+          foreach ($rr as $r) {
+            $t = '';
+            if (isset($r['txt'])) $t = $r['txt'];
+            elseif (isset($r['entries'])) $t = implode('', (array) $r['entries']);
+            if ($t !== '') $vals[] = $t;
+          }
+          return $vals ?: null;
+        } catch (Exception $e) { return null; }
+      };
+      $all = $txt($domain) ?: [];
+      foreach ($all as $v) {
+        if (stripos($v, 'v=spf1') !== false) $records['spf'] = $v;
+      }
+      $dm = $txt('_dmarc.' . $domain) ?: [];
+      foreach ($dm as $v) {
+        if (stripos($v, 'v=DMARC1') !== false) $records['dmarc'] = $v;
+      }
+      $dk = $txt('default._domainkey.' . $domain) ?: [];
+      foreach ($dk as $v) {
+        if (stripos($v, 'v=DKIM1') !== false || stripos($v, 'k=rsa') !== false || stripos($v, 'p=') !== false) $records['dkim'] = substr($v, 0, 120) . (strlen($v) > 120 ? '…' : '');
+      }
+    }
+    json_response($records);
+  }
   elseif ($path === '/mail/status' && $method === 'GET') {
     $user = require_cap('admin.system');
     $out = [];

@@ -314,6 +314,7 @@
           <button class="btn btn-outline btn-sm" onclick="loadMailPanel()">Refresh</button>
         </div>
       </div>
+      <div id="mailDeliverability"></div>
       <div style="display:flex;gap:0.5rem;margin-bottom:1rem">
         <button class="btn btn-sm btn-primary" id="mailTabInbox" onclick="switchMailView('inbox')">Inbox</button>
         <button class="btn btn-sm btn-outline" id="mailTabSent" onclick="switchMailView('sent')">Sent</button>
@@ -992,12 +993,36 @@
       if (api.hasCap('admin.system')) {
         const status = await api.request('/mail/status').catch(() => null);
         renderMailSetup(status);
+        renderDeliverability(await api.request('/mail/deliverability').catch(() => null));
       }
       mailOffices = await api.request('/my/inboxes').catch(() => []);
       if (mailOffices.length && !mailOffices.includes(mailOffice)) mailOffice = mailOffices[0];
       renderMailOfficeTabs();
       if (mailOffice) loadMailList();
       else document.getElementById('mailList').innerHTML = '<div class="empty-state"><p>No office inbox access. Ask a system administrator to grant it on your role.</p></div>';
+    }
+
+    function renderDeliverability(d) {
+      const box = document.getElementById('mailDeliverability');
+      if (!d) { box.innerHTML = ''; return; }
+      if (!d.dns_ok) {
+        box.innerHTML = '<p class="text-dim text-sm">DNS checks unavailable on this host.</p>';
+        return;
+      }
+      const row = (label, value, fix) => `
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;padding:0.45rem 0;border-bottom:1px solid var(--border);font-size:0.85rem">
+          <div><strong>${label}</strong><div class="text-dim text-sm" style="overflow-wrap:anywhere">${value ? esc(value) : 'Not found'}</div></div>
+          <span class="badge ${value ? 'badge-active' : 'badge-inactive'}">${value ? 'OK' : 'Missing'}</span>
+        </div>
+        ${!value && fix ? `<div class="text-dim text-sm" style="margin-bottom:0.4rem">${fix}</div>` : ''}`;
+      box.innerHTML = `
+        <div class="card" style="padding:1rem 1.25rem;margin-bottom:1rem">
+          <h4 style="margin:0 0 0.25rem">Deliverability (astronomy.ug)</h4>
+          ${row('SPF', d.spf, '')}
+          ${row('DMARC', d.dmarc, 'Add TXT <code>_dmarc</code> → <code>v=DMARC1; p=none; rua=mailto:info@astronomy.ug</code> in cPanel Zone Editor.')}
+          ${row('DKIM', d.dkim, 'cPanel → Email Deliverability → astronomy.ug → enable DKIM (creates <code>default._domainkey</code> automatically).')}
+          <p class="text-dim text-sm" style="margin:0.6rem 0 0">Also verify with a <code>mail-tester.com</code> test and register the domain in Google Postmaster Tools once mail flows.</p>
+        </div>`;
     }
 
     function renderMailSetup(status) {
