@@ -2537,6 +2537,12 @@ try {
     json_response(['ok' => true, 'offices' => $offices]);
   }
   // --- OFFICE MAILBOXES (live IMAP; credentials encrypted, officers never see them) ---
+  elseif (preg_match('#^/mail/([^/]+)/diag$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('admin.system');
+    $office = $m[1];
+    if (!in_array($office, array_keys(office_list()), true)) json_error('Unknown office', 400);
+    json_response(smtp_probe($office));
+  }
   elseif ($path === '/mail/status' && $method === 'GET') {
     $user = require_cap('admin.system');
     $out = [];

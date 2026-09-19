@@ -220,6 +220,54 @@ function mail_signature(int $userId, string $userName): string {
   return implode("\n", $lines);
 }
 
+// Observe-only SMTP probe for diagnostics: connects, reads the greeting and
+// EHLO capabilities per transport. Never authenticates, never sends.
+function smtp_probe(string $office): array {
+  $out = ['office' => $office, 'transports' => []];
+  try {
+    $offices = office_list();
+    if (!isset($offices[$office])) { $out['error'] = 'unknown office'; return $out; }
+    $stmt = db()->prepare('SELECT host, port FROM office_mailboxes WHERE office = ? AND enabled = 1');
+    $stmt->execute([$office]);
+    $cfg = $stmt->fetch();
+    if (!$cfg) { $out['error'] = 'mailbox not configured'; return $out; }
+    $host = $cfg['host'] ?: 'astronomy.ug';
+    $port = (int) ($cfg['port'] ?: 465);
+    $deadline = time() + 20;
+    foreach (['ssl://' . $host . ':' . $port, 'tcp://127.0.0.1:25', 'tcp://127.0.0.1:587'] as $target) {
+      $t = ['target' => $target, 'lines' => []];
+      $fp = @stream_socket_client($target, $errno, $errstr, 3);
+      if (!$fp) { $t['lines'][] = ['!', 'connect failed' . ($errstr ? ": $errstr" : '')]; $out['transports'][] = $t; continue; }
+      stream_set_timeout($fp, 4);
+      $read = function () use ($fp, $deadline) {
+        $resp = ''; $n = 0;
+        while (time() < $deadline && $n++ < 20) {
+          $line = @fgets($fp, 512);
+          if ($line === false || $line === '') break;
+          $resp .= $line;
+          if (preg_match('/^\d{3} /', $line)) break;
+        }
+        return $resp;
+      };
+      $g = $read();
+      $t['lines'][] = ['S', trim($g) !== '' ? trim($g) : '(no greeting)'];
+      if (strpos($g, '220') === 0) {
+        @fwrite($fp, "EHLO astronomy.ug\r\n");
+        $e = $read();
+        $t['lines'][] = ['S', trim($e) !== '' ? trim($e) : '(no EHLO response)'];
+        @fwrite($fp, "QUIT\r\n");
+      }
+      @stream_set_blocking($fp, false);
+      @fclose($fp);
+      $out['transports'][] = $t;
+      if (time() >= $deadline) break;
+    }
+  } catch (Throwable $e) {
+    $out['error'] = 'probe failed: ' . $e->getMessage();
+  }
+  return $out;
+}
+
 // Decode a possibly MIME-encoded header to UTF-8.
 function mailbox_text(string $s): string {
   if (function_exists('imap_mime_header_decode')) {
@@ -305,7 +353,7 @@ function send_office_email(string $office, string $to, string $subject, string $
 // Tries transports in order: office host over SSL, then localhost
 // submission (same machine, no auth needed). Returns [sent, note] —
 // the note names the failing step across all transports for diagnostics.
-function smtp_office_email(string $office, string $to, string $subject, string $body): array {
+function smtp_office_email(string $office, string $to, string $subject, string $body, ?array &$transcript = null): array {
   try {
     $offices = office_list();
     if (!isset($offices[$office])) return [false, 'unknown office'];

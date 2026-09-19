@@ -996,7 +996,7 @@
             <td><strong>${esc(OFFICE_LABELS[s.office] || s.office)}</strong><br><span class="text-dim text-sm">${esc(s.address)}</span></td>
             <td class="text-sm">${esc(s.username || '—')}</td>
             <td>${!s.configured ? '<span class="badge badge-inactive">not set</span>' : !s.enabled ? '<span class="badge badge-inactive">disabled</span>' : s.ok ? '<span class="badge badge-active">connected</span>' : `<span class="badge badge-inactive" title="${esc(s.error || '')}">error</span>`}</td>
-            <td><button class="btn btn-outline btn-xs" onclick="toggleMailboxForm('${s.office}')">Configure</button></td>
+            <td><button class="btn btn-outline btn-xs" onclick="toggleMailboxForm('${s.office}')">Configure</button> <button class="btn btn-outline btn-xs" onclick="diagMailbox('${s.office}')">Diagnose</button></td>
           </tr>
           <tr id="mbox-form-${s.office}" style="display:none"><td colspan="4">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;max-width:560px">
@@ -1014,6 +1014,24 @@
     function toggleMailboxForm(office) {
       const row = document.getElementById('mbox-form-' + office);
       if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
+    }
+
+    async function diagMailbox(office) {
+      document.getElementById('mailModalTitle').textContent = 'SMTP Diagnostics: ' + office;
+      document.getElementById('mailModalBody').innerHTML = '<p class="text-dim">Probing transports…</p>';
+      document.getElementById('mailOverlay').classList.add('open');
+      try {
+        const d = await api.request(`/mail/${office}/diag`, { method: 'POST', body: {} });
+        let html = '';
+        if (d.error) html += `<p style="color:var(--danger)">${esc(d.error)}</p>`;
+        (d.transports || []).forEach(t => {
+          html += `<h5 style="margin:0.75rem 0 0.25rem">${esc(t.target)}</h5><pre style="white-space:pre-wrap;font-family:monospace;font-size:0.78rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:0.5rem;max-height:180px;overflow-y:auto">${t.lines.map(([dir, text]) => esc(dir + ' ' + text)).join('\n')}</pre>`;
+        });
+        html += '<p class="text-dim text-sm">No authentication is attempted and nothing is sent. Screenshot this for support.</p>';
+        document.getElementById('mailModalBody').innerHTML = html || '<p class="text-dim">No data.</p>';
+      } catch (e) {
+        document.getElementById('mailModalBody').innerHTML = `<p style="color:var(--danger)">Probe failed: ${esc(e.error || 'unknown error')}</p>`;
+      }
     }
 
     async function saveMailbox(office) {
