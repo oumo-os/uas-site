@@ -198,26 +198,112 @@ function mailbox_open(string $office): array {
   return [$mbox, null];
 }
 
+// Display names per office for the From header (envelope + addresses unchanged).
+function office_names(): array {
+  return [
+    'info' => 'UAS Information',
+    'contact' => 'UAS General',
+    'membership' => 'Membership Team',
+    'programmes' => 'Programmes Team',
+    'partnerships' => 'Partnerships Team',
+    'publicity' => 'Publicity Team',
+    'secretary' => 'Secretariat',
+    'legal' => 'Legal Team',
+    'finance' => 'Finance Team',
+  ];
+}
+
+// Full sender string, e.g. Finance Team <finance@astronomy.ug>.
+function office_from(string $office): string {
+  $list = office_list();
+  $names = office_names();
+  $addr = $list[$office] ?? $list['contact'];
+  $name = $names[$office] ?? 'UAS';
+  return $name . ' <' . $addr . '>';
+}
+
 // Forced institutional signature appended server-side to every outgoing
 // office email: author name, governance/administrative roles, committees,
 // then the standard organisation block.
 function mail_signature(int $userId, string $userName): string {
-  $lines = [$userName];
+  $p = mail_signature_parts($userId, $userName);
+  $lines = [$p['name']];
+  if ($p['roles'] !== '') $lines[] = $p['roles'];
+  if ($p['committees'] !== '') $lines[] = $p['committees'];
+  $lines[] = 'Uganda Astronomical Society';
+  $lines[] = 'https://astronomy.ug';
+  return implode("\n", $lines);
+}
+
+// Structured signature parts for the styled HTML signature block.
+function mail_signature_parts(int $userId, string $userName): array {
+  $parts = ['name' => $userName, 'roles' => '', 'committees' => ''];
   try {
     $roles = [];
     foreach (user_roles($userId) as $r) {
       if (in_array($r['role_type'] ?? '', ['governance', 'administrative'], true)) $roles[] = $r['title'];
     }
     $roles = array_values(array_unique($roles));
-    if ($roles) $lines[] = implode(', ', $roles);
+    if ($roles) $parts['roles'] = implode(', ', $roles);
     $stmt = db()->prepare("SELECT wg.name FROM working_group_members wgm JOIN working_groups wg ON wg.id = wgm.group_id WHERE wgm.user_id = ? AND wgm.status = 'active' AND wg.status = 'active' AND wg.type = 'committee' ORDER BY wg.name");
     $stmt->execute([$userId]);
     $committees = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
-    if ($committees) $lines[] = implode(', ', $committees);
+    if ($committees) $parts['committees'] = implode(', ', $committees);
   } catch (Exception $e) { /* roles unavailable — name + org block still apply */ }
-  $lines[] = 'Uganda Astronomical Society';
-  $lines[] = 'https://astronomy.ug';
-  return implode("\n", $lines);
+  return $parts;
+}
+
+// Styled HTML signature block (matches the plain-text signature content).
+function mail_signature_html(int $userId, string $userName): string {
+  $p = mail_signature_parts($userId, $userName);
+  $h = fn($s) => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+  $html = '<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:16px;padding-top:12px;border-top:1px solid #d8dde5;font-family:Arial,Helvetica,sans-serif;">'
+    . '<tr><td style="font-size:14px;font-weight:bold;color:#1a2332;">' . $h($p['name']) . '</td></tr>';
+  if ($p['roles'] !== '') {
+    $html .= '<tr><td style="font-size:12px;color:#4a5568;padding-top:2px;">' . $h($p['roles']) . '</td></tr>';
+  }
+  if ($p['committees'] !== '') {
+    $html .= '<tr><td style="font-size:12px;color:#4a5568;">' . $h($p['committees']) . '</td></tr>';
+  }
+  $html .= '<tr><td style="font-size:12px;color:#1b4965;font-weight:bold;padding-top:6px;">Uganda Astronomical Society</td></tr>'
+    . '<tr><td style="font-size:12px;"><a href="https://astronomy.ug" style="color:#1b4965;">astronomy.ug</a></td></tr>'
+    . '</table>';
+  return $html;
+}
+
+// Build a multipart/alternative body: identical plain-text part plus a
+// styled HTML part (plain paragraphs + signature block). Returns
+// [headers_suffix, body] where headers_suffix holds Content-Type lines.
+function mail_mime(string $textBody, string $htmlSigBlock): array {
+  $boundary = 'uas_' . bin2hex(random_bytes(12));
+  $htmlBody = '';
+  foreach (preg_split('/\r\n|\r|\n/', $textBody) as $para) {
+    $para = trim($para);
+    if ($para === '') continue;
+    // Strip the plain signature tail (from the — separator); HTML sig replaces it.
+    if ($para === '—') break;
+    $htmlBody .= '<p style="font-size:14px;line-height:1.65;color:#1a2332;margin:0 0 12px;">'
+      . htmlspecialchars($para, ENT_QUOTES, 'UTF-8') . '</p>';
+  }
+  // Drop any signature lines that followed the separator in plain text.
+  $headers = 'MIME-Version: 1.0' . "\r\n"
+    . 'Content-Type: multipart/alternative; boundary="' . $boundary . '"' . "\r\n";
+  $raw = '--' . $boundary . "\r\n"
+    . 'Content-Type: text/plain; charset=UTF-8' . "\r\n"
+    . 'Content-Transfer-Encoding: 8bit' . "\r\n\r\n"
+    . $textBody . "\r\n\r\n"
+    . '--' . $boundary . "\r\n"
+    . 'Content-Type: text/html; charset=UTF-8' . "\r\n"
+    . 'Content-Transfer-Encoding: 8bit' . "\r\n\r\n"
+    . '<div style="font-family:Arial,Helvetica,sans-serif;">' . $htmlBody . $htmlSigBlock . '</div>' . "\r\n\r\n"
+    . '--' . $boundary . '--';
+  // Dot-stuff for SMTP DATA transparency.
+  $stuffed = [];
+  foreach (preg_split('/\r\n|\r|\n/', $raw) as $ln) {
+    $stuffed[] = (isset($ln[0]) && $ln[0] === '.') ? '.' . $ln : $ln;
+  }
+  $body = implode("\r\n", $stuffed);
+  return [$headers, $body];
 }
 
 // Observe-only SMTP probe for diagnostics: connects, reads the greeting and
@@ -339,23 +425,25 @@ function mailbox_body($mbox, int $uid): array {
 }
 // Send an office reply through the host mail system. Returns handoff
 // status (true = accepted by MTA, NOT proof of inbox delivery — needs SPF).
-function send_office_email(string $office, string $to, string $subject, string $body, ?string &$via = null, ?string &$msgId = null, array $extraHeaders = []): bool {
+function send_office_email(string $office, string $to, string $subject, string $body, ?string &$via = null, ?string &$msgId = null, array $extraHeaders = [], int $userId = 0, string $userName = ''): bool {
   // Preferred path: authenticated SMTP as the office itself, so the
   // envelope sender matches From (no "on behalf of", SPF/DKIM align).
+  $fromHeader = office_from($office);
+  [$mimeHeaders, $mimeBody] = mail_mime($body, mail_signature_html($userId, $userName));
   $msgId = bin2hex(random_bytes(12)) . '@astronomy.ug';
-  [$ok, $note] = smtp_office_email($office, $to, $subject, $body, $msgId, $extraHeaders);
+  [$ok, $note] = smtp_office_email($office, $to, $subject, $body, $msgId, $extraHeaders, $fromHeader, $mimeHeaders, $mimeBody);
   if ($ok) { $via = 'smtp'; return true; }
   $msgId = null; // sendmail path generates its own Message-ID server-side
   $via = 'sendmail-fallback(' . $note . ')';
   $list = office_list();
   $from = $list[$office] ?? $list['contact'];
-  $headers = "From: UAS <$from>\r\nReply-To: $from\r\nContent-Type: text/plain; charset=UTF-8\r\nX-Mailer: UAS-Platform";
+  $headers = "From: $fromHeader\r\nReply-To: $from\r\n" . $mimeHeaders . "X-Mailer: UAS-Platform";
   // Envelope sender = office address so SPF/DKIM align (no "on behalf of").
   // Falls back to server default if the host rejects custom senders.
   // -odb queues in background so a slow remote MTA can't kill the request.
   $params = '-f' . $from . ' -odb';
-  $sent = @mail($to, $subject, $body, $headers, $params);
-  if (!$sent) $sent = @mail($to, $subject, $body, $headers);
+  $sent = @mail($to, $subject, $mimeBody, $headers, $params);
+  if (!$sent) $sent = @mail($to, $subject, $mimeBody, $headers);
   if (!$sent) $via = 'failed';
   return $sent;
 }
@@ -364,7 +452,7 @@ function send_office_email(string $office, string $to, string $subject, string $
 // Tries transports in order: office host over SSL, then localhost
 // submission (same machine, no auth needed). Returns [sent, note] —
 // the note names the failing step across all transports for diagnostics.
-function smtp_office_email(string $office, string $to, string $subject, string $body, ?string $msgId = null, array $extraHeaders = []): array {
+function smtp_office_email(string $office, string $to, string $subject, string $body, ?string $msgId = null, array $extraHeaders = [], ?string $fromHeader = null, ?string $mimeHeaders = null, ?string $mimeBody = null): array {
   try {
     $offices = office_list();
     if (!isset($offices[$office])) return [false, 'unknown office'];
@@ -387,18 +475,23 @@ function smtp_office_email(string $office, string $to, string $subject, string $
     if ($msgId === null) $msgId = bin2hex(random_bytes(12)) . '@astronomy.ug';
     $extra = '';
     foreach ($extraHeaders as $k => $v) $extra .= $k . ': ' . $v . "\r\n";
-    $payload = 'From: UAS <' . $from . '>' . "\r\n"
+    if ($fromHeader === null) $fromHeader = 'UAS <' . $from . '>';
+    if ($mimeHeaders === null || $mimeBody === null) {
+      $mimeHeaders = 'MIME-Version: 1.0' . "\r\n"
+        . 'Content-Type: text/plain; charset=UTF-8' . "\r\n"
+        . 'Content-Transfer-Encoding: 8bit' . "\r\n";
+      $mimeBody = implode("\r\n", $stuffed);
+    }
+    $payload = 'From: ' . $fromHeader . "\r\n"
       . 'Reply-To: ' . $from . "\r\n"
       . 'To: ' . $to . "\r\n"
       . 'Subject: ' . $subj . "\r\n"
       . 'Date: ' . date('r') . "\r\n"
       . 'Message-ID: <' . $msgId . '>' . "\r\n"
       . $extra
-      . 'MIME-Version: 1.0' . "\r\n"
-      . 'Content-Type: text/plain; charset=UTF-8' . "\r\n"
-      . 'Content-Transfer-Encoding: 8bit' . "\r\n"
+      . $mimeHeaders
       . 'X-Mailer: UAS-Platform' . "\r\n"
-      . "\r\n" . implode("\r\n", $stuffed);
+      . "\r\n" . $mimeBody;
 
     // One submission attempt over a single transport. $deadline bounds the
     // whole cascade so slow hosts fail gracefully instead of killing PHP.

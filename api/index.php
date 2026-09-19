@@ -2481,7 +2481,7 @@ try {
     $from = $offices[$msg['office']] ?? $offices['contact'];
     $subject = 'Re: ' . ($msg['subject'] ?: 'your message to UAS') . ' [UAS]';
     $text = $body . "\n\n—\n" . mail_signature((int) $user['id'], $user['name']);
-    $sent = send_office_email($msg['office'], $msg['email'], $subject, $text, $via, $msgId);
+    $sent = send_office_email($msg['office'], $msg['email'], $subject, $text, $via, $msgId, [], (int) $user['id'], $user['name']);
     db()->prepare("INSERT INTO message_replies (message_id, user_id, body, sent_via) VALUES (?, ?, ?, ?)")
       ->execute([$id, $user['id'], $body, $sent ? 'email' : 'internal']);
     db()->prepare("UPDATE contact_messages SET status = 'replied' WHERE id = ?")->execute([$id]);
@@ -2776,7 +2776,7 @@ try {
     $text = $body . "\n\n—\n" . mail_signature((int) $user['id'], $user['name']);
     $origMsgId = isset($orig->message_id) && trim($orig->message_id) !== '' ? trim($orig->message_id) : null;
     $threadHeaders = $origMsgId ? ['In-Reply-To' => $origMsgId, 'References' => $origMsgId] : [];
-    $sent = send_office_email($office, $mm[0], $subject, $text, $via, $msgId, $threadHeaders);
+    $sent = send_office_email($office, $mm[0], $subject, $text, $via, $msgId, $threadHeaders, (int) $user['id'], $user['name']);
     if ($sent) record_sent($office, $mm[0], $subject, $text, $msgId, 'mailbox-reply', $uid, (int) $user['id'], $via, $origMsgId);
     @imap_setflag_full($mbox, (string) $uid, '\\Seen', FT_UID);
     imap_close($mbox);
@@ -2801,7 +2801,7 @@ try {
       json_error('Too many messages sent. Try again later.', 429);
     }
     $text = $body . "\n\n—\n" . mail_signature((int) $user['id'], $user['name']);
-    $sent = send_office_email($office, $to, $subject . ' [UAS]', $text, $via, $msgId);
+    $sent = send_office_email($office, $to, $subject . ' [UAS]', $text, $via, $msgId, [], (int) $user['id'], $user['name']);
     if ($sent) record_sent($office, $to, $subject . ' [UAS]', $text, $msgId, 'compose', null, (int) $user['id'], $via);
     audit_log('mail_compose', 'office', 0, ['office' => $office, 'to' => $to, 'emailed' => $sent, 'via' => $via]);
     if (!$sent) json_error('Mail server refused the message', 502);
