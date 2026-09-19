@@ -365,7 +365,6 @@ function smtp_office_email(string $office, string $to, string $subject, string $
     if ($pass === null || $pass === '') return [false, 'cannot decrypt credentials'];
     $from = $offices[$office];
     $host = $cfg['host'] ?: 'astronomy.ug';
-    $port = (int) ($cfg['port'] ?: 465);
     @set_time_limit(90);
     $subj = function_exists('mb_encode_mimeheader')
       ? mb_encode_mimeheader($subject, 'UTF-8', 'B', "\r\n") : $subject;
@@ -460,10 +459,12 @@ function smtp_office_email(string $office, string $to, string $subject, string $
     };
 
     $creds = [$cfg['username'], $pass];
+    // NOTE: $cfg['port'] is the IMAP port — SMTP uses its own standard ports.
     $candidates = [
-      ['ssl://' . $host . ':' . $port, true, $creds, 'smtp-ssl'],
-      ['tcp://127.0.0.1:25', false, null, 'smtp-localhost'],
-      ['tcp://127.0.0.1:587', false, null, 'smtp-localhost587'],
+      ['ssl://' . $host . ':465', true, $creds, 'smtp-465'],
+      ['tcp://' . $host . ':587', false, $creds, 'smtp-587'],
+      ['tcp://127.0.0.1:25', false, $creds, 'smtp-localhost'],
+      ['tcp://127.0.0.1:587', false, $creds, 'smtp-localhost587'],
     ];
     $notes = [];
     $authBroken = false;
