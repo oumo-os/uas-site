@@ -373,20 +373,28 @@
     function renderCommitteesSection() {
       const committees = allWgData.filter(g => g.type === 'committee');
       if (!committees.length) return '';
+      const dirByUser = {};
+      (allMembers || []).forEach(m => { dirByUser[m.user_id || m.id] = m; });
       const groupsHtml = committees.map(g => {
         const members = g.members || [];
         const cardsHtml = members.length ? '<div class="member-grid">' + members.map(m => {
           const roleBadge = m.role ? `<div class="user-roles-list"><span class="role-badge governance">${esc(m.role)}</span></div>` : '';
+          const dir = dirByUser[m.user_id] || {};
+          const classLabel = (dir.class || 'Regular Member').replace(' Member', '');
+          const joined = dir.joined_date ? new Date(dir.joined_date).toLocaleDateString('en', { month: 'short', year: 'numeric' }) : '';
           return `
           <div class="member-card" onclick="showMemberDetail(${m.user_id})">
             <div class="member-header">
               <div class="member-avatar">${avatarHtml(m.avatar_url, m.user_name)}</div>
               <div>
                 <div class="member-name">${esc(m.user_name)}</div>
-                <div class="member-inst">${esc(m.email || '')}</div>
+                <div class="member-inst">${esc(m.institution || dir.institution || 'Independent')}${m.location || dir.location ? ' &middot; ' + esc(m.location || dir.location) : ''}</div>
               </div>
             </div>
             ${roleBadge}
+            <div class="user-roles-list"><span class="role-badge general">${esc(classLabel)}</span>${joined ? `<span class="text-dim text-sm" style="margin-left:0.4rem">since ${esc(joined)}</span>` : ''}</div>
+            ${dir.bio ? `<div class="member-bio">${esc(dir.bio)}</div>` : ''}
+            ${m.email ? `<div class="member-inst" style="margin-top:0.35rem">${esc(m.email)}</div>` : ''}
           </div>`;
         }).join('') + '</div>' : '<div style="padding:0.5rem 0;color:var(--text-dim);font-size:0.85rem">No members</div>';
         return `
