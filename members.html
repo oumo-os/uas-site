@@ -262,10 +262,9 @@
     function renderFilter() {
       const sections = [
         { key: '', label: 'All' },
+        { key: 'all_members', label: 'All Members' },
         { key: 'committees', label: 'Committees' },
         { key: 'working_groups', label: 'Working Groups' },
-        { key: 'key_members', label: 'Key Members' },
-        { key: 'other', label: 'Other Members' },
         { key: 'vacancies', label: 'Vacancies' },
       ];
       document.getElementById('roleFilter').innerHTML = sections.map(s =>
@@ -293,25 +292,16 @@
       const members = getFilteredMembers();
       document.getElementById('emptyMsg').style.display = members.length || allWgData.length ? 'none' : 'block';
 
-      const committeeMembers = new Set();
-      const keyMemberIds = new Set();
-      allWgData.filter(g => g.type === 'committee').forEach(g => {
-        (g.members || []).forEach(m => committeeMembers.add(m.user_id));
-      });
-
       let html = '';
 
+      if (!activeSection || activeSection === 'all_members') {
+        html += renderAllMembersSection(members);
+      }
       if (!activeSection || activeSection === 'committees') {
         html += renderCommitteesSection();
       }
       if (!activeSection || activeSection === 'working_groups') {
         html += renderWorkingGroupsSection();
-      }
-      if (!activeSection || activeSection === 'key_members') {
-        html += renderKeyMembersSection(members, committeeMembers, keyMemberIds);
-      }
-      if (!activeSection || activeSection === 'other') {
-        html += renderOtherSection(members, committeeMembers, keyMemberIds);
       }
       if (!activeSection || activeSection === 'vacancies') {
         html += renderVacanciesSection();
@@ -358,16 +348,42 @@
       return html;
     }
 
-    function formatRoleBadges(roles) {
-      if (!roles || !roles.length) return '';
-      return roles.map(r => {
-        const cssClass = ROLE_TYPE_CSS[r.role_type] || 'general';
-        let label = esc(r.title);
-        if (r.target) {
-          label += ` <span style="opacity:0.6;font-size:0.65rem">→ ${esc(r.target)}</span>`;
-        }
-        return `<span class="role-badge ${cssClass}">${label}</span>`;
-      }).join('');
+    // Single compact member card used everywhere on this page.
+    function memberCard(m, extraBadge) {
+      const name = m.name || m.user_name || '?';
+      const roles = (m.roles || []).filter(r => r.role_type === 'governance' || r.role_type === 'administrative');
+      const primary = roles[0];
+      const more = roles.length > 1 ? ` <span class="role-badge general" title="${esc(roles.slice(1).map(r => r.title).join(', '))}">+${roles.length - 1}</span>` : '';
+      const roleClass = primary ? (primary.role_type === 'governance' ? 'governance' : 'administrative') : '';
+      const classLabel = (m.class || 'Regular Member').replace(' Member', '');
+      const joined = m.joined_date ? new Date(m.joined_date).toLocaleDateString('en', { month: 'short', year: 'numeric' }) : '';
+      return `
+      <div class="member-card" onclick="showMemberDetail(${m.user_id || m.id})">
+        <div class="member-header">
+          <div class="member-avatar">${avatarHtml(m.avatar_url, name)}</div>
+          <div>
+            <div class="member-name">${esc(name)}</div>
+            <div class="member-inst">${esc(m.institution || 'Independent')}${m.location ? ' &middot; ' + esc(m.location) : ''}</div>
+          </div>
+        </div>
+        <div class="user-roles-list">${primary ? `<span class="role-badge ${roleClass}">${esc(primary.title)}${primary.target ? ` → ${esc(primary.target)}` : ''}</span>` : ''}${more} <span class="role-badge general">${esc(classLabel)}</span>${extraBadge || ''}</div>
+        ${m.bio ? `<div class="member-bio">${esc(m.bio)}</div>` : ''}
+        <div class="member-meta"><span>${m.membership_number ? '#' + esc(m.membership_number) : esc(classLabel)}</span>${joined ? `<span>since ${esc(joined)}</span>` : ''}</div>
+      </div>`;
+    }
+
+    function renderAllMembersSection(members) {
+      const users = members.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      if (!users.length) return '';
+      return `
+        <div class="role-section">
+          <div class="role-section-header">
+            <h3>All Members</h3>
+            <span class="role-count">${users.length} member${users.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div class="member-grid">${users.map(m => memberCard(m)).join('')}</div>
+        </div>
+      `;
     }
 
     function renderCommitteesSection() {
@@ -378,24 +394,9 @@
       const groupsHtml = committees.map(g => {
         const members = g.members || [];
         const cardsHtml = members.length ? '<div class="member-grid">' + members.map(m => {
-          const roleBadge = m.role ? `<div class="user-roles-list"><span class="role-badge governance">${esc(m.role)}</span></div>` : '';
-          const dir = dirByUser[m.user_id] || {};
-          const classLabel = (dir.class || 'Regular Member').replace(' Member', '');
-          const joined = dir.joined_date ? new Date(dir.joined_date).toLocaleDateString('en', { month: 'short', year: 'numeric' }) : '';
-          return `
-          <div class="member-card" onclick="showMemberDetail(${m.user_id})">
-            <div class="member-header">
-              <div class="member-avatar">${avatarHtml(m.avatar_url, m.user_name)}</div>
-              <div>
-                <div class="member-name">${esc(m.user_name)}</div>
-                <div class="member-inst">${esc(m.institution || dir.institution || 'Independent')}${m.location || dir.location ? ' &middot; ' + esc(m.location || dir.location) : ''}</div>
-              </div>
-            </div>
-            ${roleBadge}
-            <div class="user-roles-list"><span class="role-badge general">${esc(classLabel)}</span>${joined ? `<span class="text-dim text-sm" style="margin-left:0.4rem">since ${esc(joined)}</span>` : ''}</div>
-            ${dir.bio ? `<div class="member-bio">${esc(dir.bio)}</div>` : ''}
-            ${m.email ? `<div class="member-inst" style="margin-top:0.35rem">${esc(m.email)}</div>` : ''}
-          </div>`;
+          const full = Object.assign({}, m, dirByUser[m.user_id] || {}, { user_name: m.user_name, role: m.role, avatar_url: (dirByUser[m.user_id] || {}).avatar_url || m.avatar_url });
+          const extra = m.role ? `<span class="role-badge governance">${esc(m.role)}</span>` : '';
+          return memberCard(full, extra);
         }).join('') + '</div>' : '<div style="padding:0.5rem 0;color:var(--text-dim);font-size:0.85rem">No members</div>';
         return `
           <div class="wg-section">
@@ -444,87 +445,6 @@
             <span class="role-count">${wgs.length} group${wgs.length !== 1 ? 's' : ''}</span>
           </div>
           ${groupsHtml}
-        </div>
-      `;
-    }
-
-    function renderKeyMembersSection(members, committeeMembers, keyMemberIds) {
-      const users = members.filter(m => {
-        if (committeeMembers.has(m.user_id)) return false;
-        if (!m.roles || !m.roles.length) return false;
-        const hasKey = m.roles.some(r => r.role_type === 'governance' || r.role_type === 'administrative');
-        if (hasKey) keyMemberIds.add(m.user_id);
-        return hasKey;
-      });
-      if (!users.length) return '';
-      const cards = users.map(m => {
-        const rolesHtml = formatRoleBadges(m.roles);
-        const interests = m.interests ? m.interests.split(',').slice(0, 3) : [];
-        const joined = m.joined_date ? new Date(m.joined_date).toLocaleDateString('en', { month: 'short', year: 'numeric' }) : '';
-        return `
-          <div class="member-card" onclick="showMemberDetail(${m.user_id || m.id})">
-            <div class="member-header">
-              <div class="member-avatar">${avatarHtml(m.avatar_url, m.name)}</div>
-              <div>
-                <div class="member-name">${esc(m.name)}</div>
-                <div class="member-inst">${esc(m.institution || 'Independent')}${m.location ? ' &middot; ' + esc(m.location) : ''}</div>
-              </div>
-            </div>
-            ${m.bio ? `<div class="member-bio">${esc(m.bio)}</div>` : ''}
-            ${interests.length ? `<div class="member-tags">${interests.map(i => `<span class="member-tag">${esc(i.trim())}</span>`).join('')}</div>` : ''}
-            <div class="user-roles-list">${rolesHtml}</div>
-            <div class="member-meta">
-              <span>${esc((m.class || 'Regular Member').replace(' Member', ''))}${m.membership_number ? ' &middot; #' + esc(m.membership_number) : ''}</span>
-              <span>${joined}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
-      return `
-        <div class="role-section">
-          <div class="role-section-header">
-            <h3>Key Members</h3>
-            <span class="role-count">${users.length} member${users.length !== 1 ? 's' : ''}</span>
-          </div>
-          <div class="member-grid">${cards}</div>
-        </div>
-      `;
-    }
-
-    function renderOtherSection(members, committeeMembers, keyMemberIds) {
-      const users = members.filter(m => !committeeMembers.has(m.user_id) && !keyMemberIds.has(m.user_id));
-      if (!users.length) return '';
-      const cards = users.map(m => {
-        const classLabel = (m.class || 'Regular Member').replace(' Member', '');
-        const rolesHtml = formatRoleBadges(m.roles);
-        const interests = m.interests ? m.interests.split(',').slice(0, 3) : [];
-        const joined = m.joined_date ? new Date(m.joined_date).toLocaleDateString('en', { month: 'short', year: 'numeric' }) : '';
-        return `
-          <div class="member-card" onclick="showMemberDetail(${m.user_id || m.id})">
-            <div class="member-header">
-              <div class="member-avatar">${avatarHtml(m.avatar_url, m.name)}</div>
-              <div>
-                <div class="member-name">${esc(m.name)}</div>
-                <div class="member-inst">${esc(m.institution || 'Independent')}${m.location ? ' &middot; ' + esc(m.location) : ''}</div>
-              </div>
-            </div>
-            ${m.bio ? `<div class="member-bio">${esc(m.bio)}</div>` : ''}
-            ${interests.length ? `<div class="member-tags">${interests.map(i => `<span class="member-tag">${esc(i.trim())}</span>`).join('')}</div>` : ''}
-            <div class="user-roles-list">${rolesHtml}</div>
-            <div class="member-meta">
-              <span><span class="role-badge general">${esc(classLabel)}</span>${m.membership_number ? ' &middot; #' + esc(m.membership_number) : ''}</span>
-              <span>${joined}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
-      return `
-        <div class="role-section">
-          <div class="role-section-header">
-            <h3>Other Members</h3>
-            <span class="role-count">${users.length} member${users.length !== 1 ? 's' : ''}</span>
-          </div>
-          <div class="member-grid">${cards}</div>
         </div>
       `;
     }
