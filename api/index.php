@@ -1169,6 +1169,15 @@ try {
     $stmt->execute();
     json_response($stmt->fetchAll());
   }
+  elseif ($path === '/users/search' && $method === 'GET') {
+    $u = require_login(); if ($u['status'] !== 'active') json_error('Account is not active', 403);
+    $q = trim($_GET['q'] ?? '');
+    if (mb_strlen($q) < 2) json_response([]);
+    $like = '%' . $q . '%';
+    $stmt = db()->prepare('SELECT id, name, email FROM users WHERE status = "active" AND (name LIKE ? OR email LIKE ?) ORDER BY name LIMIT 10');
+    $stmt->execute([$like, $like]);
+    json_response($stmt->fetchAll());
+  }
   elseif (preg_match('#^/users/(\d+)/roles$#', $path, $m) && $method === 'GET') {
     require_login();
     $stmt = db()->prepare('SELECT r.*, ra.effective_from, ra.effective_to, ra.assigned_by FROM role_assignments ra JOIN roles r ON r.id = ra.role_id WHERE ra.user_id = ? AND ra.status = "active" ORDER BY r.title');
@@ -1305,6 +1314,39 @@ try {
     json_response(['id' => $id], 201);
   }
 
+  // --- MY PROGRAMMES: teams the user belongs to or leads (for dashboard) ---
+  elseif ($path === '/programmes/mine' && $method === 'GET') {
+    $user = require_login();
+    $uid = (int) $user['id'];
+    $stmt = db()->prepare('SELECT p.id, p.title, p.description, p.status, p.image_url, p.category FROM programmes p WHERE p.status = "active" ORDER BY p.title');
+    $stmt->execute();
+    $mine = [];
+    foreach ($stmt->fetchAll() as $p) {
+      $pid = (int) $p['id'];
+      $s = db()->prepare('SELECT role_in_programme FROM programme_members WHERE programme_id = ? AND user_id = ? AND status = "active" LIMIT 1');
+      $s->execute([$pid, $uid]);
+      $membership = $s->fetch();
+      $isLead = $membership && preg_match('/lead|chair|coordinat|head/i', $membership['role_in_programme'] ?? '');
+      if (!$isLead) {
+        $s = db()->prepare("SELECT 1 FROM role_assignments ra JOIN roles r ON r.id = ra.role_id WHERE ra.user_id = ? AND ra.status = 'active' AND r.status = 'active' AND r.target = ? AND (r.title LIKE '%lead%' OR r.title LIKE '%chair%' OR r.title LIKE '%coordinat%' OR r.title LIKE '%head%') LIMIT 1");
+        $s->execute([$uid, $p['title']]);
+        $isLead = (bool) $s->fetch();
+      }
+      if (!$membership && !$isLead) continue;
+      $p['is_member'] = (bool) $membership;
+      $p['is_lead'] = (bool) $isLead;
+      $p['team_role'] = $membership['role_in_programme'] ?? null;
+      $p['can_manage'] = user_has_cap($uid, 'programmes.manage') || user_has_cap($uid, 'programmes.manage', 'programme', $pid);
+      try {
+        $s = db()->prepare("SELECT COUNT(*) FROM programme_applications WHERE programme_id = ? AND status = 'pending'");
+        $s->execute([$pid]);
+        $p['pending_apps'] = (int) $s->fetchColumn();
+      } catch (Exception $e) { $p['pending_apps'] = 0; }
+      $mine[] = $p;
+    }
+    json_response($mine);
+  }
+
   // --- PROJECTS ---
   elseif ($path === '/projects' && $method === 'GET') {
     require_login();
@@ -1315,11 +1357,11 @@ try {
   elseif ($path === '/projects' && $method === 'POST') {
     $data = input_json();
     $progId = $data['programme_id'] ?? null;
-    // Check global projects.create OR scoped to this programme
+    // Check global projects.create OR scoped to this programme OR programme lead
     $user = current_user();
     if (!$user) json_error('Authentication required', 401);
     if ($user['status'] !== 'active') json_error('Account is not active', 403);
-    if (!user_has_cap($user['id'], 'projects.create') && !($progId && user_has_cap($user['id'], 'projects.create', 'programme', (int)$progId))) {
+    if (!user_has_cap($user['id'], 'projects.create') && !($progId && user_has_cap($user['id'], 'projects.create', 'programme', (int)$progId)) && !($progId && is_programme_lead($user['id'], (int)$progId))) {
       json_error('Insufficient permissions: projects.create', 403);
     }
     db()->prepare('INSERT INTO projects (programme_id, title, description, objectives, deadline, created_by) VALUES (?, ?, ?, ?, ?, ?)')
@@ -1346,11 +1388,11 @@ try {
   elseif ($path === '/events' && $method === 'POST') {
     $data = input_json();
     $progId = $data['programme_id'] ?? null;
-    // Check global events.create OR scoped to this programme
+    // Check global events.create OR scoped to this programme OR programme lead
     $user = current_user();
     if (!$user) json_error('Authentication required', 401);
     if ($user['status'] !== 'active') json_error('Account is not active', 403);
-    if (!user_has_cap($user['id'], 'events.create') && !($progId && user_has_cap($user['id'], 'events.create', 'programme', (int)$progId))) {
+    if (!user_has_cap($user['id'], 'events.create') && !($progId && user_has_cap($user['id'], 'events.create', 'programme', (int)$progId)) && !($progId && is_programme_lead($user['id'], (int)$progId))) {
       json_error('Insufficient permissions: events.create', 403);
     }
     db()->prepare('INSERT INTO events (programme_id, project_id, title, description, organizer_id, date, end_date, location, capacity, image_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
@@ -3174,7 +3216,9 @@ try {
     json_response($stmt->fetchAll());
   }
   elseif (preg_match('#^/programmes/(\d+)/members$#', $path, $m) && $method === 'POST') {
-    require_cap_for('programmes.manage', 'programme', (int)$m[1]);
+    $pid = (int)$m[1];
+    $u = current_user(); if (!$u) json_error('Authentication required', 401);
+    if (!user_has_cap($u['id'], 'programmes.manage', 'programme', $pid) && !user_has_cap($u['id'], 'programmes.manage') && !is_programme_lead($u['id'], $pid)) json_error('Insufficient permissions: programmes.manage', 403);
     $data = input_json();
     $id = (int) $m[1];
     if (empty($data['user_id'])) json_error('user_id is required', 400);
@@ -3186,7 +3230,8 @@ try {
     json_response(['ok' => true]);
   }
   elseif (preg_match('#^/programmes/(\d+)/members/(\d+)$#', $path, $m) && $method === 'DELETE') {
-    require_cap_for('programmes.manage', 'programme', (int)$m[1]);
+    $pid = (int)$m[1]; $u = current_user(); if (!$u) json_error('Authentication required', 401);
+    if (!user_has_cap($u['id'], 'programmes.manage', 'programme', $pid) && !user_has_cap($u['id'], 'programmes.manage') && !is_programme_lead($u['id'], $pid)) json_error('Insufficient permissions: programmes.manage', 403);
     db()->prepare('DELETE FROM programme_members WHERE programme_id = ? AND user_id = ?')->execute([(int)$m[1], (int)$m[2]]);
     audit_log('programme_member_remove', 'programme', (int)$m[1], ['user_id' => (int)$m[2]]);
     json_response(['ok' => true]);
@@ -3228,7 +3273,9 @@ try {
     json_response(['id' => $appId], 201);
   }
   elseif (preg_match('#^/programmes/(\d+)/applications$#', $path, $m) && $method === 'GET') {
-    $user = require_cap_for('programmes.manage', 'programme', (int)$m[1]);
+    $pid = (int)$m[1]; $u = current_user(); if (!$u) json_error('Authentication required', 401);
+    if (!user_has_cap($u['id'], 'programmes.manage', 'programme', $pid) && !user_has_cap($u['id'], 'programmes.manage') && !is_programme_lead($u['id'], $pid)) json_error('Insufficient permissions: programmes.manage', 403);
+    $user = $u;
     $stmt = db()->prepare('SELECT pa.*, u.name AS applicant_name, u.email AS applicant_email FROM programme_applications pa JOIN users u ON u.id = pa.user_id WHERE pa.programme_id = ? AND pa.status = "pending" ORDER BY pa.created_at');
     $stmt->execute([(int)$m[1]]);
     json_response($stmt->fetchAll());
@@ -3240,7 +3287,9 @@ try {
     $app = $stmt->fetch();
     if (!$app) json_error('Application not found', 404);
     if ($app['status'] !== 'pending') json_error('Application already decided', 409);
-    $user = require_cap_for('programmes.manage', 'programme', (int)$app['programme_id']);
+    $pid = (int)$app['programme_id']; $u = current_user(); if (!$u) json_error('Authentication required', 401);
+    if (!user_has_cap($u['id'], 'programmes.manage', 'programme', $pid) && !user_has_cap($u['id'], 'programmes.manage') && !is_programme_lead($u['id'], $pid)) json_error('Insufficient permissions: programmes.manage', 403);
+    $user = $u;
     $data = input_json();
     db()->prepare('INSERT INTO programme_members (programme_id, user_id, role_in_programme, status, joined_date) VALUES (?, ?, ?, "active", CURDATE())
       ON DUPLICATE KEY UPDATE role_in_programme = VALUES(role_in_programme), status = "active"')
@@ -3258,7 +3307,9 @@ try {
     $app = $stmt->fetch();
     if (!$app) json_error('Application not found', 404);
     if ($app['status'] !== 'pending') json_error('Application already decided', 409);
-    $user = require_cap_for('programmes.manage', 'programme', (int)$app['programme_id']);
+    $pid = (int)$app['programme_id']; $u = current_user(); if (!$u) json_error('Authentication required', 401);
+    if (!user_has_cap($u['id'], 'programmes.manage', 'programme', $pid) && !user_has_cap($u['id'], 'programmes.manage') && !is_programme_lead($u['id'], $pid)) json_error('Insufficient permissions: programmes.manage', 403);
+    $user = $u;
     db()->prepare("UPDATE programme_applications SET status = 'rejected', reviewed_by = ?, reviewed_at = NOW() WHERE id = ?")
       ->execute([$user['id'], $aid]);
     audit_log('programme_application_reject', 'programme', (int)$app['programme_id'], ['user_id' => (int)$app['user_id']]);

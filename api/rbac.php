@@ -399,6 +399,23 @@ function rbac_audit(): array {
 }
 
 /**
+ * Check if a user is a programme lead (via team seat or targeted role).
+ */
+function is_programme_lead(int $userId, int $programmeId): bool {
+  $stmt = db()->prepare('SELECT role_in_programme FROM programme_members WHERE programme_id = ? AND user_id = ? AND status = "active" LIMIT 1');
+  $stmt->execute([$programmeId, $userId]);
+  $role = $stmt->fetchColumn();
+  if ($role && preg_match('/lead|chair|coordinat|head/i', $role)) return true;
+  $stmt = db()->prepare('SELECT p.title FROM programmes p WHERE p.id = ?');
+  $stmt->execute([$programmeId]);
+  $title = $stmt->fetchColumn();
+  if (!$title) return false;
+  $stmt = db()->prepare("SELECT 1 FROM role_assignments ra JOIN roles r ON r.id = ra.role_id WHERE ra.user_id = ? AND ra.status = 'active' AND r.status = 'active' AND r.target = ? AND (r.title LIKE '%lead%' OR r.title LIKE '%chair%' OR r.title LIKE '%coordinat%' OR r.title LIKE '%head%') LIMIT 1");
+  $stmt->execute([$userId, $title]);
+  return (bool) $stmt->fetchColumn();
+}
+
+/**
  * Expire role assignments past their effective_to date.
  * Sets status='expired' for clean record-keeping. Called from institutional_health().
  */

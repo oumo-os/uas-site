@@ -683,6 +683,7 @@
       <button class="dash-tab" data-panel="finance">Finance</button>
       <button class="dash-tab" data-panel="members" id="membersTab">Members</button>
       <button class="dash-tab" data-panel="org">Groups & Meetings</button>
+      <button class="dash-tab" data-panel="programmes">Programmes</button>
       <button class="dash-tab" data-panel="roles">My Roles</button>
       <button class="dash-tab" data-panel="profile">Profile</button>
       <button class="dash-tab" data-panel="create">Create</button>
@@ -929,6 +930,15 @@
         </div>
         <div id="meetingsList"></div>
       </div>
+    </div>
+
+    <!-- Programmes Panel (my teams: projects, events, members, applications) -->
+    <div class="dash-panel" id="panel-programmes">
+      <div class="section-header">
+        <h3>My Programmes</h3>
+        <p class="text-dim text-sm" style="margin:0">Teams you belong to or lead. Leads manage projects, events, members and applications here.</p>
+      </div>
+      <div id="myProgrammes"></div>
     </div>
 
     <!-- Roles Panel -->
@@ -3183,7 +3193,7 @@
       }
     }
 
-    async function showCreateForm(type) {
+    async function showCreateForm(type, opts = {}) {
       const div = document.getElementById('createForm');
       const formId = 'create-' + type;
       let fields, title;
@@ -3210,7 +3220,7 @@
         } catch(e) {}
         fields = [
           { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Event title' },
-          { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts },
+          { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts, value: opts.programme_id || '' },
           { name: 'date', label: 'Start Date & Time', type: 'datetime-local', required: true },
           { name: 'end_date', label: 'End Date & Time', type: 'datetime-local' },
           { name: 'location', label: 'Location', type: 'text', placeholder: 'e.g. Kampala, Uganda' },
@@ -3235,7 +3245,7 @@
         } catch(e) {}
         fields = [
           { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Project title' },
-          { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts },
+          { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts, value: opts.programme_id || '' },
           { name: 'description', label: 'Description', type: 'textarea', rows: 4, required: true },
           { name: 'objectives', label: 'Objectives', type: 'textarea', rows: 3 },
           { name: 'deadline', label: 'Deadline', type: 'date' },
@@ -3620,6 +3630,7 @@
       if (panel === 'profile') loadDashProfile();
       if (panel === 'members') loadMembersPanel();
       if (panel === 'mail') loadDashMail();
+      if (panel === 'programmes') loadMyProgrammes();
     }
 
     function goGov(sub) {
@@ -3633,6 +3644,228 @@
         const members = await api.request('/members');
         renderMembersPanel(members);
       } catch (e) { document.getElementById('memberList').innerHTML = '<div class="empty-state"><p>Failed to load members.</p></div>'; }
+    }
+
+    // ── My Programmes (team management for programme context) ──
+    async function loadMyProgrammes() {
+      const container = document.getElementById('myProgrammes');
+      if (!container) return;
+      container.innerHTML = '<p class="text-dim" style="padding:1rem">Loading your programmes…</p>';
+      try {
+        const mine = await api.request('/programmes/mine');
+        if (!mine || !mine.length) {
+          container.innerHTML = '<div class="empty-state"><h4>No programme teams yet</h4><p>You are not on any programme team. Browse <a href="/programmes">Programmes</a> and apply to join, or ask a programme lead to add you.</p></div>';
+          return;
+        }
+        renderMyProgrammes(mine);
+      } catch (e) {
+        container.innerHTML = `<div class="empty-state"><p>Failed to load programmes.</p><p class="text-dim text-sm">${esc(e.error || e.message || '')}</p></div>`;
+      }
+    }
+
+    function renderMyProgrammes(list) {
+      const container = document.getElementById('myProgrammes');
+      container.innerHTML = list.map(p => {
+        const leadBadge = p.is_lead ? '<span class="badge badge-active">Lead</span>' : '<span class="badge badge-inactive">Member</span>';
+        const manageBadge = p.can_manage ? '<span class="cap-tag">Manager</span>' : '';
+        const pendingBadge = p.pending_apps ? `<span class="badge badge-pending">${p.pending_apps} pending</span>` : '';
+        const roleText = p.team_role ? `Your role: ${esc(p.team_role)}` : '';
+        return `
+        <div class="dash-card" style="margin-bottom:1rem" id="prog-${p.id}">
+          <div class="dash-card-header">
+            <div style="flex:1; min-width:0">
+              <h4 style="margin:0; display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap">${esc(p.title)} ${leadBadge} ${manageBadge} ${pendingBadge}</h4>
+              <div class="text-dim text-sm" style="margin-top:0.25rem">${esc(stripHtml(p.description || '').slice(0,140))}</div>
+              <div class="text-dim text-sm">${roleText}</div>
+            </div>
+            <div style="display:flex; gap:0.5rem; align-items:flex-start">
+              <button class="btn btn-outline btn-xs" onclick="toggleProgDetails(${p.id})" id="prog-toggle-${p.id}">Manage</button>
+              <a class="btn btn-outline btn-xs" href="/programmes/${p.id}">View</a>
+            </div>
+          </div>
+          <div id="prog-details-${p.id}" style="display:none; padding-top:1rem; border-top:1px solid var(--border); margin-top:0.75rem">
+            <div class="dash-tabs" style="margin-bottom:1rem">
+              <button class="dash-tab active" data-ptab="team" onclick="switchProgTab(${p.id}, 'team')">Team</button>
+              <button class="dash-tab" data-ptab="projects" onclick="switchProgTab(${p.id}, 'projects')">Projects</button>
+              <button class="dash-tab" data-ptab="events" onclick="switchProgTab(${p.id}, 'events')">Events</button>
+              ${p.is_lead || p.can_manage ? `<button class="dash-tab" data-ptab="applications" onclick="switchProgTab(${p.id}, 'applications')">Applications ${p.pending_apps ? '('+p.pending_apps+')' : ''}</button>` : ''}
+            </div>
+            <div id="prog-team-${p.id}"><p class="text-dim">Loading team…</p></div>
+            <div id="prog-projects-${p.id}" style="display:none"></div>
+            <div id="prog-events-${p.id}" style="display:none"></div>
+            <div id="prog-applications-${p.id}" style="display:none"></div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    async function toggleProgDetails(pid) {
+      const details = document.getElementById(`prog-details-${pid}`);
+      const btn = document.getElementById(`prog-toggle-${pid}`);
+      if (!details) return;
+      const isHidden = details.style.display === 'none';
+      details.style.display = isHidden ? '' : 'none';
+      if (btn) btn.textContent = isHidden ? 'Hide' : 'Manage';
+      if (isHidden) {
+        // default to team tab
+        switchProgTab(pid, 'team');
+        loadProgTeam(pid);
+      }
+    }
+
+    function switchProgTab(pid, tab) {
+      const container = document.getElementById(`prog-details-${pid}`);
+      if (!container) return;
+      container.querySelectorAll('[data-ptab]').forEach(b => b.classList.toggle('active', b.dataset.ptab === tab));
+      ['team','projects','events','applications'].forEach(t => {
+        const el = document.getElementById(`prog-${t}-${pid}`);
+        if (el) el.style.display = t === tab ? '' : 'none';
+      });
+      if (tab === 'team') loadProgTeam(pid);
+      if (tab === 'projects') loadProgProjects(pid);
+      if (tab === 'events') loadProgEvents(pid);
+      if (tab === 'applications') loadProgApplications(pid);
+    }
+
+    async function loadProgTeam(pid) {
+      const box = document.getElementById(`prog-team-${pid}`);
+      if (!box) return;
+      box.innerHTML = '<p class="text-dim">Loading team…</p>';
+      try {
+        const members = await api.request(`/programmes/${pid}/members`);
+        if (!members.length) {
+          box.innerHTML = '<div class="empty-state" style="padding:1rem"><p>No team members yet.</p></div>' + progAddMemberUI(pid);
+          return;
+        }
+        const rows = members.map(m => `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid var(--border)">
+            <div style="display:flex; align-items:center; gap:0.75rem">
+              <div style="width:36px;height:36px;border-radius:50%;background:var(--accent-glow);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent)">${esc((m.user_name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase())}</div>
+              <div>
+                <div style="font-weight:600; font-size:0.9rem">${esc(m.user_name)}</div>
+                <div class="text-dim text-sm">${esc(m.role_in_programme || 'Member')} · ${esc(m.user_email || '')}</div>
+              </div>
+            </div>
+            <button class="btn btn-outline btn-xs" style="color:var(--danger)" onclick="removeProgMember(${pid}, ${m.user_id})">Remove</button>
+          </div>`).join('');
+        box.innerHTML = rows + progAddMemberUI(pid);
+      } catch (e) {
+        box.innerHTML = `<p class="text-dim">Failed to load team: ${esc(e.error || '')}</p>` + progAddMemberUI(pid);
+      }
+    }
+
+    function progAddMemberUI(pid) {
+      return `
+        <div style="margin-top:1rem; padding:1rem; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius)">
+          <h5 style="margin:0 0 0.5rem; font-size:0.9rem">Add team member</h5>
+          <div style="display:flex; gap:0.5rem">
+            <input id="prog-search-${pid}" placeholder="Search name or email (min 2 chars)" style="flex:1; padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-card)">
+            <button class="btn btn-outline btn-sm" onclick="searchProgUser(${pid})">Search</button>
+          </div>
+          <div id="prog-search-results-${pid}" style="margin-top:0.75rem"></div>
+          <div style="margin-top:0.75rem; display:flex; gap:0.5rem">
+            <input id="prog-role-${pid}" placeholder="Role (e.g., Coordinator)" style="flex:1; padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-card)">
+          </div>
+          <p class="text-dim text-sm" style="margin-top:0.5rem">Programme leads can add members directly. Others need programmes.manage capability.</p>
+        </div>`;
+    }
+
+    async function searchProgUser(pid) {
+      const q = (document.getElementById(`prog-search-${pid}`)?.value || '').trim();
+      const resultsBox = document.getElementById(`prog-search-results-${pid}`);
+      if (q.length < 2) { toast('Enter at least 2 characters','warning'); return; }
+      resultsBox.innerHTML = '<p class="text-dim">Searching…</p>';
+      try {
+        const users = await api.request('/users/search?q=' + encodeURIComponent(q));
+        if (!users.length) { resultsBox.innerHTML = '<p class="text-dim">No users found</p>'; return; }
+        resultsBox.innerHTML = users.map(u => `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem; border-bottom:1px solid var(--border)">
+            <span>${esc(u.name)} <span class="text-dim text-sm">${esc(u.email)}</span></span>
+            <button class="btn btn-primary btn-xs" onclick="addProgMember(${pid}, ${u.id})">Add</button>
+          </div>`).join('');
+      } catch (e) {
+        resultsBox.innerHTML = `<p class="text-dim">Search failed: ${esc(e.error || '')}</p>`;
+      }
+    }
+
+    async function addProgMember(pid, userId) {
+      const role = (document.getElementById(`prog-role-${pid}`)?.value || '').trim() || null;
+      try {
+        await api.request(`/programmes/${pid}/members`, { method: 'POST', body: { user_id: userId, role_in_programme: role } });
+        toast('Member added','success');
+        document.getElementById(`prog-search-${pid}`).value = '';
+        document.getElementById(`prog-search-results-${pid}`).innerHTML = '';
+        loadProgTeam(pid);
+      } catch (e) { toast(e.error || 'Failed to add member','error'); }
+    }
+
+    async function removeProgMember(pid, userId) {
+      if (!confirm('Remove this member from the programme team?')) return;
+      try {
+        await api.request(`/programmes/${pid}/members/${userId}`, { method: 'DELETE' });
+        toast('Member removed','success');
+        loadProgTeam(pid);
+      } catch (e) { toast(e.error || 'Failed','error'); }
+    }
+
+    async function loadProgProjects(pid) {
+      const box = document.getElementById(`prog-projects-${pid}`);
+      if (!box) return;
+      box.innerHTML = '<p class="text-dim">Loading projects…</p>';
+      try {
+        const all = await api.request('/projects').catch(()=>[]);
+        const filtered = all.filter(p => String(p.programme_id) === String(pid));
+        if (!filtered.length) {
+          box.innerHTML = '<div class="empty-state" style="padding:1rem"><p>No projects in this programme yet.</p></div>'
+            + `<button class="btn btn-primary btn-sm" onclick="switchTab('create'); showCreateForm('project', {programme_id: ${pid}})">New Project in this Programme</button>`;
+          return;
+        }
+        box.innerHTML = filtered.map(pr => `
+          <div class="wg-card" style="margin-bottom:0.5rem">
+            <h4 style="margin:0">${esc(pr.title)}</h4>
+            <p class="text-dim text-sm">${esc((pr.description||'').slice(0,120))}</p>
+            <div class="text-dim text-sm">Status: ${esc(pr.status)} ${pr.deadline ? '· Due: '+esc(pr.deadline) : ''}</div>
+          </div>`).join('') + `<div style="margin-top:0.75rem"><button class="btn btn-outline btn-sm" onclick="switchTab('create'); showCreateForm('project', {programme_id: ${pid}})">New Project</button></div>`;
+      } catch (e) { box.innerHTML = `<p class="text-dim">Failed: ${esc(e.error||'')}</p>`; }
+    }
+
+    async function loadProgEvents(pid) {
+      const box = document.getElementById(`prog-events-${pid}`);
+      if (!box) return;
+      box.innerHTML = '<p class="text-dim">Loading events…</p>';
+      try {
+        const events = await api.request(`/events?programme_id=${pid}`).catch(()=>[]);
+        if (!events.length) {
+          box.innerHTML = '<div class="empty-state" style="padding:1rem"><p>No events in this programme yet.</p></div>'
+            + `<button class="btn btn-primary btn-sm" onclick="switchTab('create'); showCreateForm('event', {programme_id: ${pid}})">New Event in this Programme</button>`;
+          return;
+        }
+        box.innerHTML = events.map(ev => `
+          <div class="wg-card" style="margin-bottom:0.5rem; cursor:pointer" onclick="showItemDetail('event', ${ev.id})">
+            <h4 style="margin:0">${esc(ev.title)}</h4>
+            <div class="text-dim text-sm">${esc(ev.location||'TBA')} · ${new Date(ev.date).toLocaleDateString()} · ${esc(ev.status)}</div>
+          </div>`).join('') + `<div style="margin-top:0.75rem"><button class="btn btn-outline btn-sm" onclick="switchTab('create'); showCreateForm('event', {programme_id: ${pid}})">New Event</button></div>`;
+      } catch (e) { box.innerHTML = `<p class="text-dim">Failed: ${esc(e.error||'')}</p>`; }
+    }
+
+    async function loadProgApplications(pid) {
+      const box = document.getElementById(`prog-applications-${pid}`);
+      if (!box) return;
+      box.innerHTML = '<p class="text-dim">Loading applications…</p>';
+      try {
+        const apps = await api.request(`/programmes/${pid}/applications`);
+        if (!apps.length) { box.innerHTML = '<div class="empty-state" style="padding:1rem"><p>No pending applications.</p></div>'; return; }
+        box.innerHTML = apps.map(a => `
+          <div style="padding:0.75rem; border:1px solid var(--border); border-radius:var(--radius); margin-bottom:0.5rem">
+            <div style="font-weight:600">${esc(a.applicant_name)} <span class="text-dim text-sm">${esc(a.applicant_email||'')}</span></div>
+            <div class="text-dim text-sm">Applied ${a.created_at ? new Date(String(a.created_at).replace(' ', 'T')).toLocaleDateString() : ''}</div>
+            ${a.message ? `<div style="margin-top:0.4rem; padding:0.5rem; background:var(--bg); border-radius:var(--radius)">${esc(a.message)}</div>` : ''}
+            <div style="display:flex; gap:0.5rem; margin-top:0.5rem">
+              <button class="btn btn-primary btn-xs" onclick="approveProgApplication(${a.id}); setTimeout(()=>loadProgApplications(${pid}), 800)">Approve</button>
+              <button class="btn btn-outline btn-xs" onclick="rejectProgApplication(${a.id}); setTimeout(()=>loadProgApplications(${pid}), 800)">Reject</button>
+            </div>
+          </div>`).join('');
+      } catch (e) { box.innerHTML = `<p class="text-dim">Failed: ${esc(e.error||'')}</p>`; }
     }
 
     // ── Inbox ──
