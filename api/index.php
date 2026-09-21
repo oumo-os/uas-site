@@ -3003,7 +3003,10 @@ try {
     json_response($events);
   }
   elseif ($path === '/public/programmes' && $method === 'GET') {
-    $stmt = db()->prepare('SELECT p.id, p.title, p.description, p.status, (SELECT u.name FROM programme_members pm JOIN users u ON u.id = pm.user_id WHERE pm.programme_id = p.id AND pm.status = "active" AND pm.role_in_programme LIKE "%lead%" ORDER BY pm.joined_date, pm.id LIMIT 1) AS lead_name FROM programmes p WHERE p.status = "active" ORDER BY p.title');
+    // Lead = programme-team lead seat first, else holder of a lead-type role
+    // targeting the programme (the current appointment convention).
+    $leadSql = "COALESCE((SELECT u.name FROM programme_members pm JOIN users u ON u.id = pm.user_id WHERE pm.programme_id = p.id AND pm.status = 'active' AND pm.role_in_programme LIKE '%lead%' ORDER BY pm.joined_date, pm.id LIMIT 1), (SELECT u.name FROM role_assignments ra JOIN roles r ON r.id = ra.role_id JOIN users u ON u.id = ra.user_id WHERE ra.status = 'active' AND r.status = 'active' AND r.target = p.title AND (r.title LIKE '%lead%' OR r.title LIKE '%chair%' OR r.title LIKE '%coordinat%' OR r.title LIKE '%head%') ORDER BY u.name LIMIT 1))";
+    $stmt = db()->prepare("SELECT p.id, p.title, p.description, p.status, $leadSql AS lead_name FROM programmes p WHERE p.status = \"active\" ORDER BY p.title");
     $stmt->execute();
     json_response($stmt->fetchAll());
   }
@@ -3037,6 +3040,12 @@ try {
     }
     $stmt->execute([$pid]);
     $programme['members'] = $stmt->fetchAll();
+
+    // Leadership: holders of lead-type roles targeting this programme
+    // (the current appointment convention — visible to everyone).
+    $stmt = db()->prepare("SELECT u.id AS user_id, u.name AS user_name, r.title AS role_title FROM role_assignments ra JOIN roles r ON r.id = ra.role_id JOIN users u ON u.id = ra.user_id WHERE ra.status = 'active' AND r.status = 'active' AND r.target = ? AND (r.title LIKE '%lead%' OR r.title LIKE '%chair%' OR r.title LIKE '%coordinat%' OR r.title LIKE '%head%') ORDER BY u.name");
+    $stmt->execute([$programme['title']]);
+    $programme['leads'] = $stmt->fetchAll();
 
     // Outputs are member-only
     if (!$requester) {

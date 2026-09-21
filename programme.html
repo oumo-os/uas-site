@@ -278,6 +278,20 @@
         }).join('');
       }
 
+      // Leadership (appointed leads — visible even when the team list is empty)
+      if (p.leads && p.leads.length) {
+        document.getElementById('pTeamSection').style.display = 'block';
+        document.getElementById('pTeam').innerHTML += '<h4 style="font-size:0.9rem;margin:1rem 0 0.5rem">Leadership</h4>' + p.leads.map(function(l) {
+          var initials = (l.user_name || '?').split(' ').map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
+          return '<div class="team-card">' +
+            '<div class="avatar">' + initials + '</div>' +
+            '<div class="team-info">' +
+            '<div class="team-name">' + esc(l.user_name) + '</div>' +
+            '<div class="team-role">' + esc(l.role_title || 'Programme Lead') + '</div>' +
+            '</div></div>';
+        }).join('');
+      }
+
       // Join / apply CTA
       (function () {
         var box = document.getElementById('pApply');
