@@ -101,7 +101,7 @@
 
       <div class="about-content" style="max-width:800px;margin:0 auto 3rem">
         <h2 style="font-size:1.3rem;font-weight:700;border-left:3px solid var(--gold);padding-left:0.75rem;margin-bottom:1.25rem">Six Permanent Programme Areas</h2>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem" id="archGrid">
           <div style="padding:1rem 1.25rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg)">
             <h4 style="font-size:0.92rem;margin-bottom:0.35rem">1. Astronomy & Observation</h4>
             <p style="font-size:0.85rem;color:var(--text-dim);line-height:1.5;margin:0">Practical astronomy, stargazing, telescopes, astrophotography and celestial events.</p>
@@ -217,6 +217,17 @@
       document.getElementById('statActive').textContent = programmes.filter(p => p.status === 'active').length;
       document.getElementById('statCompleted').textContent = programmes.filter(p => p.status === 'completed').length;
       document.getElementById('statPlanned').textContent = programmes.filter(p => p.status === 'planned').length;
+
+      // Architecture grid with live leads (replaces the static fallback above)
+      const arch = document.getElementById('archGrid');
+      if (arch && programmes.length) {
+        arch.innerHTML = programmes.map((p, i) => `
+          <div style="padding:1rem 1.25rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);cursor:pointer" onclick="location.href=ua('/programmes/${p.id}')">
+            <h4 style="font-size:0.92rem;margin-bottom:0.35rem">${i + 1}. ${esc(p.title)}</h4>
+            <p style="font-size:0.85rem;color:var(--text-dim);line-height:1.5;margin:0">${esc(stripHtml(p.description || '').slice(0, 140))}</p>
+            <p style="font-size:0.78rem;color:var(--text-dim);margin:0.5rem 0 0">Lead: ${p.lead_name ? esc(p.lead_name) : '<em>to be appointed</em>'}</p>
+          </div>`).join('');
+      }
 
       if (programmes.length) {
         const totalPages = Math.ceil(programmes.length / PROG_PER);

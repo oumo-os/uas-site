@@ -3003,7 +3003,7 @@ try {
     json_response($events);
   }
   elseif ($path === '/public/programmes' && $method === 'GET') {
-    $stmt = db()->prepare('SELECT p.id, p.title, p.description, p.status FROM programmes p WHERE p.status = "active" ORDER BY p.title');
+    $stmt = db()->prepare('SELECT p.id, p.title, p.description, p.status, (SELECT u.name FROM programme_members pm JOIN users u ON u.id = pm.user_id WHERE pm.programme_id = p.id AND pm.status = "active" AND pm.role_in_programme LIKE "%lead%" ORDER BY pm.joined_date, pm.id LIMIT 1) AS lead_name FROM programmes p WHERE p.status = "active" ORDER BY p.title');
     $stmt->execute();
     json_response($stmt->fetchAll());
   }

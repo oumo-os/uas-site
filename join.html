@@ -214,7 +214,7 @@
     <div class="container" style="max-width:800px">
       <h2 class="section-title">Open Roles</h2>
       <p class="section-subtitle">UAS is member-run. These seats are currently open — members may express interest through the dashboard or by emailing <a href="mailto:secretary@astronomy.ug">secretary@astronomy.ug</a>.</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem" id="openRolesGrid">
         <div style="padding:1rem 1.25rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg)">
           <h4 style="font-size:0.92rem;margin-bottom:0.35rem">Vice President</h4>
           <p style="font-size:0.85rem;color:var(--text-dim);line-height:1.5;margin:0">Board office. Deputises for the President with a distinct delegated portfolio.</p>
@@ -297,6 +297,25 @@
       try { await api.me(); } catch(e) {}
       updateNavUser();
       loadDuesRates();
+      loadOpenRoles();
+    }
+
+    // Live open seats (replaces the static fallback above)
+    async function loadOpenRoles() {
+      const grid = document.getElementById('openRolesGrid');
+      if (!grid) return;
+      try {
+        const roles = await api.request('/public/open-roles').catch(() => []);
+        if (!roles || !roles.length) {
+          grid.innerHTML = '<div class="text-dim" style="grid-column:1/-1;text-align:center;padding:1.5rem">No open seats right now — check back soon.</div>';
+          return;
+        }
+        grid.innerHTML = roles.map(r => `
+          <div style="padding:1rem 1.25rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg)">
+            <h4 style="font-size:0.92rem;margin-bottom:0.35rem">${esc(r.title)}</h4>
+            <p style="font-size:0.85rem;color:var(--text-dim);line-height:1.5;margin:0">${esc(stripHtml(r.description || '').slice(0, 160))}</p>
+          </div>`).join('');
+      } catch(e) { /* keep static fallback */ }
     }
 
     const check = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> ';
