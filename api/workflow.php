@@ -11,7 +11,7 @@ define('WORKFLOWS', [
   'document'=> ['draft', 'submitted', 'approved', 'published', 'archived'],
   'resolution' => ['draft', 'submitted', 'voting', 'passed', 'failed', 'applied', 'rejected'],
   'programme' => ['draft', 'active', 'paused', 'completed', 'archived'],
-  'project' => ['draft', 'active', 'on_hold', 'completed', 'archived'],
+  'project' => ['draft', 'submitted', 'approved', 'published', 'rejected', 'archived'],
   'assignment' => ['not_started', 'in_progress', 'submitted', 'completed', 'overdue'],
 ]);
 
@@ -44,10 +44,11 @@ define('TRANSITIONS', [
     'completed' => ['archived'],
   ],
   'project' => [
-    'draft' => ['active'],
-    'active' => ['on_hold', 'completed'],
-    'on_hold' => ['active', 'archived'],
-    'completed' => ['archived'],
+    'draft' => ['submitted'],
+    'submitted' => ['approved', 'rejected'],
+    'approved' => ['published'],
+    'rejected' => ['draft'],
+    'published' => ['archived'],
   ],
 ]);
 
@@ -150,7 +151,10 @@ function get_required_cap(string $objectType, string $newState): ?string {
       'active' => 'programmes.approve',
     ],
     'project' => [
-      'active' => 'projects.approve',
+      'submitted' => 'projects.create',
+      'approved' => 'projects.approve',
+      'published' => 'projects.approve',
+      'rejected' => 'projects.approve',
     ],
   ];
   return $map[$objectType][$newState] ?? null;
@@ -308,6 +312,15 @@ function get_pending_items(?int $userId = null): array {
     $stmt->execute([$userId]);
     $items = array_merge($items, $stmt->fetchAll());
 
+    // Projects by user
+    $sql = "SELECT p.id, p.title, p.status, p.created_at, u.name AS author_name,
+            'project' AS item_type, p.id AS related_id
+            FROM projects p JOIN users u ON u.id = p.created_by
+            WHERE p.created_by = ? AND p.status IN ('submitted','draft')";
+    $stmt = db()->prepare($sql);
+    $stmt->execute([$userId]);
+    $items = array_merge($items, $stmt->fetchAll());
+
   } else {
     // ORG WIDE: all pending items
     // Articles pending review/approval
@@ -356,6 +369,23 @@ function get_pending_items(?int $userId = null): array {
             JOIN programmes p ON p.id = pa.programme_id
             JOIN users u ON u.id = pa.user_id
             WHERE pa.status = 'pending'";
+    $stmt = db()->prepare($sql);
+    $stmt->execute();
+    $items = array_merge($items, $stmt->fetchAll());
+
+    // Projects pending approval
+    $sql = "SELECT p.id, p.title, p.status, p.created_at, u.name AS author_name,
+            'project' AS item_type, r.title AS approver_role
+            FROM projects p
+            JOIN users u ON u.id = p.created_by
+            LEFT JOIN roles r ON r.id = (
+              SELECT ra.role_id FROM role_assignments ra
+              JOIN role_capabilities rc ON rc.role_id = ra.role_id
+              JOIN capabilities c ON c.id = rc.capability_id
+              WHERE c.slug = 'projects.approve' AND ra.status = 'active'
+              LIMIT 1
+            )
+            WHERE p.status IN ('submitted','draft')";
     $stmt = db()->prepare($sql);
     $stmt->execute();
     $items = array_merge($items, $stmt->fetchAll());
@@ -422,7 +452,7 @@ function institutional_health(): array {
   $health['programmes'] = $stmt->fetch();
 
   // Projects
-  $stmt = db()->prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active FROM projects");
+  $stmt = db()->prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN status IN ('approved','published') THEN 1 ELSE 0 END) AS active FROM projects");
   $stmt->execute();
   $health['projects'] = $stmt->fetch();
 

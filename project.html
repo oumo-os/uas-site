@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script>(function(){var s=location.pathname.replace(/\/+$/,'').split('/').filter(Boolean);var P=/^(index\.html|index|about|programmes|programme|projects|project|events|event|news|knowledge|article|articles|library|search|ecosystem|members|join|login|dashboard|profile|admin|member|404\.html|gallery|contact)$/;while(s.length>=2&&/^(article|articles|event|events|programme|programmes|projects|project|poll|polls|resolution|resolutions)$/.test(s[s.length-2])&&/^[^\/]+$/.test(s[s.length-1])){var maybe=s[s.length-1];if(/^\d+$/.test(maybe)||/^[a-z0-9-]+$/.test(maybe)){s.pop();s.pop();continue;}break;}while(s.length&&(P.test(s[s.length-1])||/\.[a-z0-9]+$/i.test(s[s.length-1]))){s.pop();}var base=s.length?'/'+s.join('/'):'';var b=document.createElement('base');b.href=base+'/';document.head.appendChild(b);if(!window.UAS_BASE)window.UAS_BASE=base;})();</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="img/uas-emblem.png">
+  <title>Project — Uganda Astronomical Society</title>
+  <meta name="description" content="Project details — Uganda Astronomical Society.">
+  <meta property="og:title" content="Project — Uganda Astronomical Society">
+  <meta property="og:description" content="Project details — Uganda Astronomical Society.">
+  <meta property="og:image" content="img/uas-emblem.png">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="css/base.css?v=20260911-8">
+  <style>
+    .stat-row { display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom:2rem; }
+    .stat-chip { display:inline-flex; align-items:center; gap:0.5rem; padding:0.6rem 1rem; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); font-size:0.85rem; }
+    .stat-chip .label { font-size:0.7rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em; }
+    .stat-chip .value { font-weight:600; }
+    .event-row { display:flex; gap:1rem; padding:0.75rem 0; border-bottom:1px solid var(--border); align-items:center; }
+    .event-row .ev-date { min-width:50px; text-align:center; padding:0.4rem; background:var(--accent-glow); border-radius:var(--radius); }
+    .event-row .ev-date .day { font-size:1.2rem; font-weight:700; color:var(--accent); line-height:1; }
+    .event-row .ev-date .month { font-size:0.65rem; color:var(--text-dim); text-transform:uppercase; }
+    .event-row .ev-info h4 { font-size:0.9rem; margin-bottom:0.15rem; }
+    .event-row .ev-info p { font-size:0.8rem; color:var(--text-dim); }
+  </style>
+</head>
+<body>
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="container">
+      <a href="/" class="nav-brand"><img src="img/uas-emblem.png" alt="UAS" class="nav-logo">Uganda Astronomical Society</a>
+      <button class="nav-burger" onclick="this.closest('.nav').classList.toggle('open')" aria-label="Menu">&#9776;</button>
+      <div class="nav-links">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/about" class="nav-link">About</a>
+        <a href="/programmes" class="nav-link active">Programmes</a>
+        <a href="/events" class="nav-link">Events</a>
+        <a href="/news" class="nav-link">News</a>
+        <a href="/knowledge" class="nav-link">Knowledge</a>
+        <a href="/contact" class="nav-link">Contact</a>
+      </div>
+      <div class="nav-right"><div class="nav-user" id="navUser"></div></div>
+    </div>
+  </nav>
+
+  <section class="detail-hero">
+    <div class="hero-bg" id="pHeroBg" style="background-image:url('img/header-programmes.jpg')"></div>
+    <div class="container">
+      <div class="breadcrumb"><a href="/programmes">Programmes</a> &rsaquo; <span id="pBreadcrumb"></span></div>
+      <h1 id="pTitle"></h1>
+      <div class="description-body" id="pDesc" style="color:rgba(255,255,255,0.85);max-width:640px;margin-top:0.5rem"></div>
+      <div class="hero-meta" id="pHeroMeta"></div>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:2rem">
+    <div class="container">
+      <div class="stat-row" id="pStats"></div>
+      <div class="content-grid">
+        <div class="content-main">
+          <div class="card-section">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg></span> Objectives</h3>
+            <ul class="obj-list" id="pObjectives"></ul>
+          </div>
+          <div class="card-section" id="pEventsSection" style="display:none">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span> Events</h3>
+            <div id="pEvents"></div>
+          </div>
+        </div>
+        <div class="sidebar">
+          <div class="card-section">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span> Quick Facts</h3>
+            <div id="pFacts"></div>
+          </div>
+        </div>
+      </div>
+      <div class="share-row" id="pShare" style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border)"></div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div><div class="footer-brand">Uganda Astronomical Society</div><p class="footer-desc">Advancing astronomy education, research, and outreach across Uganda since 2023.</p></div>
+        <div><div class="footer-heading">Explore</div><ul class="footer-links"><li><a href="/about">About UAS</a></li><li><a href="/programmes">Programmes</a></li><li><a href="/events">Events</a></li><li><a href="/knowledge">Knowledge Base</a></li></ul></div>
+        <div><div class="footer-heading">Community</div><ul class="footer-links"><li><a href="/members">Members</a></li><li><a href="/ecosystem">Ecosystem</a></li><li><a href="/library">Library</a></li><li><a href="/contact">Contact</a></li></ul></div>
+        <div><div class="footer-heading">Connect</div><ul class="footer-links"><li><a href="mailto:contact@astronomy.ug">contact@astronomy.ug</a></li><li><a href="/login">Member Login</a></li></ul></div>
+      </div>
+      <div class="footer-bottom"><span>&copy; <span class="js-year">2026</span> Uganda Astronomical Society. All rights reserved.</span><span>Kampala, Uganda</span></div>
+    </div>
+  </footer>
+
+  <script src="js/api.js?v=20260911-9"></script>
+  <script>
+    async function load() {
+      try { await api.me(); } catch(e) {}
+      updateNavUser();
+      var params = new URLSearchParams(location.search);
+      var key = params.get('slug') || params.get('id') || (location.pathname.match(/\/([^\/]+)\/?$/) || [])[1];
+      if (['projects','project','programmes','programme'].indexOf(key) !== -1) key = null;
+      if (!key) { document.getElementById('pTitle').textContent = 'Project not found'; return; }
+      var p = await api.request('/public/projects/' + encodeURIComponent(key)).catch(function(){ return null; });
+      if (!p) { document.getElementById('pTitle').textContent = 'Project not found'; return; }
+      render(p);
+    }
+
+    function render(p) {
+      document.title = p.title + ' — Uganda Astronomical Society';
+      document.getElementById('pBreadcrumb').textContent = p.title;
+      document.getElementById('pTitle').textContent = p.title;
+      if (p.image_url) {
+        document.getElementById('pHeroBg').style.backgroundImage = 'url(' + esc(p.image_url) + ')';
+      }
+      (function () {
+        var desc = stripHtml(p.description || '').slice(0, 160);
+        var canon = 'https://astronomy.ug/' + (p.slug || p.id);
+        setSeoMeta({
+          title: p.title + ' — Uganda Astronomical Society',
+          description: desc, image: p.image_url || null, canonical: canon,
+          schema: { '@context': 'https://schema.org', '@type': 'CreativeWork', name: p.title, description: desc, image: absImg(p.image_url), url: canon, author: { '@type': 'Organization', name: 'Uganda Astronomical Society', url: 'https://astronomy.ug/' } }
+        });
+      })();
+      document.getElementById('pDesc').innerHTML = p.description ? p.description : '';
+      var statusClass = p.status === 'active' ? 'active' : p.status === 'completed' ? 'dim' : 'pending';
+      document.getElementById('pHeroMeta').innerHTML =
+        '<span class="badge badge-' + statusClass + '">' + esc(p.status) + '</span>' +
+        (p.programme_title ? '<span style="color:rgba(255,255,255,0.8)">Programme: ' + esc(p.programme_title) + '</span>' : '') +
+        (p.deadline ? '<span style="color:rgba(255,255,255,0.8)">Due ' + esc(p.deadline) + '</span>' : '');
+      document.getElementById('pStats').innerHTML =
+        (p.programme_title ? '<div class="stat-chip"><div><div class="label">Programme</div><div class="value">' + esc(p.programme_title) + '</div></div></div>' : '') +
+        (p.budget && Number(p.budget) > 0 ? '<div class="stat-chip"><div><div class="label">Budget</div><div class="value">UGX ' + Number(p.budget).toLocaleString() + '</div></div></div>' : '') +
+        (p.deadline ? '<div class="stat-chip"><div><div class="label">Deadline</div><div class="value">' + esc(p.deadline) + '</div></div></div>' : '');
+      var objs = document.getElementById('pObjectives');
+      objs.innerHTML = p.objectives
+        ? p.objectives.split(/\r?\n/).filter(Boolean).map(function(o){ return '<li>' + esc(o.trim()) + '</li>'; }).join('')
+        : '<p class="text-dim" style="font-size:0.9rem">No objectives listed.</p>';
+      if (p.events && p.events.length) {
+        document.getElementById('pEventsSection').style.display = 'block';
+        document.getElementById('pEvents').innerHTML = p.events.map(function(ev) {
+          var d = new Date(ev.date);
+          return '<div class="event-row" onclick="location.href=ua(\'/events/\' + (ev.slug || ev.id))" style="cursor:pointer">' +
+            '<div class="ev-date"><div class="day">' + d.getDate() + '</div><div class="month">' + d.toLocaleString('en',{month:'short'}) + '</div></div>' +
+            '<div class="ev-info"><h4>' + esc(ev.title) + '</h4><p>' + esc(ev.location || 'TBD') + ' &middot; ' + esc(ev.status) + '</p></div></div>';
+        }).join('');
+      }
+      document.getElementById('pFacts').innerHTML =
+        '<div style="font-size:0.88rem;line-height:2">' +
+        '<div><span class="text-dim">Status:</span> <strong>' + esc(p.status) + '</strong></div>' +
+        (p.programme_title ? '<div><span class="text-dim">Programme:</span> ' + esc(p.programme_title) + '</div>' : '') +
+        (p.deadline ? '<div><span class="text-dim">Deadline:</span> ' + esc(p.deadline) + '</div>' : '') +
+        '</div>';
+      var pageUrl = encodeURIComponent(window.location.href);
+      var shareText = encodeURIComponent(p.title + ' — Uganda Astronomical Society');
+      document.getElementById('pShare').innerHTML =
+        '<span style="font-size:0.82rem;color:var(--text-dim);align-self:center">Share:</span>' +
+        '<a class="share-btn" href="https://twitter.com/intent/tweet?url=' + pageUrl + '&text=' + shareText + '" target="_blank">Twitter</a>' +
+        '<a class="share-btn" href="https://www.facebook.com/sharer/sharer.php?u=' + pageUrl + '" target="_blank">Facebook</a>' +
+        '<a class="share-btn" href="https://wa.me/?text=' + shareText + '%20' + pageUrl + '" target="_blank">WhatsApp</a>' +
+        '<a class="share-btn" href="https://www.linkedin.com/sharing/share-offsite/?url=' + pageUrl + '" target="_blank">LinkedIn</a>' +
+        '<button class="share-btn" onclick="navigator.clipboard.writeText(window.location.href).then(function(){this.textContent=\'Copied!\'}.bind(this));setTimeout(function(){this.textContent=\'Copy URL\'}.bind(this),2000)" type="button">Copy URL</button>';
+    }
+
+    function fmtDate(d) { if (!d) return ''; var dt = new Date(d); return dt.toLocaleDateString('en',{year:'numeric',month:'short',day:'numeric'}); }
+    function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+    function updateNavUser() {
+      var el = document.getElementById('navUser');
+      el.innerHTML = api._user
+        ? '<a href="/dashboard" class="btn btn-outline btn-sm">' + esc(api._user.name) + '</a>'
+        : '<a href="/login" class="btn btn-primary btn-sm">Login</a>';
+    }
+    load();
+  </script>
+</body>
+</html>

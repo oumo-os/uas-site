@@ -13,19 +13,23 @@ ErrorDocument 404 /404.html
 # /admin -> admin.html (must precede the directory check below)
 RewriteRule ^admin/?$ admin.html [L]
 
-# Clean URLs: /about -> about.html, etc.
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
+# Event detail: /events/<slug> or /events/<id> -> event.html?slug=... (preferred)
+RewriteRule ^events/([a-z0-9-]+)/?$ event.html?slug=$1 [QSA,L]
+# Legacy numeric (keep for 301 fallback; accepts both /programme/3 and /programmes/3)
+RewriteRule ^programmes?/(\d+)/?$ programme.html?id=$1 [QSA,L]
+RewriteRule ^articles?/(\d+)/?$ article.html?id=$1 [QSA,L]
+RewriteRule ^events?/(\d+)/?$ event.html?id=$1 [QSA,L]
+
+# Clean URLs: /about -> about.html, etc. (only when matching file exists)
+RewriteCond %{DOCUMENT_ROOT}/$1.html -f
 RewriteRule ^([a-z0-9-]+)$ $1.html [QSA,L]
 
-# Programme detail: /programmes/3 or /programme/3 -> programme.html?id=3
-RewriteRule ^programmes?/(\d+)/?$ programme.html?id=$1 [QSA,L]
-
-# Article detail: /article/5 or /articles/5 -> article.html?id=5
-RewriteRule ^articles?/(\d+)/?$ article.html?id=$1 [QSA,L]
-
-# Event detail: /event/3 or /events/3 -> event.html?id=3
-RewriteRule ^events?/(\d+)/?$ event.html?id=$1 [QSA,L]
+# Root slugs: programmes & projects at astronomy.ug/<slug>
+# Only for non-file single segments that aren't static pages; keeps /<slug> URL with 200
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{DOCUMENT_ROOT}/$1.html !-f
+RewriteRule ^([a-z0-9-]+)/?$ slug.php?slug=$1 [QSA,L]
 
 # Absorb preload-scanner requests that raced the dynamic <base> on deep routes
 # (e.g. /article/css/base.css -> /css/base.css). The scanner resolves relative

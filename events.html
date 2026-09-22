@@ -376,7 +376,7 @@
           return '<div class="day-ev"><div><div style="font-weight:600">' + esc(e.title) + '</div>' +
             '<div class="text-dim" style="font-size:0.82rem">' + t.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' }) +
             (e.location ? ' &middot; ' + esc(e.location) : '') + '</div></div>' +
-            '<a class="btn btn-outline btn-sm" href="/event/' + e.id + '">Details</a></div>';
+            '<a class="btn btn-outline btn-sm" href="/events/' + (e.slug || e.id) + '">Details</a></div>';
         }).join('') + '</div>';
       } else {
         panel.innerHTML = '';
@@ -396,7 +396,7 @@
       const img = esc(feat.image_url || eventImgs[0]);
       const full = feat.capacity ? (feat.rsvp_count || 0) >= feat.capacity : false;
       el.innerHTML = `
-        <div class="spotlight" style="background-image:url('${img}')" onclick="location.href=ua('/event/${feat.id}')">
+        <div class="spotlight" style="background-image:url('${img}')" onclick="location.href=ua('/events/' + (feat.slug || feat.id))">
           <div class="spotlight-body">
             <span class="spotlight-kicker">Next up &middot; ${d.toLocaleDateString('en',{weekday:'long', month:'long', day:'numeric'})}</span>
             <h2>${esc(feat.title)}</h2>
@@ -408,7 +408,7 @@
             </div>
             <div onclick="event.stopPropagation()" style="display:flex;gap:0.5rem;flex-wrap:wrap">
               ${renderRsvpButton(feat, full, false, false)}
-              <a class="btn btn-outline btn-sm" href="/event/${feat.id}">Details</a>
+              <a class="btn btn-outline btn-sm" href="/events/${feat.slug || feat.id}">Details</a>
             </div>
           </div>
         </div>`;
@@ -453,7 +453,7 @@
         const pct = e.capacity ? Math.min(100, (e.rsvp_count || 0) / e.capacity * 100) : 0;
 
         return `
-          <div class="event-card" onclick="location.href=ua('/event/${e.id}')">
+          <div class="event-card" onclick="location.href=ua('/events/' + (e.slug || e.id))">
             <img src="${esc(e.image_url || eventImgs[idx % eventImgs.length])}" alt="${esc(e.title)}" loading="lazy" onerror="this.onerror=null;this.src='${eventImgs[idx % eventImgs.length]}'">
             <div class="event-date-box">
               <div class="day">${d.getDate()}</div>
@@ -475,7 +475,7 @@
               <div class="event-actions" onclick="event.stopPropagation()">
                 ${renderRsvpButton(e, full, cancelled, past)}
                 ${canManage(e) && !cancelled && !past ? '<button class="btn btn-outline btn-sm" onclick="toggleAttendees(' + e.id + ', this)">Attendees (' + (e.rsvp_count || 0) + ')</button>' : ''}
-                <a class="btn btn-outline btn-sm" href="/event/${e.id}">Details</a>
+                <a class="btn btn-outline btn-sm" href="/events/${e.slug || e.id}">Details</a>
               </div>
               ${canManage(e) ? `<div class="attendee-list" id="attendees-${e.id}" style="display:none;margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem" onclick="event.stopPropagation()"></div>` : ''}
             </div>

@@ -146,6 +146,42 @@ function user_inbox_offices(int $userId): array {
   return array_values(array_intersect($offices, array_keys(office_list())));
 }
 
+// ---- Slugs ----
+function slugify(string $text): string {
+  $text = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text) ?: $text;
+  $text = strtolower(trim($text));
+  $text = preg_replace('/[^a-z0-9]+/', '-', $text);
+  $text = trim($text, '-');
+  $text = substr($text, 0, 80);
+  return $text !== '' ? $text : 'item';
+}
+function slugExists(string $slug, string $table, ?int $excludeId = null): bool {
+  $allowed = ['programmes','projects','events'];
+  if (!in_array($table, $allowed, true)) return false;
+  $sql = "SELECT id FROM `$table` WHERE slug = ?";
+  $params = [$slug];
+  if ($excludeId) { $sql .= " AND id != ?"; $params[] = $excludeId; }
+  $stmt = db()->prepare($sql);
+  $stmt->execute($params);
+  return (bool) $stmt->fetchColumn();
+}
+function rootSlugExists(string $slug, ?int $excludeProgId = null, ?int $excludeProjId = null): bool {
+  if (slugExists($slug, 'programmes', $excludeProgId)) return true;
+  if (slugExists($slug, 'projects', $excludeProjId)) return true;
+  return false;
+}
+function makeSlug(string $title, string $table, ?int $excludeId = null): string {
+  $base = slugify($title);
+  $slug = $base;
+  $i = 2;
+  $isRoot = in_array($table, ['programmes','projects'], true);
+  while ($isRoot ? rootSlugExists($slug, $table==='programmes'?$excludeId:null, $table==='projects'?$excludeId:null) : slugExists($slug, $table, $excludeId)) {
+    $slug = $base . '-' . $i++;
+    if (strlen($slug) > 120) $slug = substr($base, 0, 100) . '-' . $i;
+  }
+  return $slug;
+}
+
 // ---- Office mailbox (IMAP) helpers ----
 // Passwords are AES-256-CBC encrypted with MAILBOX_KEY from api/prod-env.php
 // (server-only). The key never leaves the server; officers never see passwords.

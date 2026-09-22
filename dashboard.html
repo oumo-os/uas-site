@@ -4540,6 +4540,31 @@
             ${actions.length ? `<div class="modal-actions">${actions.join('')}</div>` : ''}
           `;
 
+        } else if (type === 'project') {
+          data = await api.request('/projects/' + id);
+          const events = await api.request('/events?project_id=' + id).catch(() => []);
+          const actions = [];
+          if (data.status === 'submitted' || data.status === 'draft') {
+            if (api.hasCap('projects.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('project','approve',${id})">Approve</button>`);
+            if (api.hasCap('projects.approve')) actions.push(`<button class="btn btn-danger btn-sm" onclick="modalRejectProject(${id})">Reject</button>`);
+          }
+          if (data.status === 'approved' && api.hasCap('projects.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('project','publish',${id})">Publish</button>`);
+
+          html = `
+            ${viewToggle(type, id)}
+            <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
+            ${data.programme_title ? `<div class="field"><div class="field-label">Programme</div>${esc(data.programme_title)}</div>` : ''}
+            <div class="field"><div class="field-label">Created by</div>${esc(data.author_name || 'Unknown')}</div>
+            <div class="field"><div class="field-label">Created</div>${new Date(data.created_at).toLocaleDateString('en', {year:'numeric',month:'long',day:'numeric'})}</div>
+            ${data.deadline ? `<div class="field"><div class="field-label">Deadline</div>${new Date(data.deadline).toLocaleDateString('en', {year:'numeric',month:'long',day:'numeric'})}</div>` : ''}
+            ${data.image_url ? `<div class="field"><div class="field-label">Cover</div><img src="${esc(publicCover(data.image_url, ''))}" alt="" style="max-width:100%;border-radius:var(--radius);border:1px solid var(--border)"></div>` : ''}
+            ${data.description ? `<div class="field"><div class="field-label">Description</div><div style="max-height:200px;overflow-y:auto;padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${data.description}</div></div>` : ''}
+            ${data.objectives ? `<div class="field"><div class="field-label">Objectives</div><div style="max-height:200px;overflow-y:auto;padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${data.objectives}</div></div>` : ''}
+            ${events.length ? `<div class="field"><div class="field-label">Events (${events.length})</div><div style="max-height:150px;overflow-y:auto">${events.map(e => `<div style="padding:0.25rem 0;font-size:0.85rem">• ${esc(e.title)} <span class="badge badge-${esc(e.status)}">${esc(e.status)}</span></div>`).join('')}</div></div>` : ''}
+            ${data.rejection_reason ? `<div class="field"><div class="field-label">Rejection Reason</div><div style="color:var(--danger);padding:0.5rem;background:rgba(185,28,28,0.05);border-radius:var(--radius)">${esc(data.rejection_reason)}</div></div>` : ''}
+            ${actions.length ? `<div class="modal-actions">${actions.join('')}</div>` : ''}
+          `;
+
         } else if (type === 'resolution') {
           data = await api.request('/resolutions/' + id);
           const comments = await api.getResolutionComments(id).catch(() => []);
@@ -4630,7 +4655,7 @@
     }
 
     async function modalAction(type, action, id) {
-      if ((action === 'approve' || action === 'publish') && (type === 'article' || type === 'event' || type === 'document')) {
+      if ((action === 'approve' || action === 'publish') && (type === 'article' || type === 'event' || type === 'document' || type === 'project')) {
         if (!confirm(`${action === 'approve' ? 'Approve' : 'Publish'} this ${type}?${action === 'publish' ? ' It will become publicly visible.' : ''}`)) return;
       }
       try {
@@ -4645,6 +4670,9 @@
         } else if (type === 'document') {
           if (action === 'approve') await api.request('/documents/' + id + '/approve', { method: 'POST' });
           if (action === 'publish') await api.request('/documents/' + id + '/publish', { method: 'POST' });
+        } else if (type === 'project') {
+          if (action === 'approve') await api.request('/projects/' + id + '/approve', { method: 'POST' });
+          if (action === 'publish') await api.request('/projects/' + id + '/publish', { method: 'POST' });
         } else if (type === 'resolution') {
           if (action === 'submit') { await api.submitResolution(id); done = 'Resolution submitted for voting'; }
           if (action === 'begin_voting') { await api.beginVoting(id); done = 'Voting is now open'; }
@@ -4655,6 +4683,7 @@
         if (type === 'article') done = action === 'approve' ? 'Article approved' : action === 'publish' ? 'Article published' : done;
         if (type === 'event') done = action === 'approve' ? 'Event approved' : action === 'publish' ? 'Event published' : action === 'rsvp' ? 'You are registered for this event' : done;
         if (type === 'document') done = action === 'approve' ? 'Document approved' : action === 'publish' ? 'Document published' : done;
+        if (type === 'project') done = action === 'approve' ? 'Project approved' : action === 'publish' ? 'Project published' : done;
         closeModal(); toast(done, 'success');
         load();
       } catch(e) { toast(e.error || 'Action failed', 'error'); }
@@ -4675,6 +4704,16 @@
       try {
         await api.request('/articles/' + id + '/reject', { method: 'POST', body: { reason: reason.trim() } });
         closeModal(); toast('Article rejected', 'success');
+        load();
+      } catch(e) { toast(e.error || 'Failed', 'error'); }
+    }
+
+    async function modalRejectProject(id) {
+      const reason = prompt('Rejection reason (shown to the author):');
+      if (reason === null || !reason.trim()) { if (reason !== null) toast('A reason is required', 'warning'); return; }
+      try {
+        await api.request('/projects/' + id + '/reject', { method: 'POST', body: { reason: reason.trim() } });
+        closeModal(); toast('Project rejected', 'success');
         load();
       } catch(e) { toast(e.error || 'Failed', 'error'); }
     }

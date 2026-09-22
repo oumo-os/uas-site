@@ -28,18 +28,25 @@ foreach ($static as [$p, $pr, $freq]) {
 
 try {
   $pdo = db();
-  $stmt = $pdo->query('SELECT id, updated_at FROM events WHERE status = "published" ORDER BY date DESC');
+  $stmt = $pdo->query('SELECT id, slug, updated_at FROM events WHERE status = "published" ORDER BY date DESC');
   foreach ($stmt->fetchAll() as $r) {
-    $urls[] = ['loc' => $base . '/event/' . (int) $r['id'], 'lastmod' => substr($r['updated_at'] ?? $today, 0, 10), 'priority' => '0.7', 'freq' => 'weekly'];
+    $slug = $r['slug'] ?: $r['id'];
+    $urls[] = ['loc' => $base . '/events/' . $slug, 'lastmod' => substr($r['updated_at'] ?? $today, 0, 10), 'priority' => '0.7', 'freq' => 'weekly'];
   }
   $stmt = $pdo->query('SELECT id, updated_at, published_at FROM articles WHERE status = "published" ORDER BY published_at DESC');
   foreach ($stmt->fetchAll() as $r) {
     $lm = $r['updated_at'] ?? $r['published_at'] ?? $today;
     $urls[] = ['loc' => $base . '/article/' . (int) $r['id'], 'lastmod' => substr($lm, 0, 10), 'priority' => '0.7', 'freq' => 'monthly'];
   }
-  $stmt = $pdo->query('SELECT id FROM programmes WHERE status = "active" ORDER BY title');
+  $stmt = $pdo->query('SELECT id, slug FROM programmes WHERE status = "active" ORDER BY title');
   foreach ($stmt->fetchAll() as $r) {
-    $urls[] = ['loc' => $base . '/programmes/' . (int) $r['id'], 'lastmod' => $today, 'priority' => '0.7', 'freq' => 'monthly'];
+    $slug = $r['slug'] ?: $r['id'];
+    $urls[] = ['loc' => $base . '/' . $slug, 'lastmod' => $today, 'priority' => '0.7', 'freq' => 'monthly'];
+  }
+  $stmt = $pdo->query('SELECT id, slug FROM projects WHERE status IN ("active","completed") ORDER BY title');
+  foreach ($stmt->fetchAll() as $r) {
+    $slug = $r['slug'] ?: $r['id'];
+    $urls[] = ['loc' => $base . '/' . $slug, 'lastmod' => $today, 'priority' => '0.6', 'freq' => 'monthly'];
   }
 } catch (Exception $e) {
   // DB unavailable: still serve the static URL set.

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <script>(function(){var s=location.pathname.replace(/\/+$/,'').split('/').filter(Boolean);var P=/^(index\.html|index|about|programmes|programme|events|event|news|knowledge|article|articles|library|search|ecosystem|members|join|login|dashboard|profile|admin|member|404\.html|gallery|contact)$/;while(s.length>=2&&/^(article|articles|event|events|programme|programmes|poll|polls|resolution|resolutions)$/.test(s[s.length-2])&&/^\d+$/.test(s[s.length-1])){s.pop();s.pop();}while(s.length&&(P.test(s[s.length-1])||/\.[a-z0-9]+$/i.test(s[s.length-1]))){s.pop();}var base=s.length?'/'+s.join('/'):'';var b=document.createElement('base');b.href=base+'/';document.head.appendChild(b);if(!window.UAS_BASE)window.UAS_BASE=base;})();</script>
+  <script>(function(){var s=location.pathname.replace(/\/+$/,'').split('/').filter(Boolean);var P=/^(index\.html|index|about|programmes|programme|projects|project|events|event|news|knowledge|article|articles|library|search|ecosystem|members|join|login|dashboard|profile|admin|member|404\.html|gallery|contact)$/;while(s.length>=2&&/^(article|articles|event|events|programme|programmes|poll|polls|resolution|resolutions)$/.test(s[s.length-2])&&/^[a-z0-9-]+$/.test(s[s.length-1])){s.pop();s.pop();}while(s.length&&(P.test(s[s.length-1])||/\.[a-z0-9]+$/i.test(s[s.length-1]))){s.pop();}var base=s.length?'/'+s.join('/'):'';var b=document.createElement('base');b.href=base+'/';document.head.appendChild(b);if(!window.UAS_BASE)window.UAS_BASE=base;})();</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/png" href="img/uas-emblem.png">
   <title>Programme — Uganda Astronomical Society</title>
@@ -170,11 +170,15 @@
     async function load() {
       try { await api.me(); } catch(e) {}
       updateNavUser();
-      var id = new URLSearchParams(location.search).get('id') || (location.pathname.match(/\/(\d+)$/) || [])[1];
-      if (!id) { document.getElementById('pTitle').textContent = 'Programme not found'; return; }
-      window._progId = parseInt(id, 10);
-      var p = await api.getPublicProgramme(id).catch(function(){ return null; });
+      var params = new URLSearchParams(location.search);
+      var key = params.get('slug') || params.get('id') || (location.pathname.match(/\/([^\/]+)\/?$/) || [])[1];
+      // filter out known static segments
+      if (['programmes','programme','projects','project','events','event','articles','article'].indexOf(key) !== -1) key = null;
+      if (!key) { document.getElementById('pTitle').textContent = 'Programme not found'; return; }
+      var p = await api.getPublicProgramme(key).catch(function(){ return null; });
       if (!p) { document.getElementById('pTitle').textContent = 'Programme not found'; return; }
+      window._progId = p.id;
+      window._progSlug = p.slug;
       render(p);
     }
 
@@ -205,7 +209,7 @@
       // SEO: dynamic meta + structured data
       (function () {
         var desc = stripHtml(p.description || '').slice(0, 160);
-        var canon = 'https://astronomy.ug/programmes/' + p.id;
+        var canon = 'https://astronomy.ug/' + (p.slug || p.id);
         setSeoMeta({
           title: p.title + ' — Uganda Astronomical Society',
           description: desc, image: p.image_url || null, canonical: canon,
@@ -385,7 +389,7 @@
       if (p.related && p.related.length) {
         document.getElementById('pRelatedSection').style.display = 'block';
         document.getElementById('pRelated').innerHTML = p.related.map(function(r) {
-          return '<a href="/programme/' + r.id + '" class="related-card">' +
+          return '<a href="/' + (r.slug || r.id) + '" class="related-card">' +
             '<h4>' + esc(r.title) + '</h4>' +
             '<p>' + esc((r.category || r.status || '').replace(/_/g,' ')) + '</p></a>';
         }).join('');

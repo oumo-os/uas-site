@@ -1307,11 +1307,13 @@ try {
   elseif ($path === '/programmes' && $method === 'POST') {
     $user = require_cap('programmes.create');
     $data = input_json();
-    db()->prepare('INSERT INTO programmes (title, description, objectives, image_url, created_by) VALUES (?, ?, ?, ?, ?)')
-      ->execute([$data['title'], $data['description'] ?? null, $data['objectives'] ?? null, clean_image_url($data['image_url'] ?? null), $user['id']]);
+    if (empty($data['title'])) json_error('Title is required', 400);
+    $slug = makeSlug($data['slug'] ?? $data['title'], 'programmes');
+    db()->prepare('INSERT INTO programmes (title, slug, description, objectives, image_url, created_by) VALUES (?, ?, ?, ?, ?, ?)')
+      ->execute([$data['title'], $slug, $data['description'] ?? null, $data['objectives'] ?? null, clean_image_url($data['image_url'] ?? null), $user['id']]);
     $id = (int) db()->lastInsertId();
     audit_log('programme_create', 'programme', $id);
-    json_response(['id' => $id], 201);
+    json_response(['id' => $id, 'slug' => $slug], 201);
   }
 
   // --- MY PROGRAMMES: teams the user belongs to or leads (for dashboard) ---
@@ -1354,6 +1356,19 @@ try {
     $stmt->execute();
     json_response($stmt->fetchAll());
   }
+  elseif (preg_match('#^/projects/(\d+)$#', $path, $m) && $method === 'GET') {
+    require_login();
+    $pid = (int) $m[1];
+    $stmt = db()->prepare('SELECT p.*, pr.title AS programme_title FROM projects p LEFT JOIN programmes pr ON pr.id = p.programme_id WHERE p.id = ?');
+    $stmt->execute([$pid]);
+    $proj = $stmt->fetch();
+    if (!$proj) json_error('Project not found', 404);
+    // attach events for detail
+    $s = db()->prepare('SELECT id, title, slug, date, location, status FROM events WHERE project_id = ? ORDER BY date');
+    $s->execute([$pid]);
+    $proj['events'] = $s->fetchAll();
+    json_response($proj);
+  }
   elseif ($path === '/projects' && $method === 'POST') {
     $data = input_json();
     $progId = $data['programme_id'] ?? null;
@@ -1364,11 +1379,57 @@ try {
     if (!user_has_cap($user['id'], 'projects.create') && !($progId && user_has_cap($user['id'], 'projects.create', 'programme', (int)$progId)) && !($progId && is_programme_lead($user['id'], (int)$progId))) {
       json_error('Insufficient permissions: projects.create', 403);
     }
-    db()->prepare('INSERT INTO projects (programme_id, title, description, objectives, deadline, created_by) VALUES (?, ?, ?, ?, ?, ?)')
-      ->execute([$progId, $data['title'], $data['description'] ?? null, $data['objectives'] ?? null, $data['deadline'] ?? null, $user['id']]);
+    if (empty($data['title'])) json_error('Title is required', 400);
+    $slug = makeSlug($data['slug'] ?? $data['title'], 'projects');
+    db()->prepare('INSERT INTO projects (programme_id, title, slug, description, objectives, deadline, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      ->execute([$progId, $data['title'], $slug, $data['description'] ?? null, $data['objectives'] ?? null, $data['deadline'] ?? null, $user['id']]);
     $id = (int) db()->lastInsertId();
+    transition('project', $id, 'submitted', $user['id']);
     audit_log('project_create', 'project', $id);
-    json_response(['id' => $id], 201);
+    notify_capability('projects.approve', 'project_submitted', 'Project awaiting approval: ' . $data['title'], 'Submitted by ' . $user['name'] . '.', '/admin?tab=projects');
+    json_response(['id' => $id, 'slug' => $slug], 201);
+  }
+  elseif (preg_match('#^/projects/(\d+)/approve$#', $path, $m) && $method === 'POST') {
+    $pid = (int) $m[1];
+    // Check global projects.approve OR scoped to the project's programme OR programme lead
+    $user = require_login();
+    $stmt = db()->prepare('SELECT programme_id FROM projects WHERE id = ?');
+    $stmt->execute([$pid]);
+    $progId = $stmt->fetchColumn();
+    if (!user_has_cap($user['id'], 'projects.approve') && !($progId && user_has_cap($user['id'], 'projects.approve', 'programme', (int)$progId)) && !($progId && is_programme_lead($user['id'], (int)$progId))) {
+      json_error('Insufficient permissions: projects.approve', 403);
+    }
+    transition('project', $pid, 'approved', $user['id']);
+    $stmt = db()->prepare('SELECT created_by, title FROM projects WHERE id = ?');
+    $stmt->execute([$pid]);
+    $proj = $stmt->fetch();
+    if ($proj) notify_user((int) $proj['created_by'], 'project_approved', 'Project approved: ' . $proj['title'], 'Your project has been approved and is ready to publish.', '/project/' . $pid);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/projects/(\d+)/publish$#', $path, $m) && $method === 'POST') {
+    $user = require_cap_for('projects.approve', 'project', (int)$m[1]);
+    $pid = (int) $m[1];
+    transition('project', $pid, 'published', $user['id']);
+    $stmt = db()->prepare('SELECT created_by, title FROM projects WHERE id = ?');
+    $stmt->execute([$pid]);
+    $proj = $stmt->fetch();
+    if ($proj) notify_user((int) $proj['created_by'], 'project_published', 'Project published: ' . $proj['title'], 'Your project is now live on the site.', '/project/' . $pid);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/projects/(\d+)/reject$#', $path, $m) && $method === 'POST') {
+    $user = require_cap('projects.approve');
+    $data = input_json();
+    $reason = trim($data['reason'] ?? '');
+    if (!$reason) json_error('A rejection reason is required', 400);
+    $pid = (int) $m[1];
+    db()->prepare("UPDATE projects SET status = 'rejected', rejection_reason = ?, approved_by = ?, approved_at = NOW() WHERE id = ?")
+      ->execute([$reason, $user['id'], $pid]);
+    audit_log('project_reject', 'project', $pid, ['reason' => $reason]);
+    $stmt = db()->prepare('SELECT created_by, title FROM projects WHERE id = ?');
+    $stmt->execute([$pid]);
+    $proj = $stmt->fetch();
+    if ($proj) notify_user((int) $proj['created_by'], 'project_rejected', 'Project not approved: ' . $proj['title'], 'Reason: ' . $reason, '/dashboard');
+    json_response(['ok' => true]);
   }
 
   // --- EVENTS ---
@@ -1395,13 +1456,16 @@ try {
     if (!user_has_cap($user['id'], 'events.create') && !($progId && user_has_cap($user['id'], 'events.create', 'programme', (int)$progId)) && !($progId && is_programme_lead($user['id'], (int)$progId))) {
       json_error('Insufficient permissions: events.create', 403);
     }
-    db()->prepare('INSERT INTO events (programme_id, project_id, title, description, organizer_id, date, end_date, location, capacity, image_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      ->execute([$progId, $data['project_id'] ?? null, $data['title'], $data['description'] ?? null, $user['id'], $data['date'], $data['end_date'] ?? null, $data['location'] ?? null, $data['capacity'] ?? null, clean_image_url($data['image_url'] ?? null), $user['id']]);
+    if (empty($data['title'])) json_error('Title is required', 400);
+    if (empty($data['date'])) json_error('Date is required', 400);
+    $slug = makeSlug($data['slug'] ?? $data['title'], 'events');
+    db()->prepare('INSERT INTO events (programme_id, project_id, title, slug, description, organizer_id, date, end_date, location, capacity, image_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      ->execute([$progId, $data['project_id'] ?? null, $data['title'], $slug, $data['description'] ?? null, $user['id'], $data['date'], $data['end_date'] ?? null, $data['location'] ?? null, $data['capacity'] ?? null, clean_image_url($data['image_url'] ?? null), $user['id']]);
     $id = (int) db()->lastInsertId();
     transition('event', $id, 'submitted', $user['id']);
     audit_log('event_create', 'event', $id);
     notify_capability('events.approve', 'event_submitted', 'Event awaiting approval: ' . $data['title'], 'Submitted by ' . $user['name'] . '.', '/admin?tab=events');
-    json_response(['id' => $id], 201);
+    json_response(['id' => $id, 'slug' => $slug], 201);
   }
   elseif (preg_match('#^/events/(\d+)/approve$#', $path, $m) && $method === 'POST') {
     $eid = (int) $m[1];
@@ -1448,12 +1512,14 @@ try {
     json_response(['ok' => true]);
   }
   // --- PUBLIC EVENT DETAIL (plus submitted/draft view for organizers & approvers) ---
-  elseif (preg_match('#^/events/(\d+)$#', $path, $m) && $method === 'GET') {
-    $eventId = (int) $m[1];
-    $stmt = db()->prepare('SELECT e.*, u.name AS organiser_name, u.avatar_url AS organiser_avatar, u.institution AS organiser_institution, u.bio AS organiser_bio, pr.title AS programme_title FROM events e LEFT JOIN users u ON u.id = e.organizer_id LEFT JOIN programmes pr ON pr.id = e.programme_id WHERE e.id = ?');
-    $stmt->execute([$eventId]);
+  elseif (preg_match('#^/events/([^/]+)$#', $path, $m) && $method === 'GET') {
+    $key = $m[1];
+    $bySlug = !ctype_digit($key);
+    $stmt = db()->prepare($bySlug ? 'SELECT e.*, u.name AS organiser_name, u.avatar_url AS organiser_avatar, u.institution AS organiser_institution, u.bio AS organiser_bio, pr.title AS programme_title FROM events e LEFT JOIN users u ON u.id = e.organizer_id LEFT JOIN programmes pr ON pr.id = e.programme_id WHERE e.slug = ?' : 'SELECT e.*, u.name AS organiser_name, u.avatar_url AS organiser_avatar, u.institution AS organiser_institution, u.bio AS organiser_bio, pr.title AS programme_title FROM events e LEFT JOIN users u ON u.id = e.organizer_id LEFT JOIN programmes pr ON pr.id = e.programme_id WHERE e.id = ?');
+    $stmt->execute([$bySlug ? $key : (int)$key]);
     $event = $stmt->fetch();
     if (!$event) json_error('Event not found', 404);
+    $eventId = (int) $event['id'];
     if (!in_array($event['status'], ['published', 'cancelled', 'completed'], true)) {
       $viewer = current_user();
       $ok = $viewer && $viewer['status'] === 'active'
@@ -3048,16 +3114,18 @@ try {
     // Lead = programme-team lead seat first, else holder of a lead-type role
     // targeting the programme (the current appointment convention).
     $leadSql = "COALESCE((SELECT u.name FROM programme_members pm JOIN users u ON u.id = pm.user_id WHERE pm.programme_id = p.id AND pm.status = 'active' AND pm.role_in_programme LIKE '%lead%' ORDER BY pm.joined_date, pm.id LIMIT 1), (SELECT u.name FROM role_assignments ra JOIN roles r ON r.id = ra.role_id JOIN users u ON u.id = ra.user_id WHERE ra.status = 'active' AND r.status = 'active' AND r.target = p.title AND (r.title LIKE '%lead%' OR r.title LIKE '%chair%' OR r.title LIKE '%coordinat%' OR r.title LIKE '%head%') ORDER BY u.name LIMIT 1))";
-    $stmt = db()->prepare("SELECT p.id, p.title, p.description, p.status, $leadSql AS lead_name FROM programmes p WHERE p.status = \"active\" ORDER BY p.title");
+    $stmt = db()->prepare("SELECT p.id, p.title, p.slug, p.description, p.status, $leadSql AS lead_name FROM programmes p WHERE p.status = \"active\" ORDER BY p.title");
     $stmt->execute();
     json_response($stmt->fetchAll());
   }
-  elseif (preg_match('#^/public/programmes/(\d+)$#', $path, $m) && $method === 'GET') {
-    $pid = (int) $m[1];
-    $stmt = db()->prepare('SELECT p.* FROM programmes p WHERE p.id = ?');
-    $stmt->execute([$pid]);
+  elseif (preg_match('#^/public/programmes/([^/]+)$#', $path, $m) && $method === 'GET') {
+    $key = $m[1];
+    $bySlug = !ctype_digit($key);
+    $stmt = db()->prepare($bySlug ? 'SELECT p.* FROM programmes p WHERE p.slug = ?' : 'SELECT p.* FROM programmes p WHERE p.id = ?');
+    $stmt->execute([$bySlug ? $key : (int)$key]);
     $programme = $stmt->fetch();
     if (!$programme) json_error('Programme not found', 404);
+    $pid = (int) $programme['id'];
 
     $requester = current_user();
 
@@ -3120,6 +3188,34 @@ try {
     $programme['related'] = $related;
 
     json_response($programme);
+  }
+  elseif ($path === '/public/projects' && $method === 'GET') {
+    $stmt = db()->prepare('SELECT p.id, p.title, p.slug, p.description, p.status, p.programme_id, pr.title AS programme_title FROM projects p LEFT JOIN programmes pr ON pr.id = p.programme_id WHERE p.status = "published" ORDER BY p.title');
+    $stmt->execute();
+    json_response($stmt->fetchAll());
+  }
+  elseif (preg_match('#^/public/projects/([^/]+)$#', $path, $m) && $method === 'GET') {
+    $key = $m[1];
+    $bySlug = !ctype_digit($key);
+    $stmt = db()->prepare($bySlug ? 'SELECT p.*, pr.title AS programme_title FROM projects p LEFT JOIN programmes pr ON pr.id = p.programme_id WHERE p.slug = ?' : 'SELECT p.*, pr.title AS programme_title FROM projects p LEFT JOIN programmes pr ON pr.id = p.programme_id WHERE p.id = ?');
+    $stmt->execute([$bySlug ? $key : (int)$key]);
+    $proj = $stmt->fetch();
+    if (!$proj) json_error('Project not found', 404);
+    // Public can only view published projects; owners/approvers can view any
+    if ($proj['status'] !== 'published') {
+      $viewer = current_user();
+      $ok = $viewer && $viewer['status'] === 'active'
+        && ((int) $proj['created_by'] === (int) $viewer['id']
+          || user_has_cap($viewer['id'], 'projects.approve')
+          || user_has_cap($viewer['id'], 'projects.manage')
+          || ($proj['programme_id'] && is_programme_lead($viewer['id'], (int)$proj['programme_id'])));
+      if (!$ok) json_error('Project not found', 404);
+    }
+    // attach events count for detail
+    $s = db()->prepare('SELECT id, title, slug, date, location, status FROM events WHERE project_id = ? ORDER BY date');
+    $s->execute([$proj['id']]);
+    $proj['events'] = $s->fetchAll();
+    json_response($proj);
   }
   elseif ($path === '/public/documents' && $method === 'GET') {
     $stmt = db()->prepare('SELECT d.id, d.title, d.category, d.file_path, d.visibility, d.updated_at AS published_at, u.name AS owner_name FROM documents d JOIN users u ON u.id = d.owner_id WHERE d.status = "published" AND d.visibility = "public" ORDER BY d.updated_at DESC');
@@ -3200,6 +3296,7 @@ try {
       if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = $data[$f]; }
     }
     if (array_key_exists('image_url', $data)) { $sets[] = 'image_url = ?'; $args[] = clean_image_url($data['image_url']); }
+    if (array_key_exists('slug', $data)) { $s = makeSlug($data['slug'], 'programmes', $id); $sets[] = 'slug = ?'; $args[] = $s; }
     if (array_key_exists('budget', $data)) { $sets[] = 'budget = ?'; $args[] = $data['budget'] !== null ? (float) $data['budget'] : null; }
     if (array_key_exists('spent', $data)) { $sets[] = 'spent = ?'; $args[] = $data['spent'] !== null ? (float) $data['spent'] : null; }
     if (!$sets) json_error('Nothing to update', 400);

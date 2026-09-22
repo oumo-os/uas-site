@@ -222,7 +222,7 @@
       const arch = document.getElementById('archGrid');
       if (arch && programmes.length) {
         arch.innerHTML = programmes.map((p, i) => `
-          <div style="padding:1rem 1.25rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);cursor:pointer" onclick="location.href=ua('/programmes/${p.id}')">
+          <div style="padding:1rem 1.25rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);cursor:pointer" onclick="location.href=ua('/' + (p.slug || p.id))">
             <h4 style="font-size:0.92rem;margin-bottom:0.35rem">${i + 1}. ${esc(p.title)}</h4>
             <p style="font-size:0.85rem;color:var(--text-dim);line-height:1.5;margin:0">${esc(stripHtml(p.description || '').slice(0, 140))}</p>
             <p style="font-size:0.78rem;color:var(--text-dim);margin:0.5rem 0 0">Lead: ${p.lead_name ? esc(p.lead_name) : '<em>to be appointed</em>'}</p>
@@ -239,7 +239,7 @@
           const idx = start + i;
           const statusClass = p.status === 'active' ? 'success' : p.status === 'completed' ? 'dim' : 'accent';
           return `
-            <div class="programme-card" onclick="location.href=ua('/programmes/${p.id}')">
+            <div class="programme-card" onclick="location.href=ua('/' + (p.slug || p.id))">
               <img src="${imgs[idx % imgs.length]}" alt="${esc(p.title)}" loading="lazy">
               <div class="card-body">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">

@@ -317,7 +317,7 @@
         const progImgs = ['/img/programme-telescope.jpg','/img/programme-observatory.jpg','/img/programme-stargazing.jpg','/img/programme-education.jpg'];
         if (programmes.length) {
           pDiv.innerHTML = programmes.slice(0, 6).map((p, i) => `
-            <div class="programme-card" onclick="location.href=ua('/programmes/${p.id}')">
+            <div class="programme-card" onclick="location.href=ua('/' + (p.slug || p.id))">
               <img src="${progImgs[i % progImgs.length]}" alt="${esc(p.title)}" class="card-thumb" loading="lazy">
               <div class="card-body">
                 <h3>${esc(p.title)}</h3>
@@ -336,7 +336,7 @@
           eDiv.innerHTML = events.slice(0, 4).map((e, i) => {
             const d = new Date(e.date);
             return `
-              <div class="event-item" onclick="location.href=ua('/event/${e.id}')">
+              <div class="event-item" onclick="location.href=ua('/events/' + (e.slug || e.id))">
                 <img src="${esc(e.image_url || eventImgs[i % eventImgs.length])}" alt="${esc(e.title)}" style="width:140px;height:110px;object-fit:cover;border-radius:var(--radius);flex-shrink:0" loading="lazy" onerror="this.onerror=null;this.src='${eventImgs[i % eventImgs.length]}'">
                 <div class="event-date">
                   <div class="day">${d.getDate()}</div>

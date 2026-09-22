@@ -203,6 +203,9 @@ const api = {
   // Projects
   async getProjects() { return this.request('/projects'); },
   async createProject(data) { return this.request('/projects', { method: 'POST', body: data }); },
+  async approveProject(id) { return this.request('/projects/' + id + '/approve', { method: 'POST' }); },
+  async rejectProject(id, reason) { return this.request('/projects/' + id + '/reject', { method: 'POST', body: { reason } }); },
+  async publishProject(id) { return this.request('/projects/' + id + '/publish', { method: 'POST' }); },
 
   // Events
   async getEvents() { return this.request('/events'); },
