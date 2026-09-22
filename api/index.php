@@ -204,6 +204,8 @@ try {
     if (!$mine && !user_has_cap($user['id'], 'articles.approve') && !user_has_cap($user['id'], 'articles.publish')) {
       json_error('Article not found', 404);
     }
+    $article['viewer_can_edit'] = user_has_cap($user['id'], 'articles.approve')
+      || ($mine && in_array($article['status'], ['draft', 'submitted', 'rejected'], true));
     json_response($article);
   }
   elseif (preg_match('#^/meetings/(\d+)$#', $path, $m) && $method === 'GET') {
@@ -1317,12 +1319,13 @@ try {
     json_response(['id' => $id, 'slug' => $slug], 201);
   }
   elseif (preg_match('#^/programmes/(\d+)$#', $path, $m) && $method === 'GET') {
-    require_login();
+    $user = require_login();
     $pid = (int) $m[1];
     $stmt = db()->prepare('SELECT p.*, u.name AS creator_name FROM programmes p LEFT JOIN users u ON u.id = p.created_by WHERE p.id = ?');
     $stmt->execute([$pid]);
     $prog = $stmt->fetch();
     if (!$prog) json_error('Programme not found', 404);
+    $prog['viewer_can_edit'] = user_has_cap_for($user['id'], 'programmes.manage', 'programme', $pid) || is_programme_lead($user['id'], $pid);
     $s = db()->prepare('SELECT COUNT(*) FROM projects WHERE programme_id = ?');
     $s->execute([$pid]);
     $prog['project_count'] = (int) $s->fetchColumn();
@@ -1373,12 +1376,13 @@ try {
     json_response($stmt->fetchAll());
   }
   elseif (preg_match('#^/projects/(\d+)$#', $path, $m) && $method === 'GET') {
-    require_login();
+    $user = require_login();
     $pid = (int) $m[1];
     $stmt = db()->prepare('SELECT p.*, pr.title AS programme_title FROM projects p LEFT JOIN programmes pr ON pr.id = p.programme_id WHERE p.id = ?');
     $stmt->execute([$pid]);
     $proj = $stmt->fetch();
     if (!$proj) json_error('Project not found', 404);
+    $proj['viewer_can_edit'] = can_manage_project($user['id'], $proj);
     // attach events count for detail
     $s = db()->prepare('SELECT id, title, slug, date, location, status FROM events WHERE project_id = ? ORDER BY date');
     $s->execute([$proj['id']]);
@@ -1389,6 +1393,8 @@ try {
       $s->execute([$proj['id']]);
       $proj['participants'] = $s->fetchAll();
     } catch (Exception $e) { $proj['participants'] = []; }
+    $viewer = current_user();
+    $proj['viewer_can_edit'] = $viewer && $viewer['status'] === 'active' && can_manage_project($viewer['id'], $proj);
     json_response($proj);
   }
   elseif ($path === '/projects' && $method === 'POST') {
@@ -1661,8 +1667,9 @@ try {
     $progId = $ev['programme_id'] ? (int) $ev['programme_id'] : null;
     $isApprover = user_has_cap($user['id'], 'events.approve') || ($progId && user_has_cap($user['id'], 'events.approve', 'programme', $progId));
     $isOwner = (int) $ev['organizer_id'] === (int) $user['id'] || (int) $ev['created_by'] === (int) $user['id'];
-    if (!$isApprover && !$isOwner) json_error('Insufficient permissions: cannot edit this event', 403);
-    if ($isOwner && !$isApprover && in_array($ev['status'], ['completed', 'cancelled'], true)) json_error('Completed or cancelled events cannot be edited', 400);
+    $isLead = $progId && is_programme_lead($user['id'], $progId);
+    if (!$isApprover && !$isOwner && !$isLead) json_error('Insufficient permissions: cannot edit this event', 403);
+    if (($isOwner || $isLead) && !$isApprover && in_array($ev['status'], ['completed', 'cancelled'], true)) json_error('Completed or cancelled events cannot be edited', 400);
     $data = input_json();
     $sets = []; $args = [];
     foreach (['title', 'description', 'date', 'end_date', 'location', 'capacity'] as $f) {
@@ -1742,6 +1749,7 @@ try {
     $waitlist_count = 0;
     $registrations = [];
     $user = current_user();
+    $viewer_can_edit = false;
     if ($user && $user['status'] === 'active') {
       if (user_has_cap($user['id'], 'events.rsvp')) {
         $stmt = db()->prepare('SELECT * FROM event_registrations WHERE event_id = ? AND user_id = ?');
@@ -1752,6 +1760,13 @@ try {
         $my_waitlist = $stmt->fetch() ?: null;
       }
       $is_manager = can_manage_event($user['id'], $event);
+      // Edit rights mirror PUT /events/:id (approvers, owners, programme leads)
+      $evProgId = $event['programme_id'] ? (int) $event['programme_id'] : null;
+      $evApprover = user_has_cap($user['id'], 'events.approve') || ($evProgId && user_has_cap($user['id'], 'events.approve', 'programme', $evProgId));
+      $evOwner = (int) $event['organizer_id'] === (int) $user['id'] || (int) $event['created_by'] === (int) $user['id'];
+      $evLead = $evProgId && is_programme_lead($user['id'], $evProgId);
+      $evLocked = in_array($event['status'], ['completed', 'cancelled'], true);
+      $viewer_can_edit = $evApprover || (($evOwner || $evLead) && !$evLocked);
       if ($is_manager) {
         $stmt = db()->prepare('SELECT er.*, u.name, u.email FROM event_registrations er JOIN users u ON u.id = er.user_id WHERE er.event_id = ? ORDER BY er.registered_at');
         $stmt->execute([$eventId]);
@@ -1786,6 +1801,7 @@ try {
       'stats' => ['total' => (int)$regs['total'], 'attended' => (int)$regs['attended']],
       'my_rsvp' => $my_rsvp ? ['status' => $my_rsvp['status'], 'created_at' => $my_rsvp['registered_at']] : null,
       'is_manager' => $is_manager,
+      'viewer_can_edit' => $viewer_can_edit,
       'registrations' => $registrations,
       'waitlist_count' => $waitlist_count,
       'my_waitlist' => $my_waitlist ? ['id' => $my_waitlist['id'], 'created_at' => $my_waitlist['created_at']] : null,

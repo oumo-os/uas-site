@@ -4613,7 +4613,7 @@
           data = await api.request('/articles/' + id);
           const actions = [];
           const isAuthor = api._user && (data.author_id === api._user.id || data.author_name === api._user.name);
-          const canEditArticle = api.hasCap('articles.approve') || (isAuthor && ['draft','submitted','rejected'].includes(data.status));
+          const canEditArticle = (typeof data.viewer_can_edit === 'boolean') ? data.viewer_can_edit : (api.hasCap('articles.approve') || (isAuthor && ['draft','submitted','rejected'].includes(data.status)));
           if (canEditArticle) actions.push(`<button class="btn btn-outline btn-sm" onclick="editArticleForm(${id})">Edit</button>`);
           if (data.status === 'submitted' || data.status === 'under_review') {
             if (api.hasCap('articles.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('article','approve',${id})">Approve</button>`);
@@ -4651,7 +4651,7 @@
           const rsvps = await api.getEventRsvps(id).catch(() => null);
           const actions = [];
           const isOwner = api._user && (data.organizer_id === api._user.id || data.created_by === api._user.id);
-          const canEditEvent = api.hasCap('events.approve') || (isOwner && !['completed','cancelled'].includes(data.status));
+          const canEditEvent = (typeof data.viewer_can_edit === 'boolean') ? data.viewer_can_edit : (api.hasCap('events.approve') || (isOwner && !['completed','cancelled'].includes(data.status)));
           if (canEditEvent) actions.push(`<button class="btn btn-outline btn-sm" onclick="editEventForm(${id})">Edit</button>`);
           if (data.status === 'submitted') {
             if (api.hasCap('events.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('event','approve',${id})">Approve</button>`);
@@ -4722,7 +4722,8 @@
           const parts = await api.getProjectParticipants(id).catch(() => []);
           const actions = [];
           const isCreator = api._user && data.created_by === api._user.id;
-          if (api.hasCap('projects.approve') || isCreator) actions.push(`<button class="btn btn-outline btn-sm" onclick="editProjectForm(${id})">Edit</button>`);
+          const canEditProject = (typeof data.viewer_can_edit === 'boolean') ? data.viewer_can_edit : (api.hasCap('projects.approve') || isCreator);
+          if (canEditProject) actions.push(`<button class="btn btn-outline btn-sm" onclick="editProjectForm(${id})">Edit</button>`);
           if (data.status === 'submitted' || data.status === 'draft') {
             if (api.hasCap('projects.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('project','approve',${id})">Approve</button>`);
             if (api.hasCap('projects.approve')) actions.push(`<button class="btn btn-danger btn-sm" onclick="modalRejectProject(${id})">Reject</button>`);
@@ -4838,8 +4839,9 @@
         } else if (type === 'programme') {
           data = await api.getProgramme(id);
           const actions = [];
-          if (api.hasCap('programmes.manage')) actions.push(`<button class="btn btn-outline btn-sm" onclick="editProgrammeForm(${id})">Edit</button>`);
-          if (data.status === 'draft' && api.hasCap('programmes.manage')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('programme','activate',${id})">Activate</button>`);
+          const canEditProg = (typeof data.viewer_can_edit === 'boolean') ? data.viewer_can_edit : api.hasCap('programmes.manage');
+          if (canEditProg) actions.push(`<button class="btn btn-outline btn-sm" onclick="editProgrammeForm(${id})">Edit</button>`);
+          if (data.status === 'draft' && canEditProg) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('programme','activate',${id})">Activate</button>`);
           html = `
             <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
             <div class="field"><div class="field-label">Proposed by</div>${esc(data.creator_name || 'Unknown')}</div>
