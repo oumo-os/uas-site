@@ -74,16 +74,27 @@ function transition(string $objectType, int $objectId, string $newState, int $us
   if ($capRequired) {
     $scopeType = null;
     $scopeId = null;
+    $progId = null;
     if ($objectType === 'event') {
       $stmt = db()->prepare('SELECT programme_id FROM events WHERE id = ?');
+      $stmt->execute([$objectId]);
+      $progId = $stmt->fetchColumn();
+      if ($progId) { $scopeType = 'programme'; $scopeId = (int)$progId; }
+    } elseif ($objectType === 'project') {
+      $stmt = db()->prepare('SELECT programme_id FROM projects WHERE id = ?');
       $stmt->execute([$objectId]);
       $progId = $stmt->fetchColumn();
       if ($progId) { $scopeType = 'programme'; $scopeId = (int)$progId; }
     } elseif ($objectType === 'programme') {
       $scopeType = 'programme';
       $scopeId = $objectId;
+      $progId = $objectId;
     }
-    if (!user_has_cap($userId, $capRequired, $scopeType, $scopeId)) {
+    // Programme leads act within their programme (create endpoints grant them
+    // access, so the workflow must too — endpoint permissions gate first).
+    if ($progId && is_programme_lead($userId, (int)$progId)) {
+      // lead override: satisfied
+    } elseif (!user_has_cap($userId, $capRequired, $scopeType, $scopeId)) {
       json_error("Insufficient permissions: {$capRequired}", 403);
     }
   }
@@ -102,6 +113,20 @@ function transition(string $objectType, int $objectId, string $newState, int $us
     'to' => $newState,
     'user_id' => $userId
   ]);
+}
+
+/**
+ * Align the workflow log with the object's status field.
+ * Reject/cancel paths update status directly, so the log can lag behind;
+ * this inserts a catch-up row only when the log disagrees. Idempotent.
+ */
+function sync_state(string $objectType, int $objectId, string $state, int $userId, string $notes = 'state synced with status field'): void {
+  if (get_current_state($objectType, $objectId) !== $state) {
+    db()->prepare(
+      "INSERT INTO workflow_states (object_type, object_id, state, assignee_id, notes)
+       VALUES (?, ?, ?, ?, ?)"
+    )->execute([$objectType, $objectId, $state, $userId, $notes]);
+  }
 }
 
 /**
@@ -321,6 +346,15 @@ function get_pending_items(?int $userId = null): array {
     $stmt->execute([$userId]);
     $items = array_merge($items, $stmt->fetchAll());
 
+    // Programmes proposed by user, awaiting activation
+    $sql = "SELECT p.id, p.title, p.status, p.created_at, u.name AS author_name,
+            'programme' AS item_type, p.id AS related_id
+            FROM programmes p JOIN users u ON u.id = p.created_by
+            WHERE p.created_by = ? AND p.status = 'draft'";
+    $stmt = db()->prepare($sql);
+    $stmt->execute([$userId]);
+    $items = array_merge($items, $stmt->fetchAll());
+
   } else {
     // ORG WIDE: all pending items
     // Articles pending review/approval
@@ -386,6 +420,16 @@ function get_pending_items(?int $userId = null): array {
               LIMIT 1
             )
             WHERE p.status IN ('submitted','draft')";
+    $stmt = db()->prepare($sql);
+    $stmt->execute();
+    $items = array_merge($items, $stmt->fetchAll());
+
+    // Programmes awaiting activation
+    $sql = "SELECT p.id, p.title, p.status, p.created_at, COALESCE(u.name, 'Unknown') AS author_name,
+            'programme' AS item_type, p.id AS related_id
+            FROM programmes p
+            LEFT JOIN users u ON u.id = p.created_by
+            WHERE p.status = 'draft'";
     $stmt = db()->prepare($sql);
     $stmt->execute();
     $items = array_merge($items, $stmt->fetchAll());

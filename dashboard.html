@@ -307,6 +307,7 @@
     .cal-day-dot.document { background: var(--success); }
     .cal-day-dot.resolution { background: var(--info); }
     .cal-day-dot.assignment { background: var(--danger); }
+    .cal-day-dot.eventdate { background: transparent; border: 1.5px solid var(--accent); width: 5px; height: 5px; }
     .cal-legend { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.4rem; font-size: 0.68rem; color: var(--text-dim); }
     .cal-legend-item { display: flex; align-items: center; gap: 0.2rem; }
 
@@ -1125,13 +1126,14 @@
           document.getElementById('createResBtn').style.display = '';
         }
 
-        const [healthData, pending, resolutions, myAsg, mySubs, calItems, finData, budgetData, wgData, activityData, meetingsData, pollsData, delData, users, myOffices] = await Promise.all([
+        const [healthData, pending, resolutions, myAsg, mySubs, calItems, pubEvents, finData, budgetData, wgData, activityData, meetingsData, pollsData, delData, users, myOffices] = await Promise.all([
           api.getDashboard().catch(() => ({})),
           api.getPending({ scope: pendingScope }).catch(() => []),
           api.getResolutions().catch(() => []),
           api.getMyAssignments().catch(() => []),
           api.request('/submissions/mine').catch(() => []),
           api.getCalendar().catch(() => []),
+          api.getPublicEvents().catch(() => []),
           api.hasCap('finance.view') ? api.getFinanceSummary().catch(() => null) : Promise.resolve(null),
           api.hasCap('finance.view') ? api.getBudgetItems().catch(() => []) : Promise.resolve([]),
           api.getWorkingGroups().catch(() => []),
@@ -1149,7 +1151,7 @@
         renderResolutions(resolutions);
         renderMyAssignments(myAsg);
         renderMySubmissions(mySubs);
-        renderUpcomingCal(calItems);
+        renderUpcomingCal(calItems, pubEvents);
         renderFinance(finData);
         renderBudgetItems(budgetData);
         renderWorkingGroups(wgData);
@@ -1252,19 +1254,25 @@
       }
     }
 
-    function renderUpcomingCal(list) {
+    function renderUpcomingCal(list, events) {
       const div = document.getElementById('upcomingCal');
-      const upcoming = (list || []).filter(c => c.deadline && new Date(c.deadline) >= new Date()).sort((a, b) => new Date(a.deadline) - new Date(b.deadline)).slice(0, 6);
-      if (!upcoming.length) { div.innerHTML = '<div class="empty-state"><h4>Nothing scheduled</h4><p>No upcoming calendar items. Create one from the Pending tab.</p></div>'; return; }
+      const items = (list || [])
+        .filter(c => c.deadline && new Date(c.deadline) >= new Date())
+        .map(c => ({ title: c.title, deadline: c.deadline, type: c.type, link: null }));
+      // Published events feed the calendar — no manual item needed
+      (events || [])
+        .filter(e => e.date && new Date(e.date) >= new Date() && e.status === 'published')
+        .forEach(e => items.push({ title: e.title, deadline: e.date, type: 'event', link: '/events/' + (e.slug || e.id) }));
+      const upcoming = items.sort((a, b) => new Date(a.deadline) - new Date(b.deadline)).slice(0, 6);
+      if (!upcoming.length) { div.innerHTML = '<div class="empty-state"><h4>Nothing scheduled</h4><p>No upcoming events or calendar items.</p></div>'; return; }
       div.innerHTML = upcoming.map(c => {
         const dotClass = c.type === 'deadline' ? 'deadline' : (c.type === 'event' ? 'event' : 'other');
-        return `
-          <div class="cal-item">
+        const inner = `
             <div class="cal-dot ${dotClass}"></div>
             <div class="cal-item-text">${esc(c.title)}</div>
             <div class="cal-item-date">${new Date(c.deadline).toLocaleDateString('en', {month:'short', day:'numeric'})}</div>
-          </div>
-        `;
+          `;
+        return c.link ? `<a class="cal-item" href="${esc(c.link)}" style="text-decoration:none;color:inherit">${inner}</a>` : `<div class="cal-item">${inner}</div>`;
       }).join('');
     }
 
@@ -2659,6 +2667,20 @@
       }
     }
 
+    // All events visible to this user, cached — plotted on the pending calendar
+    // by event date (hollow dots) alongside submission-date dots.
+    let dashEventsCache = null;
+    let dashEventsLoading = false;
+    async function ensureDashEvents() {
+      if (dashEventsCache || dashEventsLoading) return;
+      dashEventsLoading = true;
+      try { dashEventsCache = await api.getEvents(); }
+      catch(e) { dashEventsCache = []; }
+      dashEventsLoading = false;
+      const cal = document.getElementById('pendingCalendar');
+      if (cal && document.getElementById('panel-pending')?.classList.contains('active')) renderPendingCalendar();
+    }
+
     function renderPending(pending) {
       allPendingData = pending;
       renderPendingCalendar();
@@ -2681,7 +2703,7 @@
       const daysInMonth = lastDay.getDate();
       const monthName = firstDay.toLocaleString('default', { month: 'long' });
 
-      // Group items by date
+      // Group items by date (submissions by created date…)
       const itemsByDate = {};
       allPendingData.forEach(item => {
         const d = (item.created_at || '').split(' ')[0];
@@ -2690,6 +2712,17 @@
           itemsByDate[d].push(item);
         }
       });
+      // …and events by their actual event date (hollow dots)
+      if (Array.isArray(dashEventsCache)) {
+        dashEventsCache.forEach(e => {
+          if (!e.date || ['cancelled'].includes(e.status)) return;
+          const d = String(e.date).split(' ')[0];
+          if (!itemsByDate[d]) itemsByDate[d] = [];
+          itemsByDate[d].push({ item_type: 'eventdate', title: e.title, id: e.id });
+        });
+      } else {
+        ensureDashEvents();
+      }
 
       let html = `
         <div class="cal-header">
@@ -2733,11 +2766,12 @@
       html += '</div>';
       html += `<div class="cal-legend">
         <span class="cal-legend-item"><span class="cal-day-dot article"></span> Article</span>
-        <span class="cal-legend-item"><span class="cal-day-dot event"></span> Event</span>
+        <span class="cal-legend-item"><span class="cal-day-dot event"></span> Event submitted</span>
+        <span class="cal-legend-item"><span class="cal-day-dot eventdate"></span> Event date</span>
         <span class="cal-legend-item"><span class="cal-day-dot document"></span> Document</span>
         <span class="cal-legend-item"><span class="cal-day-dot resolution"></span> Resolution</span>
         <span class="cal-legend-item"><span class="cal-day-dot assignment"></span> Assignment</span>
-      </div><p class="text-dim text-sm" style="margin:0.4rem 0 0">Dots mark submission dates — hover a day for titles.</p>`;
+      </div><p class="text-dim text-sm" style="margin:0.4rem 0 0">Solid dots mark submission dates, hollow dots mark event dates — hover a day for titles.</p>`;
 
       div.innerHTML = html;
     }
@@ -2866,6 +2900,17 @@
         out.push(`<button class="btn btn-outline btn-xs" onclick="showItemDetail('event', ${item.id}, 'preview')">Preview</button>`);
         if (api.hasCap('events.approve')) out.push(`<button class="btn btn-primary btn-xs" onclick="actOnItem('event', 'approve', ${item.id})">Approve</button>`);
         if (api.hasCap('events.publish')) out.push(`<button class="btn btn-outline btn-xs" onclick="actOnItem('event', 'publish', ${item.id})">Publish</button>`);
+        if (api.hasCap('events.approve')) out.push(`<button class="btn btn-outline btn-xs" onclick="rejectEventItem(${item.id})">Reject</button>`);
+      }
+      if (item.item_type === 'project' && (item.status === 'submitted' || item.status === 'draft')) {
+        if (api.hasCap('projects.approve')) out.push(`<button class="btn btn-primary btn-xs" onclick="actOnItem('project', 'approve', ${item.id})">Approve</button>`);
+        if (api.hasCap('projects.approve')) out.push(`<button class="btn btn-outline btn-xs" onclick="rejectProjectItem(${item.id})">Reject</button>`);
+      }
+      if (item.item_type === 'project' && item.status === 'approved') {
+        if (api.hasCap('projects.approve')) out.push(`<button class="btn btn-outline btn-xs" onclick="actOnItem('project', 'publish', ${item.id})">Publish</button>`);
+      }
+      if (item.item_type === 'programme' && item.status === 'draft') {
+        if (api.hasCap('programmes.manage')) out.push(`<button class="btn btn-primary btn-xs" onclick="actOnItem('programme', 'activate', ${item.id})">Activate</button>`);
       }
       if (item.item_type === 'document' && (item.status === 'submitted' || item.status === 'draft')) {
         if (api.hasCap('documents.approve')) out.push(`<button class="btn btn-primary btn-xs" onclick="actOnItem('document', 'approve', ${item.id})">Approve</button>`);
@@ -2900,8 +2945,11 @@
       if (type === 'resolution' && (action === 'for' || action === 'against' || action === 'abstain')) {
         if (!(await confirmVote(id, action))) return;
       }
-      if ((action === 'approve' || action === 'publish') && (type === 'article' || type === 'event' || type === 'document')) {
+      if ((action === 'approve' || action === 'publish') && (type === 'article' || type === 'event' || type === 'document' || type === 'project')) {
         if (!confirm(`${action === 'approve' ? 'Approve' : 'Publish'} this ${type}?${action === 'publish' ? ' It will become publicly visible.' : ''}`)) return;
+      }
+      if (type === 'programme' && action === 'activate') {
+        if (!confirm('Activate this programme? It will become publicly visible.')) return;
       }
       try {
         switch (type) {
@@ -2917,6 +2965,13 @@
             if (action === 'approve') await api.request('/documents/' + id + '/approve', { method: 'POST' });
             if (action === 'publish') await api.request('/documents/' + id + '/publish', { method: 'POST' });
             break;
+          case 'project':
+            if (action === 'approve') await api.approveProject(id);
+            if (action === 'publish') await api.publishProject(id);
+            break;
+          case 'programme':
+            if (action === 'activate') await api.activateProgramme(id);
+            break;
           case 'resolution':
             await api.castVote(id, action);
             break;
@@ -2924,14 +2979,39 @@
         const pending = await api.getPending();
         renderOverview(pending);
         renderPending(pending);
-        if ((action === 'approve' || action === 'publish') && (type === 'article' || type === 'event' || type === 'document')) {
+        if ((action === 'approve' || action === 'publish') && (type === 'article' || type === 'event' || type === 'document' || type === 'project')) {
           toast(`${type.charAt(0).toUpperCase() + type.slice(1)} ${action === 'approve' ? 'approved' : 'published'}`, 'success');
         }
+        if (type === 'programme' && action === 'activate') toast('Programme activated', 'success');
         if (type === 'resolution') {
           const resolutions = await api.getResolutions();
           renderResolutions(resolutions);
         }
       } catch(e) { toast(e.error || 'Action failed', 'error'); }
+    }
+
+    async function rejectEventItem(id) {
+      const reason = prompt('Rejection reason (shown to the organizer — the event returns to draft):');
+      if (reason === null || !reason.trim()) { if (reason !== null) toast('A reason is required', 'warning'); return; }
+      try {
+        await api.rejectEvent(id, reason.trim());
+        const pending = await api.getPending();
+        renderOverview(pending);
+        renderPending(pending);
+        toast('Event returned to draft', 'success');
+      } catch(e) { toast(e.error || 'Failed', 'error'); }
+    }
+
+    async function rejectProjectItem(id) {
+      const reason = prompt('Rejection reason (shown to the author):');
+      if (reason === null || !reason.trim()) { if (reason !== null) toast('A reason is required', 'warning'); return; }
+      try {
+        await api.rejectProject(id, reason.trim());
+        const pending = await api.getPending();
+        renderOverview(pending);
+        renderPending(pending);
+        toast('Project rejected', 'success');
+      } catch(e) { toast(e.error || 'Failed', 'error'); }
     }
 
     function renderResolutions(resolutions) {
@@ -3663,13 +3743,19 @@
       }
     }
 
+    // Programme management rights per programme (leads manage the projects,
+    // events and teams inside their programme — teams live in projects).
+    const PROG_PERMS = {};
+
     function renderMyProgrammes(list) {
       const container = document.getElementById('myProgrammes');
       container.innerHTML = list.map(p => {
+        PROG_PERMS[p.id] = { isLead: !!(p.is_lead || p.can_manage) };
         const leadBadge = p.is_lead ? '<span class="badge badge-active">Lead</span>' : '<span class="badge badge-inactive">Member</span>';
         const manageBadge = p.can_manage ? '<span class="cap-tag">Manager</span>' : '';
         const pendingBadge = p.pending_apps ? `<span class="badge badge-pending">${p.pending_apps} pending</span>` : '';
         const roleText = p.team_role ? `Your role: ${esc(p.team_role)}` : '';
+        const canEdit = p.is_lead || p.can_manage;
         return `
         <div class="dash-card" style="margin-bottom:1rem" id="prog-${p.id}">
           <div class="dash-card-header">
@@ -3678,20 +3764,19 @@
               <div class="text-dim text-sm" style="margin-top:0.25rem">${esc(stripHtml(p.description || '').slice(0,140))}</div>
               <div class="text-dim text-sm">${roleText}</div>
             </div>
-            <div style="display:flex; gap:0.5rem; align-items:flex-start">
+            <div style="display:flex; gap:0.5rem; align-items:flex-start; flex-wrap:wrap">
               <button class="btn btn-outline btn-xs" onclick="toggleProgDetails(${p.id})" id="prog-toggle-${p.id}">Manage</button>
-              <a class="btn btn-outline btn-xs" href="/programmes/${p.id}">View</a>
+              ${canEdit ? `<button class="btn btn-outline btn-xs" onclick="editProgrammeForm(${p.id})">Edit</button>` : ''}
+              <a class="btn btn-outline btn-xs" href="/programmes/${esc(p.slug || p.id)}">View</a>
             </div>
           </div>
           <div id="prog-details-${p.id}" style="display:none; padding-top:1rem; border-top:1px solid var(--border); margin-top:0.75rem">
             <div class="dash-tabs" style="margin-bottom:1rem">
-              <button class="dash-tab active" data-ptab="team" onclick="switchProgTab(${p.id}, 'team')">Team</button>
-              <button class="dash-tab" data-ptab="projects" onclick="switchProgTab(${p.id}, 'projects')">Projects</button>
-              <button class="dash-tab" data-ptab="events" onclick="switchProgTab(${p.id}, 'events')">Events</button>
+              <button class="dash-tab active" data-ptab="projects" onclick="switchProgTab(${p.id}, 'projects')">Projects & Teams</button>
+              <button class="dash-tab" data-ptab="events" onclick="switchProgTab(${p.id}, 'events')">Events & Attendance</button>
               ${p.is_lead || p.can_manage ? `<button class="dash-tab" data-ptab="applications" onclick="switchProgTab(${p.id}, 'applications')">Applications ${p.pending_apps ? '('+p.pending_apps+')' : ''}</button>` : ''}
             </div>
-            <div id="prog-team-${p.id}"><p class="text-dim">Loading team…</p></div>
-            <div id="prog-projects-${p.id}" style="display:none"></div>
+            <div id="prog-projects-${p.id}"><p class="text-dim">Loading projects…</p></div>
             <div id="prog-events-${p.id}" style="display:none"></div>
             <div id="prog-applications-${p.id}" style="display:none"></div>
           </div>
@@ -3706,105 +3791,112 @@
       const isHidden = details.style.display === 'none';
       details.style.display = isHidden ? '' : 'none';
       if (btn) btn.textContent = isHidden ? 'Hide' : 'Manage';
-      if (isHidden) {
-        // default to team tab
-        switchProgTab(pid, 'team');
-        loadProgTeam(pid);
-      }
+      if (isHidden) switchProgTab(pid, 'projects');
     }
 
     function switchProgTab(pid, tab) {
       const container = document.getElementById(`prog-details-${pid}`);
       if (!container) return;
       container.querySelectorAll('[data-ptab]').forEach(b => b.classList.toggle('active', b.dataset.ptab === tab));
-      ['team','projects','events','applications'].forEach(t => {
+      ['projects','events','applications'].forEach(t => {
         const el = document.getElementById(`prog-${t}-${pid}`);
         if (el) el.style.display = t === tab ? '' : 'none';
       });
-      if (tab === 'team') loadProgTeam(pid);
       if (tab === 'projects') loadProgProjects(pid);
       if (tab === 'events') loadProgEvents(pid);
       if (tab === 'applications') loadProgApplications(pid);
     }
 
-    async function loadProgTeam(pid) {
-      const box = document.getElementById(`prog-team-${pid}`);
+    // ── Project teams: participants with roles (the team lives in the project) ──
+    function progCanManage(pid) { return !!(PROG_PERMS[pid] && PROG_PERMS[pid].isLead); }
+
+    async function toggleProjParts(pid, projId) {
+      const box = document.getElementById(`proj-parts-${pid}-${projId}`);
+      const btn = document.getElementById(`proj-parts-btn-${pid}-${projId}`);
       if (!box) return;
-      box.innerHTML = '<p class="text-dim">Loading team…</p>';
+      const hidden = box.style.display === 'none';
+      box.style.display = hidden ? '' : 'none';
+      if (btn) btn.textContent = hidden ? 'Hide team' : 'Team';
+      if (hidden) loadProjParts(pid, projId);
+    }
+
+    async function loadProjParts(pid, projId) {
+      const box = document.getElementById(`proj-parts-${pid}-${projId}`);
+      if (!box) return;
+      box.innerHTML = '<p class="text-dim text-sm">Loading team…</p>';
       try {
-        const members = await api.request(`/programmes/${pid}/members`);
-        if (!members.length) {
-          box.innerHTML = '<div class="empty-state" style="padding:1rem"><p>No team members yet.</p></div>' + progAddMemberUI(pid);
-          return;
-        }
-        const rows = members.map(m => `
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid var(--border)">
-            <div style="display:flex; align-items:center; gap:0.75rem">
-              <div style="width:36px;height:36px;border-radius:50%;background:var(--accent-glow);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent)">${esc((m.user_name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase())}</div>
+        const parts = await api.getProjectParticipants(projId).catch(() => []);
+        const canEdit = progCanManage(pid);
+        const rows = parts.length ? parts.map(m => `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:0.45rem 0; border-bottom:1px solid var(--border)">
+            <div style="display:flex; align-items:center; gap:0.6rem">
+              <div style="width:30px;height:30px;border-radius:50%;background:var(--accent-glow);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.75rem;color:var(--accent)">${esc((m.user_name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase())}</div>
               <div>
-                <div style="font-weight:600; font-size:0.9rem">${esc(m.user_name)}</div>
-                <div class="text-dim text-sm">${esc(m.role_in_programme || 'Member')} · ${esc(m.user_email || '')}</div>
+                <div style="font-weight:600; font-size:0.85rem">${esc(m.user_name)}</div>
+                <div class="text-dim text-sm">${esc(m.role || 'Member')}</div>
               </div>
             </div>
-            <button class="btn btn-outline btn-xs" style="color:var(--danger)" onclick="removeProgMember(${pid}, ${m.user_id})">Remove</button>
-          </div>`).join('');
-        box.innerHTML = rows + progAddMemberUI(pid);
-      } catch (e) {
-        box.innerHTML = `<p class="text-dim">Failed to load team: ${esc(e.error || '')}</p>` + progAddMemberUI(pid);
-      }
+            ${canEdit ? `<div style="display:flex;gap:0.35rem;align-items:center">
+              <select onchange="changeProjRole(${pid}, ${projId}, ${m.user_id}, this.value)" style="padding:0.25rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);font-size:0.8rem">
+                ${['Member','Coordinator','Lead','Treasurer','Secretary','Volunteer'].map(r => `<option value="${r}"${(m.role||'Member')===r?' selected':''}>${r}</option>`).join('')}
+                ${!['Member','Coordinator','Lead','Treasurer','Secretary','Volunteer'].includes(m.role||'Member') ? `<option value="${esc(m.role)}" selected>${esc(m.role)} (custom)</option>` : ''}
+              </select>
+              <button class="btn btn-outline btn-xs" style="color:var(--danger)" onclick="removeProjParticipant(${pid}, ${projId}, ${m.user_id})">Remove</button>
+            </div>` : ''}
+          </div>`).join('') : '<p class="text-dim text-sm">No participants yet.</p>';
+        box.innerHTML = rows + (canEdit ? `
+          <div style="margin-top:0.6rem; padding:0.75rem; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius)">
+            <h6 style="margin:0 0 0.4rem; font-size:0.82rem">Add participant</h6>
+            <div style="display:flex; gap:0.4rem">
+              <input id="pp-search-${pid}-${projId}" placeholder="Search name or email" style="flex:1; padding:0.4rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-card); font-size:0.85rem">
+              <button class="btn btn-outline btn-sm" onclick="searchProjUser(${pid}, ${projId})">Search</button>
+            </div>
+            <div id="pp-results-${pid}-${projId}" style="margin-top:0.5rem"></div>
+            <div style="margin-top:0.5rem; display:flex; gap:0.4rem">
+              <input id="pp-role-${pid}-${projId}" placeholder="Role (e.g., Coordinator)" style="flex:1; padding:0.4rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-card); font-size:0.85rem">
+            </div>
+          </div>` : '');
+      } catch (e) { box.innerHTML = `<p class="text-dim text-sm">Failed to load team: ${esc(e.error || '')}</p>`; }
     }
 
-    function progAddMemberUI(pid) {
-      return `
-        <div style="margin-top:1rem; padding:1rem; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius)">
-          <h5 style="margin:0 0 0.5rem; font-size:0.9rem">Add team member</h5>
-          <div style="display:flex; gap:0.5rem">
-            <input id="prog-search-${pid}" placeholder="Search name or email (min 2 chars)" style="flex:1; padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-card)">
-            <button class="btn btn-outline btn-sm" onclick="searchProgUser(${pid})">Search</button>
-          </div>
-          <div id="prog-search-results-${pid}" style="margin-top:0.75rem"></div>
-          <div style="margin-top:0.75rem; display:flex; gap:0.5rem">
-            <input id="prog-role-${pid}" placeholder="Role (e.g., Coordinator)" style="flex:1; padding:0.5rem; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-card)">
-          </div>
-          <p class="text-dim text-sm" style="margin-top:0.5rem">Programme leads can add members directly. Others need programmes.manage capability.</p>
-        </div>`;
-    }
-
-    async function searchProgUser(pid) {
-      const q = (document.getElementById(`prog-search-${pid}`)?.value || '').trim();
-      const resultsBox = document.getElementById(`prog-search-results-${pid}`);
+    async function searchProjUser(pid, projId) {
+      const q = (document.getElementById(`pp-search-${pid}-${projId}`)?.value || '').trim();
+      const box = document.getElementById(`pp-results-${pid}-${projId}`);
       if (q.length < 2) { toast('Enter at least 2 characters','warning'); return; }
-      resultsBox.innerHTML = '<p class="text-dim">Searching…</p>';
+      box.innerHTML = '<p class="text-dim text-sm">Searching…</p>';
       try {
         const users = await api.request('/users/search?q=' + encodeURIComponent(q));
-        if (!users.length) { resultsBox.innerHTML = '<p class="text-dim">No users found</p>'; return; }
-        resultsBox.innerHTML = users.map(u => `
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem; border-bottom:1px solid var(--border)">
+        if (!users.length) { box.innerHTML = '<p class="text-dim text-sm">No users found</p>'; return; }
+        box.innerHTML = users.map(u => `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:0.4rem 0; border-bottom:1px solid var(--border); font-size:0.85rem">
             <span>${esc(u.name)} <span class="text-dim text-sm">${esc(u.email)}</span></span>
-            <button class="btn btn-primary btn-xs" onclick="addProgMember(${pid}, ${u.id})">Add</button>
+            <button class="btn btn-primary btn-xs" onclick="addProjParticipant(${pid}, ${projId}, ${u.id})">Add</button>
           </div>`).join('');
-      } catch (e) {
-        resultsBox.innerHTML = `<p class="text-dim">Search failed: ${esc(e.error || '')}</p>`;
-      }
+      } catch (e) { box.innerHTML = `<p class="text-dim text-sm">Search failed: ${esc(e.error || '')}</p>`; }
     }
 
-    async function addProgMember(pid, userId) {
-      const role = (document.getElementById(`prog-role-${pid}`)?.value || '').trim() || null;
+    async function addProjParticipant(pid, projId, userId) {
+      const role = (document.getElementById(`pp-role-${pid}-${projId}`)?.value || '').trim() || 'Member';
       try {
-        await api.request(`/programmes/${pid}/members`, { method: 'POST', body: { user_id: userId, role_in_programme: role } });
-        toast('Member added','success');
-        document.getElementById(`prog-search-${pid}`).value = '';
-        document.getElementById(`prog-search-results-${pid}`).innerHTML = '';
-        loadProgTeam(pid);
-      } catch (e) { toast(e.error || 'Failed to add member','error'); }
+        await api.addProjectParticipant(projId, userId, role);
+        toast('Participant added','success');
+        loadProjParts(pid, projId);
+      } catch (e) { toast(e.error || 'Failed to add participant','error'); }
     }
 
-    async function removeProgMember(pid, userId) {
-      if (!confirm('Remove this member from the programme team?')) return;
+    async function changeProjRole(pid, projId, userId, role) {
       try {
-        await api.request(`/programmes/${pid}/members/${userId}`, { method: 'DELETE' });
-        toast('Member removed','success');
-        loadProgTeam(pid);
+        await api.updateProjectParticipant(projId, userId, { role });
+        toast('Role updated','success');
+      } catch (e) { toast(e.error || 'Failed to update role','error'); loadProjParts(pid, projId); }
+    }
+
+    async function removeProjParticipant(pid, projId, userId) {
+      if (!confirm('Remove this participant from the project team?')) return;
+      try {
+        await api.removeProjectParticipant(projId, userId);
+        toast('Participant removed','success');
+        loadProjParts(pid, projId);
       } catch (e) { toast(e.error || 'Failed','error'); }
     }
 
@@ -3822,11 +3914,71 @@
         }
         box.innerHTML = filtered.map(pr => `
           <div class="wg-card" style="margin-bottom:0.5rem">
-            <h4 style="margin:0">${esc(pr.title)}</h4>
-            <p class="text-dim text-sm">${esc((pr.description||'').slice(0,120))}</p>
-            <div class="text-dim text-sm">Status: ${esc(pr.status)} ${pr.deadline ? '· Due: '+esc(pr.deadline) : ''}</div>
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem">
+              <div style="flex:1; min-width:0; cursor:pointer" onclick="showItemDetail('project', ${pr.id})">
+                <h4 style="margin:0">${esc(pr.title)} <span class="badge badge-${esc(pr.status)}" style="font-size:0.65rem">${esc(pr.status)}</span></h4>
+                <p class="text-dim text-sm">${esc(stripHtml(pr.description||'').slice(0,120))}</p>
+                <div class="text-dim text-sm">${pr.deadline ? 'Due: '+esc(pr.deadline) : ''}</div>
+              </div>
+              <button class="btn btn-outline btn-xs" id="proj-parts-btn-${pid}-${pr.id}" onclick="toggleProjParts(${pid}, ${pr.id})">Team</button>
+            </div>
+            <div id="proj-parts-${pid}-${pr.id}" style="display:none; margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border)"></div>
           </div>`).join('') + `<div style="margin-top:0.75rem"><button class="btn btn-outline btn-sm" onclick="switchTab('create'); showCreateForm('project', {programme_id: ${pid}})">New Project</button></div>`;
       } catch (e) { box.innerHTML = `<p class="text-dim">Failed: ${esc(e.error||'')}</p>`; }
+    }
+
+    // ── Event attendance: RSVPs + guests, managed per event ──
+    async function toggleEvAttend(pid, eventId) {
+      const box = document.getElementById(`ev-attend-${pid}-${eventId}`);
+      const btn = document.getElementById(`ev-attend-btn-${pid}-${eventId}`);
+      if (!box) return;
+      const hidden = box.style.display === 'none';
+      box.style.display = hidden ? '' : 'none';
+      if (btn) btn.textContent = hidden ? 'Hide attendance' : 'Attendance';
+      if (hidden) loadEvAttend(pid, eventId);
+    }
+
+    async function loadEvAttend(pid, eventId) {
+      const box = document.getElementById(`ev-attend-${pid}-${eventId}`);
+      if (!box) return;
+      box.innerHTML = '<p class="text-dim text-sm">Loading attendance…</p>';
+      try {
+        const rows = await api.getEventRsvps(eventId);
+        const members = rows.filter(r => !r.is_guest);
+        const guests = rows.filter(r => r.is_guest);
+        const attended = members.filter(r => r.status === 'attended').length;
+        box.innerHTML = `
+          <div class="text-dim text-sm" style="margin-bottom:0.4rem">${members.length} RSVPs (${attended} attended) · ${guests.length} guests</div>
+          ${members.map(r => `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:0.35rem 0; border-bottom:1px solid var(--border); font-size:0.85rem">
+              <span>${esc(r.name)} <span class="text-dim text-sm">${esc(r.status)}</span></span>
+              ${r.status !== 'attended' ? `<button class="btn btn-outline btn-xs" onclick="markEvAttended(${pid}, ${eventId}, ${r.id})">Mark attended</button>` : '<span class="cap-tag">attended</span>'}
+            </div>`).join('') || '<p class="text-dim text-sm">No member RSVPs.</p>'}
+          ${guests.map(g => `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:0.35rem 0; border-bottom:1px solid var(--border); font-size:0.85rem">
+              <span>${esc(g.name)} <span class="text-dim text-sm">${esc(g.email||'')} · guest</span></span>
+              <button class="btn btn-outline btn-xs" style="color:var(--danger)" onclick="removeEvGuest(${pid}, ${eventId}, ${g.id})">Remove</button>
+            </div>`).join('')}`;
+      } catch (e) {
+        box.innerHTML = `<p class="text-dim text-sm">Attendance list is restricted to the organizer and programme leads.</p>`;
+      }
+    }
+
+    async function markEvAttended(pid, eventId, regId) {
+      try {
+        await api.markAttended(eventId, regId);
+        toast('Marked attended','success');
+        loadEvAttend(pid, eventId);
+      } catch (e) { toast(e.error || 'Failed','error'); }
+    }
+
+    async function removeEvGuest(pid, eventId, guestId) {
+      if (!confirm('Remove this guest signup?')) return;
+      try {
+        await api.removeGuest(guestId);
+        toast('Guest removed','success');
+        loadEvAttend(pid, eventId);
+      } catch (e) { toast(e.error || 'Failed','error'); }
     }
 
     async function loadProgEvents(pid) {
@@ -3841,9 +3993,15 @@
           return;
         }
         box.innerHTML = events.map(ev => `
-          <div class="wg-card" style="margin-bottom:0.5rem; cursor:pointer" onclick="showItemDetail('event', ${ev.id})">
-            <h4 style="margin:0">${esc(ev.title)}</h4>
-            <div class="text-dim text-sm">${esc(ev.location||'TBA')} · ${new Date(ev.date).toLocaleDateString()} · ${esc(ev.status)}</div>
+          <div class="wg-card" style="margin-bottom:0.5rem">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem">
+              <div style="flex:1; min-width:0; cursor:pointer" onclick="showItemDetail('event', ${ev.id})">
+                <h4 style="margin:0">${esc(ev.title)} <span class="badge badge-${esc(ev.status)}" style="font-size:0.65rem">${esc(ev.status)}</span></h4>
+                <div class="text-dim text-sm">${esc(ev.location||'TBA')} · ${new Date(ev.date).toLocaleDateString()}</div>
+              </div>
+              <button class="btn btn-outline btn-xs" id="ev-attend-btn-${pid}-${ev.id}" onclick="toggleEvAttend(${pid}, ${ev.id})">Attendance</button>
+            </div>
+            <div id="ev-attend-${pid}-${ev.id}" style="display:none; margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border)"></div>
           </div>`).join('') + `<div style="margin-top:0.75rem"><button class="btn btn-outline btn-sm" onclick="switchTab('create'); showCreateForm('event', {programme_id: ${pid}})">New Event</button></div>`;
       } catch (e) { box.innerHTML = `<p class="text-dim">Failed: ${esc(e.error||'')}</p>`; }
     }
@@ -4454,12 +4612,15 @@
         if (type === 'article') {
           data = await api.request('/articles/' + id);
           const actions = [];
+          const isAuthor = api._user && (data.author_id === api._user.id || data.author_name === api._user.name);
+          const canEditArticle = api.hasCap('articles.approve') || (isAuthor && ['draft','submitted','rejected'].includes(data.status));
+          if (canEditArticle) actions.push(`<button class="btn btn-outline btn-sm" onclick="editArticleForm(${id})">Edit</button>`);
           if (data.status === 'submitted' || data.status === 'under_review') {
             if (api.hasCap('articles.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('article','approve',${id})">Approve</button>`);
             if (api.hasCap('articles.approve')) actions.push(`<button class="btn btn-danger btn-sm" onclick="modalRejectArticle(${id})">Reject</button>`);
           }
           if (data.status === 'approved' && api.hasCap('articles.publish')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('article','publish',${id})">Publish</button>`);
-          if (data.status === 'rejected' && api.hasCap('articles.edit') && data.author_name === api._user?.name) actions.push(`<button class="btn btn-outline btn-sm" onclick="modalAction('article','resubmit',${id})">Resubmit</button>`);
+          if (data.status === 'rejected' && isAuthor) actions.push(`<button class="btn btn-outline btn-sm" onclick="modalAction('article','resubmit',${id})">Revise & Resubmit</button>`);
 
           html = `
             ${viewToggle(type, id)}
@@ -4487,13 +4648,27 @@
 
         } else if (type === 'event') {
           data = await api.request('/events/' + id);
-          const rsvps = await api.getEventRsvps(id).catch(() => []);
+          const rsvps = await api.getEventRsvps(id).catch(() => null);
           const actions = [];
+          const isOwner = api._user && (data.organizer_id === api._user.id || data.created_by === api._user.id);
+          const canEditEvent = api.hasCap('events.approve') || (isOwner && !['completed','cancelled'].includes(data.status));
+          if (canEditEvent) actions.push(`<button class="btn btn-outline btn-sm" onclick="editEventForm(${id})">Edit</button>`);
           if (data.status === 'submitted') {
             if (api.hasCap('events.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('event','approve',${id})">Approve</button>`);
             if (api.hasCap('events.publish')) actions.push(`<button class="btn btn-outline btn-sm" onclick="modalAction('event','publish',${id})">Publish</button>`);
+            if (api.hasCap('events.approve')) actions.push(`<button class="btn btn-danger btn-sm" onclick="modalRejectEvent(${id})">Reject</button>`);
           }
+          if (data.status === 'draft' && data.rejection_reason && isOwner) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('event','resubmit',${id})">Revise & Resubmit</button>`);
           if (data.status === 'published' && api.hasCap('events.rsvp')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('event','rsvp',${id})">RSVP</button>`);
+          const attendHtml = rsvps ? `
+            <div class="field"><div class="field-label">Attendance (${rsvps.filter(r => !r.is_guest).length} RSVPs · ${rsvps.filter(r => r.is_guest).length} guests)</div>
+              <div style="max-height:160px;overflow-y:auto">${rsvps.map(r => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:0.3rem 0;border-bottom:1px solid var(--border);font-size:0.85rem">
+                  <span>${esc(r.name)}${r.is_guest ? ' <span class="cap-tag">guest</span>' : ''} <span class="text-dim">${esc(r.status)}</span></span>
+                  ${!r.is_guest && r.status !== 'attended' ? `<button class="btn btn-outline btn-xs" onclick="modalAttend(${id}, ${r.id})">Attended</button>` : ''}
+                  ${r.is_guest ? `<button class="btn btn-outline btn-xs" style="color:var(--danger)" onclick="modalRemoveGuest(${id}, ${r.id})">Remove</button>` : ''}
+                </div>`).join('') || '<p class="text-dim text-sm">No signups yet.</p>'}</div>
+            </div>` : '';
 
           html = `
             ${viewToggle(type, id)}
@@ -4518,7 +4693,8 @@
             <div class="field"><div class="field-label">Capacity</div>${data.capacity ? data.capacity + ' attendees' : 'Unlimited'}</div>
             ${data.image_url ? `<div class="field"><div class="field-label">Cover</div><img src="${esc(publicCover(data.image_url, ''))}" alt="" style="max-width:100%;border-radius:var(--radius);border:1px solid var(--border)"></div>` : ''}
             ${data.description ? `<div class="field"><div class="field-label">Description</div><div style="max-height:200px;overflow-y:auto;padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${data.description}</div></div>` : ''}
-            ${rsvps.length ? `<div class="field"><div class="field-label">RSVPs (${rsvps.length})</div><div style="max-height:120px;overflow-y:auto">${rsvps.map(r => `<div style="padding:0.25rem 0;font-size:0.85rem">• ${esc(r.user_name || r.name)} <span class="text-dim">${esc(r.status)}</span>${r.is_guest ? ' <span class="cap-tag">guest</span>' : ''}</div>`).join('')}</div></div>` : ''}`}
+            ${data.rejection_reason && data.status === 'draft' ? `<div class="field"><div class="field-label">Needs revision</div><div style="color:var(--danger);padding:0.5rem;background:rgba(185,28,28,0.05);border-radius:var(--radius)">${esc(data.rejection_reason)}</div></div>` : ''}
+            ${attendHtml}`}
             ${actions.length ? `<div class="modal-actions">${actions.join('')}</div>` : ''}
           `;
 
@@ -4542,13 +4718,17 @@
 
         } else if (type === 'project') {
           data = await api.request('/projects/' + id);
-          const events = await api.request('/events?project_id=' + id).catch(() => []);
+          const events = await api.getEvents({ project_id: id }).catch(() => []);
+          const parts = await api.getProjectParticipants(id).catch(() => []);
           const actions = [];
+          const isCreator = api._user && data.created_by === api._user.id;
+          if (api.hasCap('projects.approve') || isCreator) actions.push(`<button class="btn btn-outline btn-sm" onclick="editProjectForm(${id})">Edit</button>`);
           if (data.status === 'submitted' || data.status === 'draft') {
             if (api.hasCap('projects.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('project','approve',${id})">Approve</button>`);
             if (api.hasCap('projects.approve')) actions.push(`<button class="btn btn-danger btn-sm" onclick="modalRejectProject(${id})">Reject</button>`);
           }
           if (data.status === 'approved' && api.hasCap('projects.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('project','publish',${id})">Publish</button>`);
+          if (data.status === 'rejected') actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('project','resubmit',${id})">Revise & Resubmit</button>`);
 
           html = `
             ${viewToggle(type, id)}
@@ -4560,6 +4740,9 @@
             ${data.image_url ? `<div class="field"><div class="field-label">Cover</div><img src="${esc(publicCover(data.image_url, ''))}" alt="" style="max-width:100%;border-radius:var(--radius);border:1px solid var(--border)"></div>` : ''}
             ${data.description ? `<div class="field"><div class="field-label">Description</div><div style="max-height:200px;overflow-y:auto;padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${data.description}</div></div>` : ''}
             ${data.objectives ? `<div class="field"><div class="field-label">Objectives</div><div style="max-height:200px;overflow-y:auto;padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${data.objectives}</div></div>` : ''}
+            <div class="field"><div class="field-label">Team (${parts.length})</div>
+              ${parts.length ? `<div style="max-height:150px;overflow-y:auto">${parts.map(m => `<div style="padding:0.3rem 0;font-size:0.85rem;display:flex;justify-content:space-between;border-bottom:1px solid var(--border)"><span>${esc(m.user_name)}</span><span class="cap-tag">${esc(m.role || 'Member')}</span></div>`).join('')}</div>` : '<p class="text-dim text-sm">No participants yet — leads manage the team from My Programmes.</p>'}
+            </div>
             ${events.length ? `<div class="field"><div class="field-label">Events (${events.length})</div><div style="max-height:150px;overflow-y:auto">${events.map(e => `<div style="padding:0.25rem 0;font-size:0.85rem">• ${esc(e.title)} <span class="badge badge-${esc(e.status)}">${esc(e.status)}</span></div>`).join('')}</div></div>` : ''}
             ${data.rejection_reason ? `<div class="field"><div class="field-label">Rejection Reason</div><div style="color:var(--danger);padding:0.5rem;background:rgba(185,28,28,0.05);border-radius:var(--radius)">${esc(data.rejection_reason)}</div></div>` : ''}
             ${actions.length ? `<div class="modal-actions">${actions.join('')}</div>` : ''}
@@ -4637,6 +4820,8 @@
         } else if (type === 'working_group') {
           data = await api.request('/working-groups/' + id);
           const members = await api.getWorkingGroupMembers(id).catch(() => []);
+          const wgActions = [];
+          if (api.hasCap('roles.manage')) wgActions.push(`<button class="btn btn-outline btn-sm" onclick="editGroupForm(${id})">Edit</button>`);
           html = `
             <div class="field"><div class="field-label">Type</div><span class="wg-badge ${data.type === 'committee' ? 'committee' : (data.type === 'task_force' ? 'task_force' : '')}">${esc(data.type?.replace('_', ' '))}</span></div>
             <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
@@ -4647,6 +4832,22 @@
             <div class="field"><div class="field-label">Members (${members.length})</div>
               ${members.length ? `<div style="max-height:150px;overflow-y:auto">${members.map(m => `<div style="padding:0.35rem 0;font-size:0.88rem;display:flex;justify-content:space-between;border-bottom:1px solid var(--border)"><span>${esc(m.user_name)}</span><span class="cap-tag">${esc(m.role)}</span></div>`).join('')}</div>` : '<p class="text-dim text-sm">No members yet</p>'}
             </div>
+            ${wgActions.length ? `<div class="modal-actions">${wgActions.join('')}</div>` : ''}
+          `;
+
+        } else if (type === 'programme') {
+          data = await api.getProgramme(id);
+          const actions = [];
+          if (api.hasCap('programmes.manage')) actions.push(`<button class="btn btn-outline btn-sm" onclick="editProgrammeForm(${id})">Edit</button>`);
+          if (data.status === 'draft' && api.hasCap('programmes.manage')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('programme','activate',${id})">Activate</button>`);
+          html = `
+            <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
+            <div class="field"><div class="field-label">Proposed by</div>${esc(data.creator_name || 'Unknown')}</div>
+            <div class="field"><div class="field-label">Created</div>${data.created_at ? new Date(data.created_at).toLocaleDateString('en', {year:'numeric',month:'long',day:'numeric'}) : '—'}</div>
+            <div class="field"><div class="field-label">Contents</div><span class="cap-tag">${data.project_count || 0} projects</span> <span class="cap-tag">${data.event_count || 0} events</span></div>
+            ${data.description ? `<div class="field"><div class="field-label">Description</div><div style="max-height:200px;overflow-y:auto;padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${data.description}</div></div>` : ''}
+            ${data.objectives ? `<div class="field"><div class="field-label">Objectives</div><div style="padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${esc(data.objectives)}</div></div>` : ''}
+            ${actions.length ? `<div class="modal-actions">${actions.join('')}</div>` : ''}
           `;
         }
 
@@ -4658,21 +4859,29 @@
       if ((action === 'approve' || action === 'publish') && (type === 'article' || type === 'event' || type === 'document' || type === 'project')) {
         if (!confirm(`${action === 'approve' ? 'Approve' : 'Publish'} this ${type}?${action === 'publish' ? ' It will become publicly visible.' : ''}`)) return;
       }
+      if (action === 'resubmit') {
+        if (!confirm('Resubmit this item for approval?')) return;
+      }
       try {
         let done = 'Action completed';
         if (type === 'article') {
           if (action === 'approve') await api.approveArticle(id);
           if (action === 'publish') await api.publishArticle(id);
+          if (action === 'resubmit') { await api.resubmitArticle(id); done = 'Article resubmitted for review'; }
         } else if (type === 'event') {
           if (action === 'approve') await api.approveEvent(id);
           if (action === 'publish') await api.publishEvent(id);
           if (action === 'rsvp') await api.rsvpEvent(id);
+          if (action === 'resubmit') { await api.resubmitEvent(id); done = 'Event resubmitted for approval'; }
         } else if (type === 'document') {
           if (action === 'approve') await api.request('/documents/' + id + '/approve', { method: 'POST' });
           if (action === 'publish') await api.request('/documents/' + id + '/publish', { method: 'POST' });
         } else if (type === 'project') {
           if (action === 'approve') await api.request('/projects/' + id + '/approve', { method: 'POST' });
           if (action === 'publish') await api.request('/projects/' + id + '/publish', { method: 'POST' });
+          if (action === 'resubmit') { await api.resubmitProject(id); done = 'Project resubmitted for approval'; }
+        } else if (type === 'programme') {
+          if (action === 'activate') { await api.activateProgramme(id); done = 'Programme activated — now publicly visible'; }
         } else if (type === 'resolution') {
           if (action === 'submit') { await api.submitResolution(id); done = 'Resolution submitted for voting'; }
           if (action === 'begin_voting') { await api.beginVoting(id); done = 'Voting is now open'; }
@@ -4687,6 +4896,33 @@
         closeModal(); toast(done, 'success');
         load();
       } catch(e) { toast(e.error || 'Action failed', 'error'); }
+    }
+
+    async function modalRejectEvent(id) {
+      const reason = prompt('Rejection reason (shown to the organizer — the event returns to draft for revision):');
+      if (reason === null || !reason.trim()) { if (reason !== null) toast('A reason is required', 'warning'); return; }
+      try {
+        await api.rejectEvent(id, reason.trim());
+        closeModal(); toast('Event returned to draft', 'success');
+        load();
+      } catch(e) { toast(e.error || 'Failed', 'error'); }
+    }
+
+    async function modalAttend(eventId, regId) {
+      try {
+        await api.markAttended(eventId, regId);
+        toast('Marked attended', 'success');
+        showItemDetail('event', eventId);
+      } catch(e) { toast(e.error || 'Failed', 'error'); }
+    }
+
+    async function modalRemoveGuest(eventId, guestId) {
+      if (!confirm('Remove this guest signup?')) return;
+      try {
+        await api.removeGuest(guestId);
+        toast('Guest removed', 'success');
+        showItemDetail('event', eventId);
+      } catch(e) { toast(e.error || 'Failed', 'error'); }
     }
 
     async function modalVote(id, value) {
@@ -4716,6 +4952,133 @@
         closeModal(); toast('Project rejected', 'success');
         load();
       } catch(e) { toast(e.error || 'Failed', 'error'); }
+    }
+
+    // ── Edit forms (prefilled create forms → PUT; backend enforces permissions) ──
+    async function editArticleForm(id) {
+      try {
+        const a = await api.request('/articles/' + id);
+        const fields = [
+          { name: 'title', label: 'Title', type: 'text', required: true, value: a.title || '' },
+          { name: 'category', label: 'Category', type: 'select', required: true, value: a.category || 'article', options: [
+            { label: 'Article', value: 'article' },
+            { label: 'Observing Report', value: 'observing_report' },
+            { label: 'Educational', value: 'educational' },
+            { label: 'Announcement', value: 'announcement' },
+          ]},
+          { name: 'body', label: 'Body', type: 'rich-text', required: true, value: a.body || '' },
+          { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image', value: a.image_url || '' },
+        ];
+        openModal('Edit Article', FormBuilder.render(fields, { id: 'edit-article', submitLabel: 'Save Changes' }));
+        FormBuilder.init('edit-article', fields, async (data) => {
+          await api.updateArticle(id, data);
+          closeModal(); toast('Article updated', 'success');
+          showItemDetail('article', id);
+        });
+      } catch(e) { toast(e.error || 'Failed to load article', 'error'); }
+    }
+
+    async function editEventForm(id) {
+      try {
+        const [e, progs] = await Promise.all([
+          api.request('/events/' + id),
+          api.getProgrammes().catch(() => []),
+        ]);
+        const dt = v => v ? String(v).replace(' ', 'T').slice(0, 16) : '';
+        const progOpts = [{ label: '— None —', value: '' }];
+        (progs || []).forEach(p => progOpts.push({ label: p.title, value: p.id }));
+        const fields = [
+          { name: 'title', label: 'Title', type: 'text', required: true, value: e.title || '' },
+          { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts, value: e.programme_id || '' },
+          { name: 'date', label: 'Start Date & Time', type: 'datetime-local', required: true, value: dt(e.date) },
+          { name: 'end_date', label: 'End Date & Time', type: 'datetime-local', value: dt(e.end_date) },
+          { name: 'location', label: 'Location', type: 'text', value: e.location || '' },
+          { name: 'capacity', label: 'Capacity', type: 'number', min: 0, value: e.capacity || '', help: 'Leave blank for open attendance' },
+          { name: 'description', label: 'Description', type: 'rich-text', required: true, value: e.description || '' },
+          { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image', value: e.image_url || '' },
+        ];
+        openModal('Edit Event', FormBuilder.render(fields, { id: 'edit-event', submitLabel: 'Save Changes' }));
+        FormBuilder.init('edit-event', fields, async (data) => {
+          if (data.end_date && data.date && data.end_date <= data.date) throw { error: 'End date must be after the start date' };
+          await api.updateEvent(id, data);
+          closeModal(); toast('Event updated', 'success');
+          showItemDetail('event', id);
+        });
+      } catch(e) { toast(e.error || 'Failed to load event', 'error'); }
+    }
+
+    async function editProjectForm(id) {
+      try {
+        const [p, progs] = await Promise.all([
+          api.getProject(id),
+          api.getProgrammes().catch(() => []),
+        ]);
+        const progOpts = [{ label: '— None —', value: '' }];
+        (progs || []).forEach(g => progOpts.push({ label: g.title, value: g.id }));
+        const fields = [
+          { name: 'title', label: 'Title', type: 'text', required: true, value: p.title || '' },
+          { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts, value: p.programme_id || '' },
+          { name: 'description', label: 'Description', type: 'textarea', rows: 4, required: true, value: stripHtml(p.description || '') },
+          { name: 'objectives', label: 'Objectives', type: 'textarea', rows: 3, value: stripHtml(p.objectives || '') },
+          { name: 'deadline', label: 'Deadline', type: 'date', value: p.deadline || '' },
+        ];
+        openModal('Edit Project', FormBuilder.render(fields, { id: 'edit-project', submitLabel: 'Save Changes' }));
+        FormBuilder.init('edit-project', fields, async (data) => {
+          await api.updateProject(id, data);
+          closeModal(); toast('Project updated', 'success');
+          showItemDetail('project', id);
+        });
+      } catch(e) { toast(e.error || 'Failed to load project', 'error'); }
+    }
+
+    async function editGroupForm(id) {
+      try {
+        const [g, progs] = await Promise.all([
+          api.request('/working-groups/' + id),
+          api.getProgrammes().catch(() => []),
+        ]);
+        const progOpts = [{ label: '— None —', value: '' }];
+        (progs || []).forEach(p => progOpts.push({ label: p.title, value: p.id }));
+        const fields = [
+          { name: 'name', label: 'Name', type: 'text', required: true, value: g.name || '' },
+          { name: 'type', label: 'Type', type: 'select', value: g.type || 'working_group', options: [
+            { label: 'Working Group', value: 'working_group' },
+            { label: 'Committee', value: 'committee' },
+            { label: 'Task Force', value: 'task_force' },
+          ]},
+          { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts, value: g.programme_id || '' },
+          { name: 'description', label: 'Description', type: 'textarea', rows: 3, value: g.description || '' },
+          { name: 'status', label: 'Status', type: 'select', value: g.status || 'active', options: [
+            { label: 'Active', value: 'active' },
+            { label: 'Inactive', value: 'inactive' },
+          ]},
+        ];
+        openModal('Edit Group', FormBuilder.render(fields, { id: 'edit-group', submitLabel: 'Save Changes' }));
+        FormBuilder.init('edit-group', fields, async (data) => {
+          await api.request('/working-groups/' + id, { method: 'PUT', body: data });
+          closeModal(); toast('Group updated', 'success');
+          showItemDetail('working_group', id);
+        });
+      } catch(e) { toast(e.error || 'Failed to load group', 'error'); }
+    }
+
+    async function editProgrammeForm(id) {
+      try {
+        const p = await api.getProgramme(id);
+        const fields = [
+          { name: 'title', label: 'Title', type: 'text', required: true, value: p.title || '' },
+          { name: 'description', label: 'Description', type: 'rich-text', required: true, value: p.description || '' },
+          { name: 'objectives', label: 'Objectives', type: 'textarea', rows: 3, value: stripHtml(p.objectives || '') },
+          { name: 'outputs', label: 'Expected Outputs', type: 'textarea', rows: 3, value: stripHtml(p.outputs || '') },
+          { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image', value: p.image_url || '' },
+        ];
+        openModal('Edit Programme', FormBuilder.render(fields, { id: 'edit-programme', submitLabel: 'Save Changes' }));
+        FormBuilder.init('edit-programme', fields, async (data) => {
+          await api.updateProgramme(id, data);
+          closeModal(); toast('Programme updated', 'success');
+          loadMyProgrammes();
+        });
+      } catch(e) { toast(e.error || 'Failed to load programme', 'error'); }
     }
 
     async function modalAssignmentSubmit(id) {

@@ -1313,14 +1313,30 @@ try {
       ->execute([$data['title'], $slug, $data['description'] ?? null, $data['objectives'] ?? null, clean_image_url($data['image_url'] ?? null), $user['id']]);
     $id = (int) db()->lastInsertId();
     audit_log('programme_create', 'programme', $id);
+    notify_capability('programmes.approve', 'programme_submitted', 'Programme awaiting activation: ' . $data['title'], 'Proposed by ' . $user['name'] . '. Review and activate it from Pending.', '/dashboard');
     json_response(['id' => $id, 'slug' => $slug], 201);
+  }
+  elseif (preg_match('#^/programmes/(\d+)$#', $path, $m) && $method === 'GET') {
+    require_login();
+    $pid = (int) $m[1];
+    $stmt = db()->prepare('SELECT p.*, u.name AS creator_name FROM programmes p LEFT JOIN users u ON u.id = p.created_by WHERE p.id = ?');
+    $stmt->execute([$pid]);
+    $prog = $stmt->fetch();
+    if (!$prog) json_error('Programme not found', 404);
+    $s = db()->prepare('SELECT COUNT(*) FROM projects WHERE programme_id = ?');
+    $s->execute([$pid]);
+    $prog['project_count'] = (int) $s->fetchColumn();
+    $s = db()->prepare('SELECT COUNT(*) FROM events WHERE programme_id = ?');
+    $s->execute([$pid]);
+    $prog['event_count'] = (int) $s->fetchColumn();
+    json_response($prog);
   }
 
   // --- MY PROGRAMMES: teams the user belongs to or leads (for dashboard) ---
   elseif ($path === '/programmes/mine' && $method === 'GET') {
     $user = require_login();
     $uid = (int) $user['id'];
-    $stmt = db()->prepare('SELECT p.id, p.title, p.description, p.status, p.image_url, p.category FROM programmes p WHERE p.status = "active" ORDER BY p.title');
+    $stmt = db()->prepare('SELECT p.id, p.title, p.slug, p.description, p.status, p.image_url, p.category FROM programmes p WHERE p.status = "active" ORDER BY p.title');
     $stmt->execute();
     $mine = [];
     foreach ($stmt->fetchAll() as $p) {
@@ -1363,10 +1379,16 @@ try {
     $stmt->execute([$pid]);
     $proj = $stmt->fetch();
     if (!$proj) json_error('Project not found', 404);
-    // attach events for detail
+    // attach events count for detail
     $s = db()->prepare('SELECT id, title, slug, date, location, status FROM events WHERE project_id = ? ORDER BY date');
-    $s->execute([$pid]);
+    $s->execute([$proj['id']]);
     $proj['events'] = $s->fetchAll();
+    // attach the team: active participants with their roles
+    try {
+      $s = db()->prepare('SELECT pp.role, u.name AS user_name FROM project_participants pp JOIN users u ON u.id = pp.user_id WHERE pp.project_id = ? AND pp.status = "active" ORDER BY u.name');
+      $s->execute([$proj['id']]);
+      $proj['participants'] = $s->fetchAll();
+    } catch (Exception $e) { $proj['participants'] = []; }
     json_response($proj);
   }
   elseif ($path === '/projects' && $method === 'POST') {
@@ -1393,11 +1415,17 @@ try {
     $pid = (int) $m[1];
     // Check global projects.approve OR scoped to the project's programme OR programme lead
     $user = require_login();
-    $stmt = db()->prepare('SELECT programme_id FROM projects WHERE id = ?');
+    $stmt = db()->prepare('SELECT programme_id, status FROM projects WHERE id = ?');
     $stmt->execute([$pid]);
-    $progId = $stmt->fetchColumn();
+    $chk = $stmt->fetch();
+    $progId = $chk ? $chk['programme_id'] : null;
     if (!user_has_cap($user['id'], 'projects.approve') && !($progId && user_has_cap($user['id'], 'projects.approve', 'programme', (int)$progId)) && !($progId && is_programme_lead($user['id'], (int)$progId))) {
       json_error('Insufficient permissions: projects.approve', 403);
+    }
+    // Approving a draft pulls it into review as-is
+    if ($chk && $chk['status'] === 'draft') {
+      db()->prepare("INSERT INTO workflow_states (object_type, object_id, state, assignee_id, notes) VALUES ('project', ?, 'submitted', ?, 'submitted on approval')")->execute([$pid, $user['id']]);
+      update_object_status('project', $pid, 'submitted');
     }
     transition('project', $pid, 'approved', $user['id']);
     $stmt = db()->prepare('SELECT created_by, title FROM projects WHERE id = ?');
@@ -1422,13 +1450,111 @@ try {
     $reason = trim($data['reason'] ?? '');
     if (!$reason) json_error('A rejection reason is required', 400);
     $pid = (int) $m[1];
+    $chk = db()->prepare('SELECT status FROM projects WHERE id = ?');
+    $chk->execute([$pid]);
+    if (!in_array($chk->fetchColumn(), ['submitted', 'draft'], true)) json_error('Only submitted or draft projects can be rejected', 400);
     db()->prepare("UPDATE projects SET status = 'rejected', rejection_reason = ?, approved_by = ?, approved_at = NOW() WHERE id = ?")
       ->execute([$reason, $user['id'], $pid]);
+    sync_state('project', $pid, 'rejected', $user['id'], 'rejected with feedback');
     audit_log('project_reject', 'project', $pid, ['reason' => $reason]);
     $stmt = db()->prepare('SELECT created_by, title FROM projects WHERE id = ?');
     $stmt->execute([$pid]);
     $proj = $stmt->fetch();
     if ($proj) notify_user((int) $proj['created_by'], 'project_rejected', 'Project not approved: ' . $proj['title'], 'Reason: ' . $reason, '/dashboard');
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/projects/(\d+)/resubmit$#', $path, $m) && $method === 'POST') {
+    $user = require_login();
+    $pid = (int) $m[1];
+    $stmt = db()->prepare('SELECT * FROM projects WHERE id = ?');
+    $stmt->execute([$pid]);
+    $proj = $stmt->fetch();
+    if (!$proj) json_error('Project not found', 404);
+    if (!can_manage_project($user['id'], $proj)) json_error('Insufficient permissions: cannot resubmit this project', 403);
+    if ($proj['status'] !== 'rejected') json_error('Only rejected projects can be resubmitted', 400);
+    sync_state('project', $pid, 'rejected', $user['id']);
+    transition('project', $pid, 'draft', $user['id']);
+    transition('project', $pid, 'submitted', $user['id']);
+    audit_log('project_resubmit', 'project', $pid);
+    notify_capability('projects.approve', 'project_submitted', 'Project resubmitted: ' . $proj['title'], 'Revised by ' . $user['name'] . '.', '/admin?tab=projects');
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/projects/(\d+)$#', $path, $m) && $method === 'PUT') {
+    $user = require_login();
+    $pid = (int) $m[1];
+    $stmt = db()->prepare('SELECT * FROM projects WHERE id = ?');
+    $stmt->execute([$pid]);
+    $proj = $stmt->fetch();
+    if (!$proj) json_error('Project not found', 404);
+    if (!can_manage_project($user['id'], $proj)) json_error('Insufficient permissions: cannot edit this project', 403);
+    $data = input_json();
+    $sets = []; $args = [];
+    foreach (['title', 'description', 'objectives', 'deadline', 'programme_id'] as $f) {
+      if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = ($data[$f] === '' ? null : $data[$f]); }
+    }
+    if (array_key_exists('slug', $data) && $data['slug'] !== null && $data['slug'] !== '') { $sets[] = 'slug = ?'; $args[] = makeSlug($data['slug'], 'projects', $pid); }
+    if (!$sets) json_error('Nothing to update', 400);
+    $args[] = $pid;
+    db()->prepare('UPDATE projects SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($args);
+    audit_log('project_update', 'project', $pid);
+    json_response(['ok' => true]);
+  }
+  // --- PROJECT PARTICIPANTS (the team lives in the project) ---
+  elseif (preg_match('#^/projects/(\d+)/participants$#', $path, $m) && $method === 'GET') {
+    require_login();
+    $pid = (int) $m[1];
+    $stmt = db()->prepare('SELECT pp.*, u.name AS user_name, u.email AS user_email FROM project_participants pp JOIN users u ON u.id = pp.user_id WHERE pp.project_id = ? AND pp.status = "active" ORDER BY u.name');
+    $stmt->execute([$pid]);
+    json_response($stmt->fetchAll());
+  }
+  elseif (preg_match('#^/projects/(\d+)/participants$#', $path, $m) && $method === 'POST') {
+    $user = require_login();
+    $pid = (int) $m[1];
+    $stmt = db()->prepare('SELECT * FROM projects WHERE id = ?');
+    $stmt->execute([$pid]);
+    $proj = $stmt->fetch();
+    if (!$proj) json_error('Project not found', 404);
+    if (!can_manage_project($user['id'], $proj)) json_error('Insufficient permissions: cannot manage this project team', 403);
+    $data = input_json();
+    if (empty($data['user_id'])) json_error('user_id is required', 400);
+    $stmt = db()->prepare('SELECT id FROM users WHERE id = ? AND status = "active"');
+    $stmt->execute([(int) $data['user_id']]);
+    if (!$stmt->fetch()) json_error('User not found or not active', 404);
+    db()->prepare('INSERT INTO project_participants (project_id, user_id, role, status) VALUES (?, ?, ?, "active")
+      ON DUPLICATE KEY UPDATE role = VALUES(role), status = "active"')
+      ->execute([$pid, (int) $data['user_id'], trim($data['role'] ?? '') ?: 'Member']);
+    audit_log('project_participant_add', 'project', $pid, ['user_id' => (int) $data['user_id']]);
+    notify_user((int) $data['user_id'], 'project_participant_add', 'Added to project: ' . $proj['title'], 'You were added to the project team' . (!empty($data['role']) ? ' as ' . $data['role'] : '') . '.', '/project/' . $pid);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/projects/(\d+)/participants/(\d+)$#', $path, $m) && $method === 'PATCH') {
+    $user = require_login();
+    $pid = (int) $m[1]; $uid = (int) $m[2];
+    $stmt = db()->prepare('SELECT * FROM projects WHERE id = ?');
+    $stmt->execute([$pid]);
+    $proj = $stmt->fetch();
+    if (!$proj) json_error('Project not found', 404);
+    if (!can_manage_project($user['id'], $proj)) json_error('Insufficient permissions: cannot manage this project team', 403);
+    $data = input_json();
+    $sets = []; $args = [];
+    if (array_key_exists('role', $data)) { $sets[] = 'role = ?'; $args[] = trim($data['role']) ?: 'Member'; }
+    if (array_key_exists('status', $data) && in_array($data['status'], ['active', 'inactive'], true)) { $sets[] = 'status = ?'; $args[] = $data['status']; }
+    if (!$sets) json_error('Nothing to update', 400);
+    $args[] = $pid; $args[] = $uid;
+    db()->prepare('UPDATE project_participants SET ' . implode(', ', $sets) . ' WHERE project_id = ? AND user_id = ?')->execute($args);
+    audit_log('project_participant_update', 'project', $pid, ['user_id' => $uid]);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/projects/(\d+)/participants/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    $user = require_login();
+    $pid = (int) $m[1]; $uid = (int) $m[2];
+    $stmt = db()->prepare('SELECT * FROM projects WHERE id = ?');
+    $stmt->execute([$pid]);
+    $proj = $stmt->fetch();
+    if (!$proj) json_error('Project not found', 404);
+    if (!can_manage_project($user['id'], $proj)) json_error('Insufficient permissions: cannot manage this project team', 403);
+    db()->prepare('DELETE FROM project_participants WHERE project_id = ? AND user_id = ?')->execute([$pid, $uid]);
+    audit_log('project_participant_remove', 'project', $pid, ['user_id' => $uid]);
     json_response(['ok' => true]);
   }
 
@@ -1438,6 +1564,7 @@ try {
     $where = [];
     $params = [];
     if (!empty($_GET['programme_id'])) { $where[] = 'e.programme_id = ?'; $params[] = (int) $_GET['programme_id']; }
+    if (!empty($_GET['project_id'])) { $where[] = 'e.project_id = ?'; $params[] = (int) $_GET['project_id']; }
     if (!empty($_GET['status'])) { $where[] = 'e.status = ?'; $params[] = $_GET['status']; }
     $sql = 'SELECT e.*, u.name AS organizer_name, pr.title AS programme_title FROM events e LEFT JOIN users u ON u.id = e.organizer_id LEFT JOIN programmes pr ON pr.id = e.programme_id';
     if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
@@ -1477,7 +1604,82 @@ try {
     if (!user_has_cap($user['id'], 'events.approve') && !($progId && user_has_cap($user['id'], 'events.approve', 'programme', (int)$progId))) {
       json_error('Insufficient permissions: events.approve', 403);
     }
+    // Approving a draft pulls it into review as-is
+    $st = db()->prepare('SELECT status FROM events WHERE id = ?');
+    $st->execute([$eid]);
+    if ($st->fetchColumn() === 'draft') {
+      db()->prepare("INSERT INTO workflow_states (object_type, object_id, state, assignee_id, notes) VALUES ('event', ?, 'submitted', ?, 'submitted on approval')")->execute([$eid, $user['id']]);
+      update_object_status('event', $eid, 'submitted');
+    }
     transition('event', $eid, 'approved', $user['id']);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/events/(\d+)/reject$#', $path, $m) && $method === 'POST') {
+    $eid = (int) $m[1];
+    $user = require_login();
+    $stmt = db()->prepare('SELECT programme_id, organizer_id, title, status FROM events WHERE id = ?');
+    $stmt->execute([$eid]);
+    $ev = $stmt->fetch();
+    if (!$ev) json_error('Event not found', 404);
+    $progId = $ev['programme_id'];
+    if (!user_has_cap($user['id'], 'events.approve') && !($progId && user_has_cap($user['id'], 'events.approve', 'programme', (int)$progId))) {
+      json_error('Insufficient permissions: events.approve', 403);
+    }
+    $data = input_json();
+    $reason = trim($data['reason'] ?? '');
+    if (!$reason) json_error('A rejection reason is required', 400);
+    if ($ev['status'] !== 'submitted') json_error('Only submitted events can be rejected', 400);
+    db()->prepare("UPDATE events SET status = 'draft', rejection_reason = ?, approved_by = ?, approved_at = NOW() WHERE id = ?")
+      ->execute([$reason, $user['id'], $eid]);
+    sync_state('event', $eid, 'draft', $user['id'], 'returned for revision');
+    audit_log('event_reject', 'event', $eid, ['reason' => $reason]);
+    if ($ev['organizer_id']) notify_user((int) $ev['organizer_id'], 'event_rejected', 'Event needs revision: ' . $ev['title'], 'Reason: ' . $reason . ' Edit the event and resubmit for approval.', '/dashboard');
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/events/(\d+)/resubmit$#', $path, $m) && $method === 'POST') {
+    $user = require_login();
+    $eid = (int) $m[1];
+    $stmt = db()->prepare('SELECT * FROM events WHERE id = ?');
+    $stmt->execute([$eid]);
+    $ev = $stmt->fetch();
+    if (!$ev) json_error('Event not found', 404);
+    if ((int) $ev['organizer_id'] !== (int) $user['id'] && (int) $ev['created_by'] !== (int) $user['id']) json_error('Only the organizer can resubmit this event', 403);
+    if ($ev['status'] !== 'draft') json_error('Only draft events can be resubmitted', 400);
+    sync_state('event', $eid, 'draft', $user['id']);
+    transition('event', $eid, 'submitted', $user['id']);
+    audit_log('event_resubmit', 'event', $eid);
+    notify_capability('events.approve', 'event_submitted', 'Event resubmitted: ' . $ev['title'], 'Revised by ' . $user['name'] . '.', '/admin?tab=events');
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/events/(\d+)$#', $path, $m) && $method === 'PUT') {
+    $user = require_login();
+    $eid = (int) $m[1];
+    $stmt = db()->prepare('SELECT * FROM events WHERE id = ?');
+    $stmt->execute([$eid]);
+    $ev = $stmt->fetch();
+    if (!$ev) json_error('Event not found', 404);
+    $progId = $ev['programme_id'] ? (int) $ev['programme_id'] : null;
+    $isApprover = user_has_cap($user['id'], 'events.approve') || ($progId && user_has_cap($user['id'], 'events.approve', 'programme', $progId));
+    $isOwner = (int) $ev['organizer_id'] === (int) $user['id'] || (int) $ev['created_by'] === (int) $user['id'];
+    if (!$isApprover && !$isOwner) json_error('Insufficient permissions: cannot edit this event', 403);
+    if ($isOwner && !$isApprover && in_array($ev['status'], ['completed', 'cancelled'], true)) json_error('Completed or cancelled events cannot be edited', 400);
+    $data = input_json();
+    $sets = []; $args = [];
+    foreach (['title', 'description', 'date', 'end_date', 'location', 'capacity'] as $f) {
+      if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = ($data[$f] === '' ? null : $data[$f]); }
+    }
+    if (array_key_exists('image_url', $data)) { $sets[] = 'image_url = ?'; $args[] = clean_image_url($data['image_url']); }
+    if ($isApprover) {
+      // Only approvers may move an event across programmes/projects
+      foreach (['programme_id', 'project_id'] as $f) {
+        if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = ($data[$f] === '' ? null : (int) $data[$f]); }
+      }
+    }
+    if (array_key_exists('slug', $data) && $data['slug'] !== null && $data['slug'] !== '') { $sets[] = 'slug = ?'; $args[] = makeSlug($data['slug'], 'events', $eid); }
+    if (!$sets) json_error('Nothing to update', 400);
+    $args[] = $eid;
+    db()->prepare('UPDATE events SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($args);
+    audit_log('event_update', 'event', $eid);
     json_response(['ok' => true]);
   }
   elseif (preg_match('#^/events/(\d+)/publish$#', $path, $m) && $method === 'POST') {
@@ -1500,11 +1702,11 @@ try {
     $user = require_login();
     $eventId = (int) $m[1];
     $regId = (int) $m[2];
-    $stmt = db()->prepare('SELECT organizer_id FROM events WHERE id = ?');
+    $stmt = db()->prepare('SELECT organizer_id, programme_id FROM events WHERE id = ?');
     $stmt->execute([$eventId]);
     $event = $stmt->fetch();
     if (!$event) json_error('Event not found', 404);
-    if (!user_has_cap($user['id'], 'events.manage_rsvps') && $event['organizer_id'] != $user['id']) {
+    if (!can_manage_event($user['id'], $event)) {
       json_error('Insufficient permissions: events.manage_rsvps', 403);
     }
     db()->prepare("UPDATE event_registrations SET status = 'attended' WHERE id = ? AND event_id = ?")->execute([$regId, $eventId]);
@@ -1549,7 +1751,7 @@ try {
         $stmt->execute([$eventId, $user['id']]);
         $my_waitlist = $stmt->fetch() ?: null;
       }
-      $is_manager = user_has_cap($user['id'], 'events.manage_rsvps');
+      $is_manager = can_manage_event($user['id'], $event);
       if ($is_manager) {
         $stmt = db()->prepare('SELECT er.*, u.name, u.email FROM event_registrations er JOIN users u ON u.id = er.user_id WHERE er.event_id = ? ORDER BY er.registered_at');
         $stmt->execute([$eventId]);
@@ -1632,11 +1834,11 @@ try {
     $eventId = (int) $m[1];
     $wlId = (int) $m[2];
 
-    $stmt = db()->prepare('SELECT organizer_id, capacity FROM events WHERE id = ?');
+    $stmt = db()->prepare('SELECT organizer_id, programme_id, capacity FROM events WHERE id = ?');
     $stmt->execute([$eventId]);
     $event = $stmt->fetch();
     if (!$event) json_error('Event not found', 404);
-    if (!user_has_cap($user['id'], 'events.manage_rsvps') && $event['organizer_id'] != $user['id']) {
+    if (!can_manage_event($user['id'], $event)) {
       json_error('Insufficient permissions: events.manage_rsvps', 403);
     }
 
@@ -1706,11 +1908,11 @@ try {
   elseif (preg_match('#^/events/(\d+)/rsvps$#', $path, $m) && $method === 'GET') {
     $user = require_login();
     $eventId = (int) $m[1];
-    $stmt = db()->prepare('SELECT organizer_id FROM events WHERE id = ?');
+    $stmt = db()->prepare('SELECT organizer_id, programme_id FROM events WHERE id = ?');
     $stmt->execute([$eventId]);
     $event = $stmt->fetch();
     if (!$event) json_error('Event not found', 404);
-    if (!user_has_cap($user['id'], 'events.manage_rsvps') && $event['organizer_id'] != $user['id']) {
+    if (!can_manage_event($user['id'], $event)) {
       json_error('Insufficient permissions: events.manage_rsvps', 403);
     }
     $stmt = db()->prepare("SELECT r.*, u.name, u.email, 0 AS is_guest FROM event_registrations r JOIN users u ON u.id = r.user_id WHERE r.event_id = ? ORDER BY r.registered_at");
@@ -1766,11 +1968,11 @@ try {
   elseif (preg_match('#^/events/guests/(\d+)$#', $path, $m) && $method === 'DELETE') {
     $user = require_login();
     $gid = (int) $m[1];
-    $stmt = db()->prepare('SELECT g.*, e.organizer_id FROM event_guests g JOIN events e ON e.id = g.event_id WHERE g.id = ?');
+    $stmt = db()->prepare('SELECT g.*, e.organizer_id, e.programme_id FROM event_guests g JOIN events e ON e.id = g.event_id WHERE g.id = ?');
     $stmt->execute([$gid]);
     $guest = $stmt->fetch();
     if (!$guest) json_error('Guest entry not found', 404);
-    if (!user_has_cap($user['id'], 'events.manage_rsvps') && $guest['organizer_id'] != $user['id']) {
+    if (!can_manage_event($user['id'], $guest)) {
       json_error('Insufficient permissions: events.manage_rsvps', 403);
     }
     db()->prepare('DELETE FROM event_guests WHERE id = ?')->execute([$gid]);
@@ -1804,6 +2006,13 @@ try {
   elseif (preg_match('#^/articles/(\d+)/approve$#', $path, $m) && $method === 'POST') {
     $user = require_cap('articles.approve');
     $aid = (int) $m[1];
+    // Approving a draft pulls it into review as-is (approver acts for the author)
+    $st = db()->prepare('SELECT status FROM articles WHERE id = ?');
+    $st->execute([$aid]);
+    if ($st->fetchColumn() === 'draft') {
+      db()->prepare("INSERT INTO workflow_states (object_type, object_id, state, assignee_id, notes) VALUES ('article', ?, 'submitted', ?, 'submitted on approval')")->execute([$aid, $user['id']]);
+      update_object_status('article', $aid, 'submitted');
+    }
     // Stage through review if not already under review
     if (get_current_state('article', $aid) === 'submitted') {
       db()->prepare(
@@ -1834,13 +2043,67 @@ try {
     $data = input_json();
     $reason = trim($data['reason'] ?? '');
     if (!$reason) json_error('A rejection reason is required', 400);
+    $chk = db()->prepare('SELECT status FROM articles WHERE id = ?');
+    $chk->execute([(int) $m[1]]);
+    if (!in_array($chk->fetchColumn(), ['submitted', 'under_review'], true)) json_error('Only submitted articles can be rejected', 400);
     db()->prepare("UPDATE articles SET status = 'rejected', rejection_reason = ?, approved_by = ?, approved_at = NOW() WHERE id = ?")
       ->execute([$reason, $user['id'], (int) $m[1]]);
+    sync_state('article', (int) $m[1], 'rejected', $user['id'], 'rejected with feedback');
     audit_log('article_reject', 'article', (int) $m[1], ['reason' => $reason]);
     $stmt = db()->prepare('SELECT author_id, title FROM articles WHERE id = ?');
     $stmt->execute([(int) $m[1]]);
     $art = $stmt->fetch();
     if ($art) notify_user((int) $art['author_id'], 'article_rejected', 'Article not approved: ' . $art['title'], 'Reason: ' . $reason, '/dashboard');
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/articles/(\d+)/resubmit$#', $path, $m) && $method === 'POST') {
+    $user = require_login();
+    $aid = (int) $m[1];
+    $stmt = db()->prepare('SELECT author_id, title, status FROM articles WHERE id = ?');
+    $stmt->execute([$aid]);
+    $art = $stmt->fetch();
+    if (!$art) json_error('Article not found', 404);
+    if ((int) $art['author_id'] !== (int) $user['id']) json_error('Only the author can resubmit this article', 403);
+    if ($art['status'] !== 'rejected') json_error('Only rejected articles can be resubmitted', 400);
+    sync_state('article', $aid, 'rejected', $user['id']);
+    transition('article', $aid, 'draft', $user['id']);
+    transition('article', $aid, 'submitted', $user['id']);
+    audit_log('article_resubmit', 'article', $aid);
+    notify_capability('articles.approve', 'article_submitted', 'Article resubmitted: ' . $art['title'], 'Revised by ' . $user['name'] . '.', '/admin?tab=articles');
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/articles/(\d+)$#', $path, $m) && $method === 'PUT') {
+    $user = require_login();
+    $aid = (int) $m[1];
+    $stmt = db()->prepare('SELECT * FROM articles WHERE id = ?');
+    $stmt->execute([$aid]);
+    $art = $stmt->fetch();
+    if (!$art) json_error('Article not found', 404);
+    $isAuthor = (int) $art['author_id'] === (int) $user['id'];
+    $isApprover = user_has_cap($user['id'], 'articles.approve');
+    if (!$isApprover && !($isAuthor && in_array($art['status'], ['draft', 'submitted', 'rejected'], true))) {
+      json_error('Insufficient permissions: cannot edit this article', 403);
+    }
+    $data = input_json();
+    $sets = []; $args = [];
+    foreach (['title', 'body', 'category'] as $f) {
+      if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = $data[$f]; }
+    }
+    if (array_key_exists('tags', $data)) {
+      $tags = $data['tags'];
+      if (is_string($tags)) { $decoded = json_decode($tags, true); $tags = is_array($decoded) ? $decoded : array_map('trim', explode(',', $tags)); }
+      $sets[] = 'tags = ?'; $args[] = json_encode(array_values(array_filter((array) $tags)));
+    }
+    if (array_key_exists('image_url', $data)) { $sets[] = 'image_url = ?'; $args[] = clean_image_url($data['image_url']); }
+    if (!$sets) json_error('Nothing to update', 400);
+    $args[] = $aid;
+    db()->prepare('UPDATE articles SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($args);
+    // An author edit on a rejected article reopens it as a draft for revision
+    if ($isAuthor && !$isApprover && $art['status'] === 'rejected') {
+      sync_state('article', $aid, 'rejected', $user['id']);
+      transition('article', $aid, 'draft', $user['id']);
+    }
+    audit_log('article_update', 'article', $aid);
     json_response(['ok' => true]);
   }
 
@@ -3093,7 +3356,7 @@ try {
     json_response($article);
   }
   elseif ($path === '/public/events' && $method === 'GET') {
-    $stmt = db()->prepare("SELECT e.id, e.title, e.description, e.date, e.end_date, e.location, e.status, e.capacity, e.image_url, e.category, e.organizer_id,
+    $stmt = db()->prepare("SELECT e.id, e.title, e.slug, e.description, e.date, e.end_date, e.location, e.status, e.capacity, e.image_url, e.category, e.organizer_id,
       (SELECT COUNT(*) FROM event_registrations r WHERE r.event_id = e.id AND r.status = 'registered') AS rsvp_count
       FROM events e WHERE (e.status = 'published' AND e.date >= NOW()) OR e.status = 'cancelled' ORDER BY e.date ASC");
     $stmt->execute();
@@ -3102,7 +3365,7 @@ try {
     json_response($events);
   }
   elseif ($path === '/public/past-events' && $method === 'GET') {
-    $stmt = db()->prepare("SELECT e.id, e.title, e.description, e.date, e.end_date, e.location, e.status, e.capacity, e.image_url, e.category, e.organizer_id,
+    $stmt = db()->prepare("SELECT e.id, e.title, e.slug, e.description, e.date, e.end_date, e.location, e.status, e.capacity, e.image_url, e.category, e.organizer_id,
       (SELECT COUNT(*) FROM event_registrations r WHERE r.event_id = e.id AND r.status = 'registered') AS rsvp_count
       FROM events e WHERE e.status = 'published' AND e.date < NOW() ORDER BY e.date DESC LIMIT 20");
     $stmt->execute();
@@ -3128,17 +3391,29 @@ try {
     $pid = (int) $programme['id'];
 
     $requester = current_user();
+    // Draft/paused programmes are invisible publicly; proposers, managers and leads can preview
+    if ($programme['status'] !== 'active') {
+      $ok = $requester && $requester['status'] === 'active'
+        && ((int) $programme['created_by'] === (int) $requester['id']
+          || user_has_cap_for($requester['id'], 'programmes.manage', 'programme', $pid)
+          || is_programme_lead($requester['id'], $pid));
+      if (!$ok) json_error('Programme not found', 404);
+    }
 
-    // Projects — budget/spent only for members
+    // Projects — budget/spent only for members; guests see published only
     if ($requester) {
-      $stmt = db()->prepare('SELECT id, title, description, status, deadline, budget, spent FROM projects WHERE programme_id = ? ORDER BY title');
+      $stmt = db()->prepare('SELECT id, title, slug, description, status, deadline, budget, spent FROM projects WHERE programme_id = ? ORDER BY title');
     } else {
-      $stmt = db()->prepare('SELECT id, title, description, status, deadline FROM projects WHERE programme_id = ? ORDER BY title');
+      $stmt = db()->prepare('SELECT id, title, slug, description, status, deadline FROM projects WHERE programme_id = ? AND status = "published" ORDER BY title');
     }
     $stmt->execute([$pid]);
     $programme['projects'] = $stmt->fetchAll();
 
-    $stmt = db()->prepare('SELECT id, title, date, end_date, location, status FROM events WHERE programme_id = ? ORDER BY date ASC');
+    if ($requester) {
+      $stmt = db()->prepare('SELECT id, title, slug, date, end_date, location, status FROM events WHERE programme_id = ? ORDER BY date ASC');
+    } else {
+      $stmt = db()->prepare('SELECT id, title, slug, date, end_date, location, status FROM events WHERE programme_id = ? AND status IN ("published","cancelled","completed") ORDER BY date ASC');
+    }
     $stmt->execute([$pid]);
     $programme['events'] = $stmt->fetchAll();
 
@@ -3287,9 +3562,13 @@ try {
   }
   // --- PROGRAMME MEMBERS & OUTPUTS ---
   elseif (preg_match('#^/programmes/(\d+)$#', $path, $m) && $method === 'PUT') {
-    require_cap_for('programmes.manage', 'programme', (int)$m[1]);
-    $data = input_json();
+    $user = require_login();
     $id = (int) $m[1];
+    // Programme managers (global or scoped) or leads of this programme
+    if (!user_has_cap_for($user['id'], 'programmes.manage', 'programme', $id) && !is_programme_lead($user['id'], $id)) {
+      json_error('Insufficient permissions: programmes.manage', 403);
+    }
+    $data = input_json();
     $sets = [];
     $args = [];
     foreach (['title', 'description', 'objectives', 'outputs', 'status'] as $f) {

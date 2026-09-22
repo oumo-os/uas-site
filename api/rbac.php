@@ -140,6 +140,11 @@ function require_cap_for(string $capability, string $resourceType, int $resource
     $stmt->execute([$resourceId]);
     $progId = $stmt->fetchColumn();
     if ($progId) { $scopeType = 'programme'; $scopeId = (int)$progId; }
+  } elseif ($resourceType === 'project') {
+    $stmt = db()->prepare('SELECT programme_id FROM projects WHERE id = ?');
+    $stmt->execute([$resourceId]);
+    $progId = $stmt->fetchColumn();
+    if ($progId) { $scopeType = 'programme'; $scopeId = (int)$progId; }
   } elseif ($resourceType === 'working_group') {
     $stmt = db()->prepare('SELECT programme_id FROM working_groups WHERE id = ?');
     $stmt->execute([$resourceId]);
@@ -413,6 +418,35 @@ function is_programme_lead(int $userId, int $programmeId): bool {
   $stmt = db()->prepare("SELECT 1 FROM role_assignments ra JOIN roles r ON r.id = ra.role_id WHERE ra.user_id = ? AND ra.status = 'active' AND r.status = 'active' AND r.target = ? AND (r.title LIKE '%lead%' OR r.title LIKE '%chair%' OR r.title LIKE '%coordinat%' OR r.title LIKE '%head%') LIMIT 1");
   $stmt->execute([$userId, $title]);
   return (bool) $stmt->fetchColumn();
+}
+
+/**
+ * Check if a user can manage a project (its details and participants).
+ * Managers: the creator, a lead of the parent programme, or holders of
+ * projects.manage / projects.approve (global or programme-scoped).
+ */
+function can_manage_project(int $userId, array $proj): bool {
+  if ((int)($proj['created_by'] ?? 0) === $userId) return true;
+  $progId = (int)($proj['programme_id'] ?? 0);
+  if ($progId && is_programme_lead($userId, $progId)) return true;
+  if (user_has_cap($userId, 'projects.manage')) return true;
+  if (user_has_cap($userId, 'projects.approve')) return true;
+  if ($progId && user_has_cap($userId, 'projects.manage', 'programme', $progId)) return true;
+  if ($progId && user_has_cap($userId, 'projects.approve', 'programme', $progId)) return true;
+  return false;
+}
+
+/**
+ * Check if a user can manage an event's attendance (RSVPs, guests).
+ * Managers: the organizer, holders of events.manage_rsvps, or a lead of
+ * the parent programme.
+ */
+function can_manage_event(int $userId, array $event): bool {
+  if ((int)($event['organizer_id'] ?? 0) === $userId) return true;
+  if (user_has_cap($userId, 'events.manage_rsvps')) return true;
+  $progId = (int)($event['programme_id'] ?? 0);
+  if ($progId && is_programme_lead($userId, $progId)) return true;
+  return false;
 }
 
 /**

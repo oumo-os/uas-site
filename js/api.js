@@ -198,30 +198,47 @@ const api = {
 
   // Programmes
   async getProgrammes() { return this.request('/programmes'); },
+  async getProgramme(id) { return this.request('/programmes/' + id); },
   async createProgramme(data) { return this.request('/programmes', { method: 'POST', body: data }); },
+  async updateProgramme(id, data) { return this.request('/programmes/' + id, { method: 'PUT', body: data }); },
+  async activateProgramme(id) { return this.request('/programmes/' + id, { method: 'PUT', body: { status: 'active' } }); },
 
   // Projects
   async getProjects() { return this.request('/projects'); },
+  async getProject(id) { return this.request('/projects/' + id); },
   async createProject(data) { return this.request('/projects', { method: 'POST', body: data }); },
+  async updateProject(id, data) { return this.request('/projects/' + id, { method: 'PUT', body: data }); },
   async approveProject(id) { return this.request('/projects/' + id + '/approve', { method: 'POST' }); },
   async rejectProject(id, reason) { return this.request('/projects/' + id + '/reject', { method: 'POST', body: { reason } }); },
   async publishProject(id) { return this.request('/projects/' + id + '/publish', { method: 'POST' }); },
+  async resubmitProject(id) { return this.request('/projects/' + id + '/resubmit', { method: 'POST' }); },
+  async getProjectParticipants(id) { return this.request('/projects/' + id + '/participants'); },
+  async addProjectParticipant(id, userId, role) { return this.request('/projects/' + id + '/participants', { method: 'POST', body: { user_id: userId, role } }); },
+  async updateProjectParticipant(id, userId, data) { return this.request('/projects/' + id + '/participants/' + userId, { method: 'PATCH', body: data }); },
+  async removeProjectParticipant(id, userId) { return this.request('/projects/' + id + '/participants/' + userId, { method: 'DELETE' }); },
 
   // Events
-  async getEvents() { return this.request('/events'); },
+  async getEvents(params) { return this.request('/events' + (params ? '?' + new URLSearchParams(params).toString() : '')); },
   async createEvent(data) { return this.request('/events', { method: 'POST', body: data }); },
+  async updateEvent(id, data) { return this.request('/events/' + id, { method: 'PUT', body: data }); },
   async approveEvent(id) { return this.request('/events/' + id + '/approve', { method: 'POST' }); },
+  async rejectEvent(id, reason) { return this.request('/events/' + id + '/reject', { method: 'POST', body: { reason } }); },
   async publishEvent(id) { return this.request('/events/' + id + '/publish', { method: 'POST' }); },
+  async resubmitEvent(id) { return this.request('/events/' + id + '/resubmit', { method: 'POST' }); },
   async rsvpEvent(id) { return this.request('/events/' + id + '/rsvp', { method: 'POST' }); },
   async cancelRsvp(id) { return this.request('/events/' + id + '/rsvp', { method: 'DELETE' }); },
   async getEventRsvps(id) { return this.request('/events/' + id + '/rsvps'); },
+  async markAttended(eventId, regId) { return this.request('/events/' + eventId + '/rsvps/' + regId + '/attended', { method: 'POST' }); },
+  async removeGuest(guestId) { return this.request('/events/guests/' + guestId, { method: 'DELETE' }); },
 
   // Articles
   async getArticles() { return this.request('/articles'); },
   async createArticle(data) { return this.request('/articles', { method: 'POST', body: data }); },
+  async updateArticle(id, data) { return this.request('/articles/' + id, { method: 'PUT', body: data }); },
   async approveArticle(id) { return this.request('/articles/' + id + '/approve', { method: 'POST' }); },
   async rejectArticle(id, reason) { return this.request('/articles/' + id + '/reject', { method: 'POST', body: { reason } }); },
   async publishArticle(id) { return this.request('/articles/' + id + '/publish', { method: 'POST' }); },
+  async resubmitArticle(id) { return this.request('/articles/' + id + '/resubmit', { method: 'POST' }); },
 
   // Documents
   async getDocuments() { return this.request('/documents'); },
@@ -352,7 +369,8 @@ const FormBuilder = {
         if (f.placeholder) input += `<option value="">${esc(f.placeholder)}</option>`;
         (f.options || []).forEach(o => {
           if (o.group) return;
-          input += `<option value="${esc(o.value)}">${esc(o.label)}</option>`;
+          const sel = (f.value !== undefined && f.value !== null && f.value !== '' && String(o.value) === String(f.value)) ? ' selected' : '';
+          input += `<option value="${esc(o.value)}"${sel}>${esc(o.label)}</option>`;
         });
         input += '</select>';
         break;
