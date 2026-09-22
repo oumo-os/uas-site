@@ -13,12 +13,13 @@ ErrorDocument 404 /404.html
 # /admin -> admin.html (must precede the directory check below)
 RewriteRule ^admin/?$ admin.html [L]
 
-# Event detail: /events/<slug> or /events/<id> -> event.html?slug=... (preferred)
-RewriteRule ^events/([a-z0-9-]+)/?$ event.html?slug=$1 [QSA,L]
-# Legacy numeric (keep for 301 fallback; accepts both /programme/3 and /programmes/3)
-RewriteRule ^programmes?/(\d+)/?$ programme.html?id=$1 [QSA,L]
-RewriteRule ^articles?/(\d+)/?$ article.html?id=$1 [QSA,L]
-RewriteRule ^events?/(\d+)/?$ event.html?id=$1 [QSA,L]
+# Detail pages via slug.php: serves the template with item-specific Open Graph
+# tags injected server-side (scrapers like WhatsApp don't run JavaScript).
+# Clean URLs stay unchanged (200, no redirect).
+RewriteRule ^events/([a-z0-9-]+)/?$ slug.php?type=event&slug=$1 [QSA,L]
+RewriteRule ^event/([a-z0-9-]+)/?$ slug.php?type=event&slug=$1 [QSA,L]
+RewriteRule ^programmes?/(\d+)/?$ slug.php?type=programme&id=$1 [QSA,L]
+RewriteRule ^articles?/(\d+)/?$ slug.php?type=article&id=$1 [QSA,L]
 
 # Clean URLs: /about -> about.html, etc. (only when matching file exists)
 RewriteCond %{DOCUMENT_ROOT}/$1.html -f

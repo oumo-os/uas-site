@@ -43,7 +43,7 @@ try {
     $slug = $r['slug'] ?: $r['id'];
     $urls[] = ['loc' => $base . '/' . $slug, 'lastmod' => $today, 'priority' => '0.7', 'freq' => 'monthly'];
   }
-  $stmt = $pdo->query('SELECT id, slug FROM projects WHERE status IN ("active","completed") ORDER BY title');
+  $stmt = $pdo->query('SELECT id, slug FROM projects WHERE status = "published" ORDER BY title');
   foreach ($stmt->fetchAll() as $r) {
     $slug = $r['slug'] ?: $r['id'];
     $urls[] = ['loc' => $base . '/' . $slug, 'lastmod' => $today, 'priority' => '0.6', 'freq' => 'monthly'];
