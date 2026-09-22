@@ -668,6 +668,7 @@
         <div class="dash-hero-roles" id="dashRoles"></div>
       </div>
       <div class="dash-hero-actions">
+        <a href="/guide" class="btn btn-sm">Guide</a>
         <a href="/profile" class="btn btn-sm">Edit Profile</a>
         <button class="btn btn-sm" onclick="api.logout().catch(function(){}).finally(function(){window.location.href=ua('/')})">Logout</button>
       </div>
@@ -1331,6 +1332,13 @@
       const grid = document.getElementById('quickActionsGrid');
       const actions = [];
 
+      actions.push(`
+        <div class="create-card" onclick="window.location.href=ua('/guide')">
+          <div class="icon-circle"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span></div>
+          <h4>How to use the system</h4>
+          <p>Member guide for your roles</p>
+        </div>
+      `);
       if (api.hasCap('finance.record')) {
         actions.push(`
           <div class="create-card" onclick="showFinanceForm()">

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script>(function(){var s=location.pathname.replace(/\/+$/,'').split('/').filter(Boolean);var P=/^(index\.html|index|about|programmes|programme|projects|project|events|event|news|knowledge|article|articles|library|search|ecosystem|members|join|login|dashboard|profile|admin|member|guide|404\.html|gallery|contact)$/;while(s.length>=2&&/^(article|articles|event|events|programme|programmes|projects|project|poll|polls|resolution|resolutions)$/.test(s[s.length-2])&&/^[^\/]+$/.test(s[s.length-1])){var maybe=s[s.length-1];if(/^\d+$/.test(maybe)||/^[a-z0-9-]+$/.test(maybe)){s.pop();s.pop();continue;}break;}while(s.length&&(P.test(s[s.length-1])||/\.[a-z0-9]+$/i.test(s[s.length-1]))){s.pop();}var base=s.length?'/'+s.join('/'):'';var b=document.createElement('base');b.href=base+'/';document.head.appendChild(b);if(!window.UAS_BASE)window.UAS_BASE=base;})();</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="img/uas-emblem.png">
+  <title>Member Guide — Uganda Astronomical Society</title>
+  <meta name="description" content="How to use the UAS member platform: dashboard, content, approvals, teams, events and governance.">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="css/base.css?v=20260911-8">
+  <style>
+    .guide-toc { display:flex; flex-wrap:wrap; gap:0.4rem; margin:1rem 0 2rem; }
+    .guide-toc a { font-size:0.8rem; padding:0.35rem 0.7rem; border:1px solid var(--border); border-radius:999px; color:var(--text-dim); text-decoration:none; }
+    .guide-toc a:hover { border-color:var(--accent); color:var(--accent); }
+    .guide-grid { display:grid; grid-template-columns:1fr; gap:1.25rem; max-width:860px; }
+    .flow { display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap; margin:0.75rem 0; font-size:0.82rem; }
+    .flow .step { padding:0.3rem 0.65rem; border-radius:999px; background:var(--bg-card); border:1px solid var(--border); font-weight:600; }
+    .flow .step.you { border-color:var(--accent); color:var(--accent); }
+    .flow .step.them { border-style:dashed; color:var(--text-dim); }
+    .flow .arrow { color:var(--text-faint); }
+    .guide-list { margin:0.5rem 0; padding-left:1.2rem; font-size:0.9rem; line-height:1.7; }
+    .guide-list li { margin-bottom:0.25rem; }
+    .role-tag { font-size:0.65rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; padding:0.15rem 0.5rem; border-radius:999px; background:var(--accent-glow); color:var(--accent); margin-left:0.5rem; vertical-align:middle; }
+  </style>
+</head>
+<body>
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="container">
+      <a href="/" class="nav-brand">Uganda Astronomical Society</a>
+      <div class="nav-links">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/about" class="nav-link">About</a>
+        <a href="/programmes" class="nav-link">Programmes</a>
+        <a href="/events" class="nav-link">Events</a>
+        <a href="/news" class="nav-link">News</a>
+        <a href="/knowledge" class="nav-link">Knowledge</a>
+        <a href="/contact" class="nav-link">Contact</a>
+      </div>
+      <div class="nav-right"><div class="nav-user" id="navUser"></div></div>
+    </div>
+  </nav>
+
+  <section class="detail-hero">
+    <div class="hero-bg" style="background-image:url('img/header-knowledge.jpg')"></div>
+    <div class="container">
+      <div class="breadcrumb"><a href="/dashboard">Dashboard</a> &rsaquo; <span>Member Guide</span></div>
+      <h1>How to use the system</h1>
+      <div class="description-body" style="color:rgba(255,255,255,0.85);max-width:640px;margin-top:0.5rem">Everything a logged-in member needs: finding things, taking part, sharing content, leading teams and reviewing work. Sections outside your role stay hidden.</div>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:2rem">
+    <div class="container">
+      <div id="loginBanner" class="card-section" style="display:none;max-width:860px">
+        <h3>You're browsing as a guest</h3>
+        <p class="text-dim" style="font-size:0.9rem">This guide is written for logged-in members — <a href="/login">log in</a> (or <a href="/join">join the Society</a>) to see the parts that apply to your roles.</p>
+      </div>
+      <div id="accessCard" class="card-section" style="display:none;max-width:860px">
+        <h3>Your access</h3>
+        <div id="accessBody" class="text-dim" style="font-size:0.9rem">Loading…</div>
+      </div>
+
+      <div class="guide-toc" id="guideToc">
+        <a href="#g-start" data-toc="always">Dashboard</a>
+        <a href="#g-find" data-toc="always">Finding things</a>
+        <a href="#g-participate" data-toc="always">Taking part</a>
+        <a href="#g-contribute" data-toc="always">Sharing content</a>
+        <a href="#g-lead" data-toc="lead">Leading a programme</a>
+        <a href="#g-review" data-toc="review">Reviewing work</a>
+        <a href="#g-govern" data-toc="govern">Governance</a>
+        <a href="#g-finance" data-toc="finance">Dues & finance</a>
+        <a href="#g-mail" data-toc="always">Inbox & mail</a>
+        <a href="#g-help" data-toc="always">Troubleshooting</a>
+      </div>
+
+      <div class="guide-grid">
+        <div class="card-section" id="g-start">
+          <h3>1. Your dashboard</h3>
+          <ul class="guide-list">
+            <li><strong>Overview</strong> — calendar (published events feed in automatically), recent pending items, your assignments, your submissions and activity.</li>
+            <li><strong>Pending</strong> — everything awaiting review. <em>Needs my action</em> shows only items you can personally approve or vote on.</li>
+            <li><strong>Programmes</strong> — the teams you belong to or lead (see §5).</li>
+            <li><strong>Create</strong> — propose articles, events, programmes and projects (see §4).</li>
+            <li><strong>Votes &amp; Decisions, Finance, Members, Groups &amp; Meetings, Mail</strong> — appear according to your roles and capabilities.</li>
+          </ul>
+        </div>
+
+        <div class="card-section" id="g-find">
+          <h3>2. Finding things</h3>
+          <ul class="guide-list">
+            <li><strong>Programmes</strong> — the Society's standing workstreams, each with its lead, projects, events and team.</li>
+            <li><strong>Events</strong> — upcoming events plus a month <strong>calendar view</strong>; past events stay browsable. Open an event to RSVP, join the waitlist or add it to your personal calendar.</li>
+            <li><strong>Knowledge</strong> — published articles, observing reports and educational pieces.</li>
+            <li><strong>Members</strong> — who holds which office; vacant seats show an <em>Express interest</em> button.</li>
+          </ul>
+        </div>
+
+        <div class="card-section" id="g-participate">
+          <h3>3. Taking part</h3>
+          <ul class="guide-list">
+            <li><strong>RSVP</strong> to an event from its page (members) — or sign up as a <strong>guest</strong> with just a name and email, no account needed.</li>
+            <li>Full event? Join the <strong>waitlist</strong> — you're promoted automatically when a place frees up.</li>
+            <li>Want to work on something? Open a <strong>programme</strong>, look at its <strong>projects</strong>, and contact the project team — or <strong>apply to join</strong> the programme and a lead will place you.</li>
+            <li>After attending, organizers mark you as <strong>attended</strong> — that's how participation history is built.</li>
+          </ul>
+        </div>
+
+        <div class="card-section" id="g-contribute">
+          <h3>4. Sharing content: the approval pipeline</h3>
+          <p class="text-dim" style="font-size:0.9rem">Everything you compose goes through review before it appears publicly. Track yours under <strong>Overview → My Submissions</strong>; reviewers work from <strong>Pending</strong>. You can <strong>edit</strong> your own drafts anytime from the item's details view.</p>
+          <h4 style="font-size:0.9rem;margin:1rem 0 0.25rem">Article</h4>
+          <div class="flow"><span class="step you">You write</span><span class="arrow">→</span><span class="step">Submitted</span><span class="arrow">→</span><span class="step them">Reviewer approves</span><span class="arrow">→</span><span class="step them">Publisher publishes</span><span class="arrow">→</span><span class="step">Live in Knowledge</span></div>
+          <h4 style="font-size:0.9rem;margin:1rem 0 0.25rem">Event</h4>
+          <div class="flow"><span class="step you">You propose</span><span class="arrow">→</span><span class="step">Submitted</span><span class="arrow">→</span><span class="step them">Approved</span><span class="arrow">→</span><span class="step them">Published</span><span class="arrow">→</span><span class="step">Open for RSVPs + on calendars</span></div>
+          <h4 style="font-size:0.9rem;margin:1rem 0 0.25rem">Project</h4>
+          <div class="flow"><span class="step you">You propose (optionally inside a programme)</span><span class="arrow">→</span><span class="step">Submitted</span><span class="arrow">→</span><span class="step them">Approved</span><span class="arrow">→</span><span class="step them">Published</span><span class="arrow">→</span><span class="step">Public project page + team</span></div>
+          <h4 style="font-size:0.9rem;margin:1rem 0 0.25rem">Programme</h4>
+          <div class="flow"><span class="step you">You propose</span><span class="arrow">→</span><span class="step">Draft (only you see it)</span><span class="arrow">→</span><span class="step them">Activated</span><span class="arrow">→</span><span class="step">Public programme</span></div>
+          <ul class="guide-list">
+            <li><strong>Rejected or sent back?</strong> You'll get the reason by notification. Edit the item, then <strong>Revise &amp; Resubmit</strong> from its details view.</li>
+            <li>Editing a <strong>published</strong> item goes live immediately — double-check dates and venues.</li>
+          </ul>
+        </div>
+
+        <div class="card-section role-sec" id="g-lead" data-sec="lead" style="display:none">
+          <h3>5. Leading a programme<span class="role-tag">Programme leads</span></h3>
+          <p class="text-dim" style="font-size:0.9rem">Teams live in <strong>projects</strong>, not in programmes. Your job: run the projects and events inside your programme.</p>
+          <ul class="guide-list">
+            <li>Dashboard → <strong>Programmes → Manage</strong> on your programme card.</li>
+            <li><strong>Projects &amp; Teams</strong> — expand a project's <em>Team</em> to add participants, change anyone's <strong>role</strong> (Member, Coordinator, Lead…), or remove them. Start new work with <em>New Project</em> — it's pre-filed under your programme.</li>
+            <li><strong>Events &amp; Attendance</strong> — expand an event's <em>Attendance</em> to see RSVPs and guests, <strong>mark attendance</strong> after the event, and remove guest signups. Your events also appear here for editing.</li>
+            <li><strong>Applications</strong> — approve or reject people asking to join; approvals notify the applicant automatically.</li>
+            <li>You can <strong>edit</strong> any event or project in your programme, and the programme's own details (Edit button on the card).</li>
+          </ul>
+        </div>
+
+        <div class="card-section role-sec" id="g-review" data-sec="review" style="display:none">
+          <h3>6. Reviewing work<span class="role-tag">Reviewers</span></h3>
+          <ul class="guide-list">
+            <li>Work in <strong>Pending → Needs my action</strong>. Open an item for full details and a public preview.</li>
+            <li><strong>Approve</strong> moves it one step forward; <strong>Publish/Activate</strong> makes it public; <strong>Reject</strong> always asks for a <strong>reason</strong> — it goes to the author, so be specific and kind.</li>
+            <li>Rejected items return to the author as drafts; approving a draft pulls it into review as-is.</li>
+            <li>Authors are notified at every step — you don't need to chase anyone.</li>
+          </ul>
+        </div>
+
+        <div class="card-section role-sec" id="g-govern" data-sec="govern" style="display:none">
+          <h3>7. Governance<span class="role-tag">Voters &amp; officers</span></h3>
+          <ul class="guide-list">
+            <li><strong>Votes &amp; Decisions</strong> — resolutions (formal votes), polls (quick consultations) and delegations (proxy voting when you're away).</li>
+            <li>Meeting attendance and minutes live under <strong>Groups &amp; Meetings</strong>.</li>
+            <li>Vacant offices are listed on the <strong>Members</strong> page — express interest to be considered.</li>
+          </ul>
+        </div>
+
+        <div class="card-section role-sec" id="g-finance" data-sec="finance" style="display:none">
+          <h3>8. Dues &amp; finance<span class="role-tag">Members</span></h3>
+          <ul class="guide-list">
+            <li>Your <strong>member class</strong> (Regular, Student, Honorary…) sets your annual dues — see <strong>Members → Dues</strong> for the schedule.</li>
+            <li>Keep your membership in <strong>good standing</strong>: some actions require it.</li>
+            <li>Officers with finance access record income/expenses under <strong>Finance</strong>; every record keeps an audit trail.</li>
+          </ul>
+        </div>
+
+        <div class="card-section" id="g-mail">
+          <h3>9. Inbox, notifications &amp; mail</h3>
+          <ul class="guide-list">
+            <li>The <strong>bell icon</strong> and dashboard <strong>Inbox</strong> carry approvals, decisions and mentions — click through to act.</li>
+            <li><strong>Office mail</strong> (info@, programmes@, …) is available if your role grants an inbox; compose and reply from the Mail tab.</li>
+            <li>Event discussions happen in each event's <strong>chatroom</strong>, not by email.</li>
+          </ul>
+        </div>
+
+        <div class="card-section" id="g-help">
+          <h3>10. Troubleshooting</h3>
+          <ul class="guide-list">
+            <li><strong>Page looks outdated?</strong> Hard-refresh: <kbd>Ctrl+Shift+R</kbd> (Windows) or <kbd>Cmd+Shift+R</kbd> (Mac). The site caches aggressively for speed.</li>
+            <li><strong>Button missing?</strong> Actions appear only when your roles allow them — check <em>Your access</em> above, or ask a lead/approver.</li>
+            <li><strong>Save failed?</strong> The message explains why (usually a permission or a missing required field). Drafts are never lost — just retry.</li>
+            <li><strong>Locked out or wrong role?</strong> Contact the Secretary via the <a href="/contact">contact page</a> or <a href="mailto:membership@astronomy.ug">membership@astronomy.ug</a>.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div><div class="footer-brand">Uganda Astronomical Society</div><p class="footer-desc">Advancing astronomy education, research, and outreach across Uganda since 2023.</p></div>
+        <div><div class="footer-heading">Explore</div><ul class="footer-links"><li><a href="/about">About UAS</a></li><li><a href="/programmes">Programmes</a></li><li><a href="/events">Events</a></li><li><a href="/knowledge">Knowledge Base</a></li></ul></div>
+        <div><div class="footer-heading">Community</div><ul class="footer-links"><li><a href="/members">Members</a></li><li><a href="/ecosystem">Ecosystem</a></li><li><a href="/library">Library</a></li><li><a href="/contact">Contact</a></li></ul></div>
+        <div><div class="footer-heading">Connect</div><ul class="footer-links"><li><a href="mailto:contact@astronomy.ug">contact@astronomy.ug</a></li><li><a href="/login">Member Login</a></li></ul></div>
+      </div>
+      <div class="footer-bottom"><span>&copy; <span class="js-year">2026</span> Uganda Astronomical Society. All rights reserved.</span><span>Kampala, Uganda</span></div>
+    </div>
+  </footer>
+
+  <script src="js/api.js?v=20260922-11"></script>
+  <script>
+    function showSec(name, on) {
+      document.querySelectorAll('[data-sec="' + name + '"]').forEach(function(el){ el.style.display = on ? '' : 'none'; });
+      document.querySelectorAll('[data-toc="' + name + '"]').forEach(function(el){ el.style.display = on ? '' : 'none'; });
+    }
+
+    async function load() {
+      updateNavUser();
+      var me = null;
+      try { me = await api.me(); } catch(e) {}
+      if (!me || !me.user) {
+        document.getElementById('loginBanner').style.display = 'block';
+        ['lead','review','govern','finance'].forEach(function(s){ showSec(s, false); });
+        return;
+      }
+      var caps = {};
+      (me.capabilities || []).forEach(function(c){ caps[typeof c === 'string' ? c : c.slug] = true; });
+      var has = function(){ for (var i = 0; i < arguments.length; i++) if (caps[arguments[i]]) return true; return false; };
+      var roles = me.roles || [];
+      var memberClass = null;
+      roles.forEach(function(r){ if (r.role_type === 'member_class') memberClass = r.title; });
+      var mine = [];
+      try { mine = await api.request('/programmes/mine'); } catch(e) {}
+      var led = (mine || []).filter(function(p){ return p.is_lead; });
+      var managed = (mine || []).filter(function(p){ return !p.is_lead && p.can_manage; });
+
+      var bits = [];
+      bits.push('<div><span class="text-dim">Signed in as:</span> <strong>' + esc(me.user.name) + '</strong>' + (memberClass ? ' <span class="cap-tag">' + esc(memberClass) + '</span>' : '') + '</div>');
+      var roleNames = roles.filter(function(r){ return r.role_type !== 'member_class'; }).map(function(r){ return r.title; }).filter(function(v,i,a){ return a.indexOf(v) === i; }).slice(0, 8);
+      if (roleNames.length) bits.push('<div style="margin-top:0.4rem"><span class="text-dim">Roles:</span> ' + roleNames.map(function(r){ return '<span class="cap-tag">' + esc(r) + '</span>'; }).join(' ') + '</div>');
+      var scope = [];
+      if (led.length) scope.push('leading ' + led.map(function(p){ return p.title; }).join(', '));
+      if (managed.length) scope.push('managing ' + managed.map(function(p){ return p.title; }).join(', '));
+      if (has('articles.approve','events.approve','projects.approve','programmes.manage','documents.approve')) scope.push('reviewing content');
+      if (has('admin.system')) scope.push('system administration');
+      bits.push('<div style="margin-top:0.4rem"><span class="text-dim">This guide shows you:</span> ' + (scope.length ? esc(scope.join(' · ')) : 'member basics') + '</div>');
+      document.getElementById('accessBody').innerHTML = bits.join('');
+      document.getElementById('accessCard').style.display = 'block';
+
+      showSec('lead', led.length > 0);
+      showSec('review', has('articles.approve','events.approve','projects.approve','programmes.manage','documents.approve'));
+      showSec('govern', has('resolutions.vote','resolutions.manage','governance.poll.create','governance.poll.vote','meetings.manage'));
+      showSec('finance', has('finance.view'));
+    }
+
+    function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+    load();
+  </script>
+</body>
+</html>
