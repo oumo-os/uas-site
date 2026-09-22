@@ -7,7 +7,7 @@ require_once __DIR__ . '/config.php';
 
 function share_abs_url($path): string {
   $path = trim((string) $path);
-  if ($path === '') return SITE_URL . '/img/uas-emblem.png';
+  if ($path === '') return SITE_URL . '/img/og-cover.jpg';
   if (preg_match('#^https?://#i', $path)) return $path;
   return SITE_URL . '/' . ltrim($path, '/');
 }
@@ -38,6 +38,8 @@ function serve_with_meta(string $template, array $meta): void {
   $block = '<meta property="og:title" content="' . $esc($meta['title']) . '">' . "\n"
     . '  <meta property="og:description" content="' . $esc($meta['description']) . '">' . "\n"
     . '  <meta property="og:image" content="' . $esc($meta['image']) . '">' . "\n"
+    . '  <meta property="og:image:width" content="1200">' . "\n"
+    . '  <meta property="og:image:height" content="630">' . "\n"
     . '  <meta property="og:url" content="' . $esc($meta['url']) . '">' . "\n"
     . '  <meta property="og:type" content="' . $esc($meta['type'] ?? 'website') . '">' . "\n"
     . '  <meta name="twitter:card" content="summary_large_image">' . "\n"
