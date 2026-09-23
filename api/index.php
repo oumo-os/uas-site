@@ -1334,8 +1334,8 @@ try {
     $data = input_json();
     if (empty($data['title'])) json_error('Title is required', 400);
     $slug = makeSlug($data['slug'] ?? $data['title'], 'programmes');
-    db()->prepare('INSERT INTO programmes (title, slug, description, objectives, image_url, created_by) VALUES (?, ?, ?, ?, ?, ?)')
-      ->execute([$data['title'], $slug, sanitize_rich_html($data['description'] ?? null), $data['objectives'] ?? null, clean_image_url($data['image_url'] ?? null), $user['id']]);
+    db()->prepare('INSERT INTO programmes (title, slug, description, objectives, image_url, video_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      ->execute([$data['title'], $slug, sanitize_rich_html($data['description'] ?? null), $data['objectives'] ?? null, clean_image_url($data['image_url'] ?? null), video_embed_url($data['video_url'] ?? null), $user['id']]);
     $id = (int) db()->lastInsertId();
     audit_log('programme_create', 'programme', $id);
     notify_capability('programmes.approve', 'programme_submitted', 'Programme awaiting activation: ' . $data['title'], 'Proposed by ' . $user['name'] . '. Review and activate it from Pending.', '/dashboard');
@@ -1432,8 +1432,8 @@ try {
     }
     if (empty($data['title'])) json_error('Title is required', 400);
     $slug = makeSlug($data['slug'] ?? $data['title'], 'projects');
-    db()->prepare('INSERT INTO projects (programme_id, title, slug, description, objectives, deadline, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      ->execute([$progId, $data['title'], $slug, sanitize_rich_html($data['description'] ?? null), $data['objectives'] ?? null, $data['deadline'] ?? null, $user['id']]);
+    db()->prepare('INSERT INTO projects (programme_id, title, slug, description, objectives, deadline, video_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      ->execute([$progId, $data['title'], $slug, sanitize_rich_html($data['description'] ?? null), $data['objectives'] ?? null, $data['deadline'] ?? null, video_embed_url($data['video_url'] ?? null), $user['id']]);
     $id = (int) db()->lastInsertId();
     transition('project', $id, 'submitted', $user['id']);
     audit_log('project_create', 'project', $id);
@@ -1522,11 +1522,28 @@ try {
       if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = ($data[$f] === '' ? null : $data[$f]); }
     }
     if (array_key_exists('description', $data)) { $sets[] = 'description = ?'; $args[] = sanitize_rich_html($data['description']); }
+    if (array_key_exists('video_url', $data)) { $sets[] = 'video_url = ?'; $args[] = video_embed_url($data['video_url']); }
     if (array_key_exists('slug', $data) && $data['slug'] !== null && $data['slug'] !== '') { $sets[] = 'slug = ?'; $args[] = makeSlug($data['slug'], 'projects', $pid); }
     if (!$sets) json_error('Nothing to update', 400);
     $args[] = $pid;
     db()->prepare('UPDATE projects SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($args);
     audit_log('project_update', 'project', $pid);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/projects/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    $user = require_login();
+    $pid = (int) $m[1];
+    $stmt = db()->prepare('SELECT * FROM projects WHERE id = ?');
+    $stmt->execute([$pid]);
+    $proj = $stmt->fetch();
+    if (!$proj) json_error('Project not found', 404);
+    if (!can_manage_project($user['id'], $proj)) json_error('Insufficient permissions: cannot delete this project', 403);
+    // Participants cascade; linked events/finance detach (SET NULL).
+    db()->prepare('DELETE FROM projects WHERE id = ?')->execute([$pid]);
+    audit_log('project_delete', 'project', $pid, ['title' => $proj['title']]);
+    if ($proj['created_by'] && (int) $proj['created_by'] !== (int) $user['id']) {
+      notify_user((int) $proj['created_by'], 'project_deleted', 'Project deleted: ' . $proj['title'], 'Deleted by ' . $user['name'] . '.', '/dashboard');
+    }
     json_response(['ok' => true]);
   }
   // --- PROJECT PARTICIPANTS (the team lives in the project) ---
@@ -1715,6 +1732,28 @@ try {
     $args[] = $eid;
     db()->prepare('UPDATE events SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($args);
     audit_log('event_update', 'event', $eid);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/events/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    $user = require_login();
+    $eid = (int) $m[1];
+    $stmt = db()->prepare('SELECT * FROM events WHERE id = ?');
+    $stmt->execute([$eid]);
+    $ev = $stmt->fetch();
+    if (!$ev) json_error('Event not found', 404);
+    // Same people who may edit it; owners/leads cannot delete finished history.
+    $progId = $ev['programme_id'] ? (int) $ev['programme_id'] : null;
+    $isApprover = user_has_cap($user['id'], 'events.approve') || ($progId && user_has_cap($user['id'], 'events.approve', 'programme', $progId));
+    $isOwner = (int) $ev['organizer_id'] === (int) $user['id'] || (int) $ev['created_by'] === (int) $user['id'];
+    $isLead = $progId && is_programme_lead($user['id'], $progId);
+    if (!$isApprover && !$isOwner && !$isLead) json_error('Insufficient permissions: cannot delete this event', 403);
+    if (($isOwner || $isLead) && !$isApprover && in_array($ev['status'], ['completed', 'cancelled'], true)) json_error('Completed or cancelled events cannot be deleted', 400);
+    // RSVPs, waitlist and guests cascade; finance links detach (SET NULL).
+    db()->prepare('DELETE FROM events WHERE id = ?')->execute([$eid]);
+    audit_log('event_delete', 'event', $eid, ['title' => $ev['title']]);
+    if ($ev['organizer_id'] && (int) $ev['organizer_id'] !== (int) $user['id']) {
+      notify_user((int) $ev['organizer_id'], 'event_deleted', 'Event deleted: ' . $ev['title'], 'Deleted by ' . $user['name'] . '.', '/dashboard');
+    }
     json_response(['ok' => true]);
   }
   elseif (preg_match('#^/events/(\d+)/publish$#', $path, $m) && $method === 'POST') {
@@ -2039,8 +2078,8 @@ try {
       $decoded = json_decode($tags, true);
       $tags = is_array($decoded) ? $decoded : array_map('trim', explode(',', $tags));
     }
-    db()->prepare('INSERT INTO articles (author_id, title, body, category, tags, image_url, approver_role_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      ->execute([$user['id'], $data['title'], sanitize_rich_html($data['body'] ?? null), $data['category'] ?? 'article', json_encode(array_values(array_filter($tags))), clean_image_url($data['image_url'] ?? null), $data['approver_role_id'] ?? null]);
+    db()->prepare('INSERT INTO articles (author_id, title, body, category, tags, image_url, video_url, approver_role_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      ->execute([$user['id'], $data['title'], sanitize_rich_html($data['body'] ?? null), $data['category'] ?? 'article', json_encode(array_values(array_filter($tags))), clean_image_url($data['image_url'] ?? null), video_embed_url($data['video_url'] ?? null), $data['approver_role_id'] ?? null]);
     $id = (int) db()->lastInsertId();
     transition('article', $id, 'submitted', $user['id']);
     audit_log('article_create', 'article', $id);
@@ -2134,6 +2173,7 @@ try {
       if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = $data[$f]; }
     }
     if (array_key_exists('body', $data)) { $sets[] = 'body = ?'; $args[] = sanitize_rich_html($data['body']); }
+    if (array_key_exists('video_url', $data)) { $sets[] = 'video_url = ?'; $args[] = video_embed_url($data['video_url']); }
     if (array_key_exists('tags', $data)) {
       $tags = $data['tags'];
       if (is_string($tags)) { $decoded = json_decode($tags, true); $tags = is_array($decoded) ? $decoded : array_map('trim', explode(',', $tags)); }
@@ -2149,6 +2189,24 @@ try {
       transition('article', $aid, 'draft', $user['id']);
     }
     audit_log('article_update', 'article', $aid);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/articles/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    $user = require_login();
+    $aid = (int) $m[1];
+    $stmt = db()->prepare('SELECT author_id, title FROM articles WHERE id = ?');
+    $stmt->execute([$aid]);
+    $art = $stmt->fetch();
+    if (!$art) json_error('Article not found', 404);
+    $isAuthor = (int) $art['author_id'] === (int) $user['id'];
+    if (!$isAuthor && !user_has_cap($user['id'], 'articles.approve')) {
+      json_error('Insufficient permissions: cannot delete this article', 403);
+    }
+    db()->prepare('DELETE FROM articles WHERE id = ?')->execute([$aid]);
+    audit_log('article_delete', 'article', $aid, ['title' => $art['title']]);
+    if (!$isAuthor) {
+      notify_user((int) $art['author_id'], 'article_deleted', 'Article deleted: ' . $art['title'], 'Deleted by ' . $user['name'] . '.', '/dashboard');
+    }
     json_response(['ok' => true]);
   }
 
@@ -3387,7 +3445,7 @@ try {
     json_response($stmt->fetchAll());
   }
   elseif (preg_match('#^/public/articles/(\d+)$#', $path, $m) && $method === 'GET') {
-    $stmt = db()->prepare('SELECT a.id, a.title, a.body, a.category, a.tags, a.image_url, a.published_at, a.created_at, a.author_id, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.id = ? AND a.status = "published"');
+    $stmt = db()->prepare('SELECT a.id, a.title, a.body, a.category, a.tags, a.image_url, a.video_url, a.published_at, a.created_at, a.author_id, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.id = ? AND a.status = "published"');
     $stmt->execute([(int) $m[1]]);
     $article = $stmt->fetch();
     if (!$article) json_error('Article not found', 404);
@@ -3623,6 +3681,7 @@ try {
       if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = sanitize_rich_html($data[$f]); }
     }
     if (array_key_exists('image_url', $data)) { $sets[] = 'image_url = ?'; $args[] = clean_image_url($data['image_url']); }
+    if (array_key_exists('video_url', $data)) { $sets[] = 'video_url = ?'; $args[] = video_embed_url($data['video_url']); }
     if (array_key_exists('slug', $data)) { $s = makeSlug($data['slug'], 'programmes', $id); $sets[] = 'slug = ?'; $args[] = $s; }
     if (array_key_exists('budget', $data)) { $sets[] = 'budget = ?'; $args[] = $data['budget'] !== null ? (float) $data['budget'] : null; }
     if (array_key_exists('spent', $data)) { $sets[] = 'spent = ?'; $args[] = $data['spent'] !== null ? (float) $data['spent'] : null; }
@@ -3630,6 +3689,22 @@ try {
     $args[] = $id;
     db()->prepare('UPDATE programmes SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($args);
     audit_log('programme_update', 'programme', $id);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/programmes/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    // Destructive: members/applications cascade, projects/events/finance detach.
+    // System-wide programme managers only — leads cannot delete programmes.
+    $user = require_cap('programmes.manage');
+    $id = (int) $m[1];
+    $stmt = db()->prepare('SELECT title, created_by FROM programmes WHERE id = ?');
+    $stmt->execute([$id]);
+    $prog = $stmt->fetch();
+    if (!$prog) json_error('Programme not found', 404);
+    db()->prepare('DELETE FROM programmes WHERE id = ?')->execute([$id]);
+    audit_log('programme_delete', 'programme', $id, ['title' => $prog['title']]);
+    if ($prog['created_by'] && (int) $prog['created_by'] !== (int) $user['id']) {
+      notify_user((int) $prog['created_by'], 'programme_deleted', 'Programme deleted: ' . $prog['title'], 'Deleted by ' . $user['name'] . '.', '/dashboard');
+    }
     json_response(['ok' => true]);
   }
   elseif (preg_match('#^/programmes/(\d+)/members$#', $path, $m) && $method === 'GET') {

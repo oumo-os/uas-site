@@ -67,6 +67,10 @@
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Team</h3>
             <div id="pTeam"></div>
           </div>
+          <div class="card-section" id="pVideoSection" style="display:none">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg></span> Video</h3>
+            <div id="pVideo"></div>
+          </div>
           <div class="card-section" id="pEventsSection" style="display:none">
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span> Events</h3>
             <div id="pEvents"></div>
@@ -146,6 +150,11 @@
           return '<div class="event-row"><div class="ev-date"><div class="day" style="font-size:0.9rem">' + esc(initials) + '</div></div>' +
             '<div class="ev-info"><h4>' + esc(m.user_name) + '</h4><p>' + esc(m.role || 'Member') + '</p></div></div>';
         }).join('');
+      }
+      if (p.video_url) {
+        document.getElementById('pVideoSection').style.display = 'block';
+        document.getElementById('pVideo').innerHTML =
+          '<iframe src="' + esc(p.video_url) + '" style="width:100%;height:360px;border:0;border-radius:8px" allow="fullscreen; autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy" title="Project video"></iframe>';
       }
       if (p.events && p.events.length) {
         document.getElementById('pEventsSection').style.display = 'block';

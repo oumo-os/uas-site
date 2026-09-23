@@ -317,13 +317,13 @@
         const progImgs = ['/img/programme-telescope.jpg','/img/programme-observatory.jpg','/img/programme-stargazing.jpg','/img/programme-education.jpg'];
         if (programmes.length) {
           pDiv.innerHTML = programmes.slice(0, 6).map((p, i) => `
-            <div class="programme-card" onclick="location.href=ua('/' + (p.slug || p.id))">
+            <a class="programme-card" href="${ua('/' + (p.slug || p.id))}" style="display:block;text-decoration:none;color:inherit">
               <img src="${progImgs[i % progImgs.length]}" alt="${esc(p.title)}" class="card-thumb" loading="lazy">
               <div class="card-body">
                 <h3>${esc(p.title)}</h3>
                 <p>${esc(stripHtml(p.description || '').slice(0, 140))}</p>
               </div>
-            </div>
+            </a>
           `).join('');
         } else {
           pDiv.innerHTML = '<p class="text-center text-dim" style="grid-column:1/-1">Programmes coming soon.</p>';

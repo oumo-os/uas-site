@@ -222,11 +222,11 @@
       const arch = document.getElementById('archGrid');
       if (arch && programmes.length) {
         arch.innerHTML = programmes.map((p, i) => `
-          <div style="padding:1rem 1.25rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);cursor:pointer" onclick="location.href=ua('/' + (p.slug || p.id))">
+          <a href="${ua('/' + (p.slug || p.id))}" style="display:block;padding:1rem 1.25rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);text-decoration:none;color:inherit">
             <h4 style="font-size:0.92rem;margin-bottom:0.35rem">${i + 1}. ${esc(p.title)}</h4>
             <p style="font-size:0.85rem;color:var(--text-dim);line-height:1.5;margin:0">${esc(stripHtml(p.description || '').slice(0, 140))}</p>
             <p style="font-size:0.78rem;color:var(--text-dim);margin:0.5rem 0 0">Lead: ${p.lead_name ? esc(p.lead_name) : '<em>to be appointed</em>'}</p>
-          </div>`).join('');
+          </a>`).join('');
       }
 
       if (programmes.length) {
@@ -239,7 +239,7 @@
           const idx = start + i;
           const statusClass = p.status === 'active' ? 'success' : p.status === 'completed' ? 'dim' : 'accent';
           return `
-            <div class="programme-card" onclick="location.href=ua('/' + (p.slug || p.id))">
+            <a class="programme-card" href="${ua('/' + (p.slug || p.id))}" style="text-decoration:none;color:inherit">
               <img src="${imgs[idx % imgs.length]}" alt="${esc(p.title)}" loading="lazy">
               <div class="card-body">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
@@ -252,7 +252,7 @@
                 ${p.start_date ? `<span class="meta"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>${esc(p.start_date)}</span>` : ''}
                 <span class="meta" style="margin-left:auto;color:var(--accent)">View &rarr;</span>
               </div>
-            </div>
+            </a>
           `;
         }).join('');
 

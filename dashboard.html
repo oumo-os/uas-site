@@ -3373,6 +3373,7 @@
           ]},
           { name: 'body', label: 'Body', type: 'rich-text', required: true },
           { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image' },
+          { name: 'video_url', label: 'Video URL (optional)', type: 'text', placeholder: 'YouTube or Vimeo link', help: 'Embedded on the article page. Never hosted here.' },
         ];
       } else if (type === 'event') {
         title = 'Create Event';
@@ -3401,6 +3402,7 @@
           { name: 'description', label: 'Description', type: 'rich-text', rows: 4, required: true },
           { name: 'objectives', label: 'Objectives', type: 'textarea', rows: 3, placeholder: 'Key objectives and goals' },
           { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image' },
+          { name: 'video_url', label: 'Video URL (optional)', type: 'text', placeholder: 'YouTube or Vimeo link', help: 'Embedded on the programme page. Never hosted here.' },
         ];
       } else if (type === 'project') {
         title = 'Create Project';
@@ -3415,6 +3417,7 @@
           { name: 'description', label: 'Description', type: 'textarea', rows: 4, required: true },
           { name: 'objectives', label: 'Objectives', type: 'textarea', rows: 3 },
           { name: 'deadline', label: 'Deadline', type: 'date' },
+          { name: 'video_url', label: 'Video URL (optional)', type: 'text', placeholder: 'YouTube or Vimeo link', help: 'Embedded on the project page. Never hosted here.' },
         ];
       }
 
@@ -4701,6 +4704,7 @@
           const isAuthor = api._user && (data.author_id === api._user.id || data.author_name === api._user.name);
           const canEditArticle = (typeof data.viewer_can_edit === 'boolean') ? data.viewer_can_edit : (api.hasCap('articles.approve') || (isAuthor && ['draft','submitted','rejected'].includes(data.status)));
           if (canEditArticle) actions.push(`<button class="btn btn-outline btn-sm" onclick="editArticleForm(${id})">Edit</button>`);
+          if (canEditArticle) actions.push(`<button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="modalDelete('article', ${id})">Delete</button>`);
           if (data.status === 'submitted' || data.status === 'under_review') {
             if (api.hasCap('articles.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('article','approve',${id})">Approve</button>`);
             if (api.hasCap('articles.approve')) actions.push(`<button class="btn btn-danger btn-sm" onclick="modalRejectArticle(${id})">Reject</button>`);
@@ -4739,6 +4743,7 @@
           const isOwner = api._user && (data.organizer_id === api._user.id || data.created_by === api._user.id);
           const canEditEvent = (typeof data.viewer_can_edit === 'boolean') ? data.viewer_can_edit : (api.hasCap('events.approve') || (isOwner && !['completed','cancelled'].includes(data.status)));
           if (canEditEvent) actions.push(`<button class="btn btn-outline btn-sm" onclick="editEventForm(${id})">Edit</button>`);
+          if (canEditEvent) actions.push(`<button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="modalDelete('event', ${id})">Delete</button>`);
           if (data.status === 'submitted') {
             if (api.hasCap('events.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('event','approve',${id})">Approve</button>`);
             if (api.hasCap('events.publish')) actions.push(`<button class="btn btn-outline btn-sm" onclick="modalAction('event','publish',${id})">Publish</button>`);
@@ -4810,6 +4815,7 @@
           const isCreator = api._user && data.created_by === api._user.id;
           const canEditProject = (typeof data.viewer_can_edit === 'boolean') ? data.viewer_can_edit : (api.hasCap('projects.approve') || isCreator);
           if (canEditProject) actions.push(`<button class="btn btn-outline btn-sm" onclick="editProjectForm(${id})">Edit</button>`);
+          if (canEditProject) actions.push(`<button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="modalDelete('project', ${id})">Delete</button>`);
           if (data.status === 'submitted' || data.status === 'draft') {
             if (api.hasCap('projects.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('project','approve',${id})">Approve</button>`);
             if (api.hasCap('projects.approve')) actions.push(`<button class="btn btn-danger btn-sm" onclick="modalRejectProject(${id})">Reject</button>`);
@@ -4927,6 +4933,7 @@
           const actions = [];
           const canEditProg = (typeof data.viewer_can_edit === 'boolean') ? data.viewer_can_edit : api.hasCap('programmes.manage');
           if (canEditProg) actions.push(`<button class="btn btn-outline btn-sm" onclick="editProgrammeForm(${id})">Edit</button>`);
+          if (api.hasCap('programmes.manage')) actions.push(`<button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="modalDelete('programme', ${id})">Delete</button>`);
           if (data.status === 'draft' && canEditProg) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('programme','activate',${id})">Activate</button>`);
           html = `
             <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
@@ -5042,6 +5049,19 @@
       } catch(e) { toast(e.error || 'Failed', 'error'); }
     }
 
+    async function modalDelete(type, id) {
+      if (!confirm(`Permanently delete this ${type}? Linked registrations, teams and signups go with it. This cannot be undone.`)) return;
+      try {
+        if (type === 'event') await api.deleteEvent(id);
+        else if (type === 'project') await api.deleteProject(id);
+        else if (type === 'article') await api.deleteArticle(id);
+        else if (type === 'programme') await api.deleteProgramme(id);
+        else return;
+        closeModal(); toast('Deleted', 'success');
+        load();
+      } catch(e) { toast(e.error || 'Delete failed', 'error'); }
+    }
+
     // ── Edit forms (prefilled create forms → PUT; backend enforces permissions) ──
     async function editArticleForm(id) {
       try {
@@ -5056,9 +5076,11 @@
           ]},
           { name: 'body', label: 'Body', type: 'rich-text', required: true, value: a.body || '' },
           { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image', value: a.image_url || '' },
+          { name: 'video_url', label: 'Video URL (optional)', type: 'text', value: '', placeholder: 'YouTube or Vimeo link', help: a.video_url ? 'A video is already attached (replaced if you paste a new link).' : 'Embedded on the article page. Never hosted here.' },
         ];
         openModal('Edit Article', FormBuilder.render(fields, { id: 'edit-article', submitLabel: 'Save Changes' }));
         FormBuilder.init('edit-article', fields, async (data) => {
+          if (!data.video_url) delete data.video_url;
           await api.updateArticle(id, data);
           closeModal(); toast('Article updated', 'success');
           showItemDetail('article', id);
@@ -5113,9 +5135,11 @@
           { name: 'description', label: 'Description', type: 'textarea', rows: 4, required: true, value: stripHtml(p.description || '') },
           { name: 'objectives', label: 'Objectives', type: 'textarea', rows: 3, value: stripHtml(p.objectives || '') },
           { name: 'deadline', label: 'Deadline', type: 'date', value: p.deadline || '' },
+          { name: 'video_url', label: 'Video URL (optional)', type: 'text', value: '', placeholder: 'YouTube or Vimeo link', help: p.video_url ? 'A video is already attached (replaced if you paste a new link).' : 'Embedded on the project page. Never hosted here.' },
         ];
         openModal('Edit Project', FormBuilder.render(fields, { id: 'edit-project', submitLabel: 'Save Changes' }));
         FormBuilder.init('edit-project', fields, async (data) => {
+          if (!data.video_url) delete data.video_url;
           await api.updateProject(id, data);
           closeModal(); toast('Project updated', 'success');
           showItemDetail('project', id);
@@ -5163,9 +5187,11 @@
           { name: 'objectives', label: 'Objectives', type: 'textarea', rows: 3, value: stripHtml(p.objectives || '') },
           { name: 'outputs', label: 'Expected Outputs', type: 'textarea', rows: 3, value: stripHtml(p.outputs || '') },
           { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image', value: p.image_url || '' },
+          { name: 'video_url', label: 'Video URL (optional)', type: 'text', value: '', placeholder: 'YouTube or Vimeo link', help: p.video_url ? 'A video is already attached (replaced if you paste a new link).' : 'Embedded on the programme page. Never hosted here.' },
         ];
         openModal('Edit Programme', FormBuilder.render(fields, { id: 'edit-programme', submitLabel: 'Save Changes' }));
         FormBuilder.init('edit-programme', fields, async (data) => {
+          if (!data.video_url) delete data.video_url;
           await api.updateProgramme(id, data);
           closeModal(); toast('Programme updated', 'success');
           loadMyProgrammes();

@@ -177,6 +177,14 @@
 
       document.getElementById('aBody').innerHTML = a.body || '<p class="text-dim">No content.</p>';
 
+      if (a.video_url) {
+        var vSec = document.createElement('div');
+        vSec.className = 'card-section';
+        vSec.innerHTML = '<h3>Video</h3><iframe src="' + esc(a.video_url) + '" style="width:100%;height:360px;border:0;border-radius:8px" allow="fullscreen; autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy" title="Article video"></iframe>';
+        var aBody = document.getElementById('aBody');
+        aBody.parentNode.insertBefore(vSec, aBody.nextSibling);
+      }
+
       var tags = parseTags(a.tags);
       if (tags.length) {
         document.getElementById('aTags').innerHTML = tags.map(function(t){
