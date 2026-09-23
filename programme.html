@@ -179,8 +179,13 @@
       // filter out known static segments
       if (['programmes','programme','projects','project','events','event','articles','article'].indexOf(key) !== -1) key = null;
       if (!key) { document.getElementById('pTitle').textContent = 'Programme not found'; return; }
-      var p = await api.getPublicProgramme(key).catch(function(){ return null; });
-      if (!p) { document.getElementById('pTitle').textContent = 'Programme not found'; return; }
+      var pErr = null;
+      var p = await api.getPublicProgramme(key).catch(function(e){ pErr = e; return null; });
+      if (!p) {
+        var detail = pErr && (pErr.status || pErr.error) ? ' (HTTP ' + (pErr.status || '?') + (pErr.error && pErr.error.length < 120 ? ': ' + pErr.error : '') + ')' : '';
+        document.getElementById('pTitle').textContent = 'Programme not found' + detail;
+        return;
+      }
       window._progId = p.id;
       window._progSlug = p.slug;
       render(p);
