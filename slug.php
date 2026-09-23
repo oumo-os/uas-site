@@ -1,17 +1,20 @@
 <?php
-// Detail router + social-share meta injector.
+// Detail router + base fix + social-share meta injector.
 // Serves programme / project / event / article detail pages under clean URLs
-// (200, no redirect) with item-specific Open Graph tags injected server-side,
-// because link scrapers (WhatsApp, Facebook, X, Telegram) don't run JavaScript.
-// Routes here via .htaccess: /<slug>, /events/<slug|id>, /article/<id>,
-// /programmes/<id>. Only publicly visible items get specific tags; anything
-// else falls back to the template's generic tags (same as before).
+// (200, no redirect). Two jobs beyond routing:
+//  1. Base fix: a bare slug (/<slug>) would otherwise be mistaken client-side
+//     for a subdirectory, breaking every API call and rewritten link on the
+//     page. Served pages get a server-computed <base> + window.UAS_BASE.
+//  2. Share meta: item-specific Open Graph tags injected server-side,
+//     because link scrapers (WhatsApp, Facebook, X, Telegram) don't run JS.
+// Routes here via .htaccess: /<slug>, /events/<slug|id>, /event/<slug|id>,
+// /article/<id>, /programmes/<id|slug>. Only publicly visible items get
+// specific tags; anything else falls back to the template's generic tags.
 require_once __DIR__ . '/api/share-meta.php';
 
 function slug_404(): void {
   http_response_code(404);
-  include __DIR__ . '/404.html';
-  exit;
+  serve_template(__DIR__ . '/404.html');
 }
 
 $type = strtolower(trim($_GET['type'] ?? 'auto'));
@@ -41,7 +44,7 @@ if ($slug !== '' && !preg_match('/^[a-z0-9-]{2,120}$/', $slug)) slug_404();
 try {
   $db = db();
 
-  // --- Programme: /<slug> or /programmes/<id> ---
+  // --- Programme: /<slug> or /programmes/<id|slug> ---
   if (in_array($type, ['auto', 'programme'], true)) {
     $row = null;
     if ($type === 'programme' || $slug !== '') {
@@ -65,10 +68,9 @@ try {
           'url' => $canon,
         ]);
       }
-      include __DIR__ . '/programme.html';
-      exit;
+      serve_template(__DIR__ . '/programme.html');
     }
-    if ($type === 'programme') { include __DIR__ . '/programme.html'; exit; }
+    if ($type === 'programme') serve_template(__DIR__ . '/programme.html');
   }
 
   // --- Project: /<slug> ---
@@ -85,8 +87,7 @@ try {
           'url' => $canon,
         ]);
       }
-      include __DIR__ . '/project.html';
-      exit;
+      serve_template(__DIR__ . '/project.html');
     }
   }
 
@@ -111,8 +112,7 @@ try {
         'url' => SITE_URL . '/events/' . ($row['slug'] ?: $row['id']),
       ]);
     }
-    include __DIR__ . '/event.html';
-    exit;
+    serve_template(__DIR__ . '/event.html');
   }
 
   // --- Article: /article/<id> ---
@@ -129,16 +129,15 @@ try {
           'type' => 'article',
         ]);
       }
-      include __DIR__ . '/article.html';
-      exit;
+      serve_template(__DIR__ . '/article.html');
     }
-    include __DIR__ . '/article.html';
-    exit;
+    serve_template(__DIR__ . '/article.html');
   }
 } catch (Exception $e) {
-  // Database unavailable: serve the plain template rather than breaking the page.
+  // Database unavailable: serve the plain template (with correct base)
+  // rather than breaking the page.
   foreach (['programme' => 'programme.html', 'project' => 'project.html', 'event' => 'event.html', 'article' => 'article.html'] as $t => $tpl) {
-    if ($type === $t) { include __DIR__ . '/' . $tpl; exit; }
+    if ($type === $t) serve_template(__DIR__ . '/' . $tpl);
   }
 }
 

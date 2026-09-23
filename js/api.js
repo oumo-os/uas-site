@@ -4,11 +4,18 @@
 // App base path: "/uas" when served under a subdirectory, "" at domain root.
 // Derived from the script's own URL so it works anywhere.
 (function () {
+  // Prefer the server-seeded base (set by slug.php before this script runs);
+  // it is always right, including on bare-slug detail URLs where a slug
+  // would otherwise be mistaken for a subdirectory.
   let base = '';
   try {
-    const src = (document.currentScript && document.currentScript.src) || '';
-    const m = src.match(/^https?:\/\/[^/]+(\/[^?]*)?\/js\/api\.js/);
-    if (m) base = (m[1] || '').replace(/\/$/, '');
+    if (typeof window.UAS_BASE === 'string') {
+      base = window.UAS_BASE;
+    } else {
+      const src = (document.currentScript && document.currentScript.src) || '';
+      const m = src.match(/^https?:\/\/[^/]+(\/[^?]*)?\/js\/api\.js/);
+      if (m) base = (m[1] || '').replace(/\/$/, '');
+    }
   } catch (e) {}
   window.UAS_BASE = base;
   window.API_BASE = window.location.origin + base + '/api';

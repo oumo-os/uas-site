@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <script>(function(){var s=location.pathname.replace(/\/+$/,'').split('/').filter(Boolean);var P=/^(index\.html|index|about|programmes|programme|projects|project|events|event|news|knowledge|article|articles|library|search|ecosystem|members|join|login|dashboard|profile|admin|member|guide|404\.html|gallery|contact)$/;while(s.length>=2&&/^(article|articles|event|events|programme|programmes|projects|project|poll|polls|resolution|resolutions)$/.test(s[s.length-2])&&/^[^\/]+$/.test(s[s.length-1])){var maybe=s[s.length-1];if(/^\d+$/.test(maybe)||/^[a-z0-9-]+$/.test(maybe)){s.pop();s.pop();continue;}break;}while(s.length&&(P.test(s[s.length-1])||/\.[a-z0-9]+$/i.test(s[s.length-1]))){s.pop();}var base=s.length?'/'+s.join('/'):'';var b=document.createElement('base');b.href=base+'/';document.head.appendChild(b);if(!window.UAS_BASE)window.UAS_BASE=base;})();</script>
+  <script>(function(){var s=location.pathname.replace(/\/+$/,'').split('/').filter(Boolean);var P=/^(index\.html|index|about|programmes|programme|projects|project|events|event|news|knowledge|article|articles|library|search|ecosystem|members|join|login|dashboard|profile|admin|member|guide|404\.html|gallery|contact)$/;while(s.length>=2&&/^(article|articles|event|events|programme|programmes|projects|project|poll|polls|resolution|resolutions)$/.test(s[s.length-2])&&/^[^\/]+$/.test(s[s.length-1])){var maybe=s[s.length-1];if(/^\d+$/.test(maybe)||/^[a-z0-9-]+$/.test(maybe)){s.pop();s.pop();continue;}break;}while(s.length&&(P.test(s[s.length-1])||/\.[a-z0-9]+$/i.test(s[s.length-1]))){s.pop();}var base=s.length?'/'+s.join('/'):'';var b=document.createElement('base');b.href=base+'/';document.head.appendChild(b);if(window.UAS_BASE===undefined)window.UAS_BASE=base;})();</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/png" href="img/uas-emblem.png">
   <title>Member Guide — Uganda Astronomical Society</title>
@@ -215,7 +215,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260922-12"></script>
+  <script src="js/api.js?v=20260922-13"></script>
   <script>
     function showSec(name, on) {
       document.querySelectorAll('[data-sec="' + name + '"]').forEach(function(el){ el.style.display = on ? '' : 'none'; });
