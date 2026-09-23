@@ -10,7 +10,7 @@
   <meta property="og:url" content="https://astronomy.ug/member/submit-article">
   <meta name="robots" content="noindex, nofollow">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="../css/base.css?v=20260911-8">
+  <link rel="stylesheet" href="../css/base.css?v=20260923-1">
 </head>
 <body>
   <nav class="nav">
@@ -78,7 +78,7 @@
     <p>Uganda Astronomical Society &middot; Institutional Platform</p>
   </footer>
 
-  <script src="../js/api.js?v=20260922-13"></script>
+  <script src="../js/api.js?v=20260923-1"></script>
   <script>
     async function load() {
       try {
