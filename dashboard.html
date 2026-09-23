@@ -106,6 +106,7 @@
     .stat-card.finance .stat-icon { background: rgba(45,106,79,0.1); color: var(--success); }
     .stat-value { font-size: 1.75rem; font-weight: 700; color: var(--text); line-height: 1; }
     .stat-label { font-size: 0.75rem; color: var(--text-dim); margin-top: 0.3rem; }
+    .stat-link { font-size: 0.72rem; color: var(--accent); margin-top: 0.45rem; font-weight: 600; }
     .stat-trend { display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.68rem; font-weight: 600; margin-top: 0.25rem; }
     .stat-trend.up { color: var(--success); }
     .stat-trend.down { color: var(--danger); }
@@ -310,6 +311,19 @@
     .cal-day-dot.eventdate { background: transparent; border: 1.5px solid var(--accent); width: 5px; height: 5px; }
     .cal-legend { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.4rem; font-size: 0.68rem; color: var(--text-dim); }
     .cal-legend-item { display: flex; align-items: center; gap: 0.2rem; }
+
+    /* ── Kanban review board ── */
+    .kanban { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; align-items: start; }
+    @media (max-width: 1100px) { .kanban { grid-template-columns: repeat(3, minmax(230px, 1fr)); overflow-x: auto; padding-bottom: 0.5rem; } }
+    .kan-col { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0.6rem; min-height: 140px; }
+    .kan-col.dragover { border-color: var(--accent); background: var(--accent-glow); }
+    .kan-col-head { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+    .kan-count { background: var(--border); border-radius: 999px; padding: 0.05rem 0.5rem; font-size: 0.7rem; }
+    .kan-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem; margin-bottom: 0.5rem; cursor: grab; font-size: 0.82rem; }
+    .kan-card:active { cursor: grabbing; }
+    .kan-card.dragging { opacity: 0.35; }
+    .kan-card h5 { font-size: 0.85rem; margin: 0 0 0.2rem; line-height: 1.35; }
+    @media (max-width: 899px) { #pendingViewToggle { display: none; } }
 
     /* ── Modal ── */
     .modal-overlay {
@@ -755,10 +769,17 @@
         <div class="dash-card">
           <div class="dash-card-header">
             <h4>Items to review</h4>
-            <div id="pendingCounts" class="text-sm text-dim"></div>
+            <div style="display:flex;gap:0.5rem;align-items:center">
+              <div style="display:flex;gap:0.3rem" id="pendingViewToggle">
+                <button class="btn btn-outline btn-xs" id="pvListBtn" onclick="switchPendingView('list')">List</button>
+                <button class="btn btn-outline btn-xs" id="pvBoardBtn" onclick="switchPendingView('board')">Board</button>
+              </div>
+              <div id="pendingCounts" class="text-sm text-dim"></div>
+            </div>
           </div>
           <div id="allPending"></div>
           <div class="pagination" id="pendingPagination"></div>
+          <div id="pendingBoard" style="display:none"></div>
         </div>
       </div>
     </div>
@@ -1111,11 +1132,21 @@
         const initials = ((user.name || '?').split(' ').map(w => w[0]).filter(Boolean).join('') || '?').toUpperCase().slice(0, 2);
         document.getElementById('dashAvatar').textContent = initials;
         document.getElementById('dashTitle').textContent = `Welcome back, ${user.name.split(' ')[0]}`;
-        document.getElementById('dashSubtitle').textContent = user.email;
         updateNavUser();
 
-        // Role badges in hero
+        // Subtitle: member class (roles already carry it — no extra fetch)
         const roles = data.roles || [];
+        const myClass = (roles.find(r => r.role_type === 'member_class') || {}).title || '';
+        document.getElementById('dashSubtitle').textContent = [myClass, user.email].filter(Boolean).join(' · ');
+        api.request('/programmes/mine').catch(() => []).then(mine => {
+          const led = (mine || []).filter(p => p.is_lead);
+          if (led.length) {
+            document.getElementById('dashSubtitle').textContent =
+              [myClass, 'Leading ' + led.map(p => p.title).join(', ')].filter(Boolean).join(' · ');
+          }
+        });
+
+        // Role badges in hero
         const rolesEl = document.getElementById('dashRoles');
         if (roles.length) {
           rolesEl.innerHTML = roles.map(r => {
@@ -1213,38 +1244,45 @@
           <div class="stat-value">${health.members?.active || 0}</div>
           <div class="stat-label">Active Members</div>
           ${newQ > 0 ? '<div class="stat-trend up">+' + newQ + ' this quarter</div>' : ''}
+          <div class="stat-link">View details &rarr;</div>
         </div>
         <div class="stat-card programmes" onclick="location.href=ua('/programmes')" title="View programmes">
           <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span></div>
           <div class="stat-value">${health.programmes?.active || 0}</div>
           <div class="stat-label">Programmes</div>
+          <div class="stat-link">View details &rarr;</div>
         </div>
         <div class="stat-card projects" onclick="location.href=ua('/programmes')" title="View projects within programmes">
           <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/></svg></span></div>
           <div class="stat-value">${health.projects?.active || 0}</div>
           <div class="stat-label">Projects</div>
+          <div class="stat-link">View details &rarr;</div>
         </div>
         <div class="stat-card events" onclick="location.href=ua('/events')" title="View events">
           <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span></div>
           <div class="stat-value">${health.events?.upcoming || 0}</div>
           <div class="stat-label">Upcoming Events</div>
           ${meetingsUp > 0 ? '<div class="stat-trend up">' + meetingsUp + ' upcoming meeting' + (meetingsUp > 1 ? 's' : '') + '</div>' : ''}
+          <div class="stat-link">View details &rarr;</div>
         </div>
         <div class="stat-card pending" onclick="switchTab('pending')" title="View pending items">
           <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span></div>
           <div class="stat-value" style="color:${overdueCount > 0 ? 'var(--danger)' : ''}">${health.pending?.total || 0}</div>
           <div class="stat-label">Pending Items</div>
           ${overdueCount > 0 ? '<div class="stat-trend down">' + overdueCount + ' overdue</div>' : '<div class="stat-trend neutral">On track</div>'}
+          <div class="stat-link">View details &rarr;</div>
         </div>
         <div class="stat-card resolutions" onclick="goGov('resolutions')" title="View resolutions">
           <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span></div>
           <div class="stat-value">${health.governance?.total || 0}</div>
           <div class="stat-label">Resolutions</div>
+          <div class="stat-link">View details &rarr;</div>
         </div>
         <div class="stat-card polls" onclick="goGov('polls')" title="View polls">
           <div class="stat-icon"><span class="icon-inline icon-lg"><svg viewBox="0 0 24 24"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M17 3H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/></svg></span></div>
           <div class="stat-value">${pollOpen}</div>
           <div class="stat-label">Open Polls</div>
+          <div class="stat-link">View details &rarr;</div>
         </div>
       `;
 
@@ -2765,10 +2803,148 @@
       if (cal && document.getElementById('panel-pending')?.classList.contains('active')) renderPendingCalendar();
     }
 
+    // ── Pending view: list + kanban board (desktop) ──
+    let pendingView = localStorage.getItem('uas-pending-view') || (window.matchMedia('(min-width: 900px)').matches ? 'board' : 'list');
+    if (!window.matchMedia('(min-width: 900px)').matches) pendingView = 'list';
+
+    function switchPendingView(v) {
+      if (v === 'board' && !window.matchMedia('(min-width: 900px)').matches) v = 'list';
+      pendingView = v;
+      try { localStorage.setItem('uas-pending-view', v); } catch (e) {}
+      applyPendingView();
+    }
+
+    function applyPendingView() {
+      const board = pendingView === 'board';
+      document.getElementById('allPending').style.display = board ? 'none' : '';
+      document.getElementById('pendingPagination').style.display = board ? 'none' : '';
+      document.getElementById('pendingBoard').style.display = board ? '' : 'none';
+      const lb = document.getElementById('pvListBtn'), bb = document.getElementById('pvBoardBtn');
+      if (lb) lb.className = 'btn btn-xs ' + (!board ? 'btn-primary' : 'btn-outline');
+      if (bb) bb.className = 'btn btn-xs ' + (board ? 'btn-primary' : 'btn-outline');
+      if (board) renderBoard();
+    }
+
+    function boardCol(item) {
+      if (!['article', 'event', 'project', 'document'].includes(item.item_type)) return null;
+      if (item.status === 'under_review') return 'review';
+      if (item.status === 'approved') return 'approved';
+      return 'submitted'; // submitted + draft queue up for review
+    }
+
+    function renderBoard() {
+      const div = document.getElementById('pendingBoard');
+      if (!div) return;
+      const cols = [
+        { key: 'submitted', label: 'Submitted' },
+        { key: 'review', label: 'Under Review' },
+        { key: 'approved', label: 'Approved' },
+      ];
+      const byCol = { submitted: [], review: [], approved: [] };
+      let listed = 0;
+      allPendingData.forEach(item => {
+        const c = boardCol(item);
+        if (c) byCol[c].push(item); else listed++;
+      });
+      div.innerHTML = cols.map(c => `
+        <div class="kan-col" data-col="${c.key}" ondragover="kanOver(event)" ondragleave="kanLeave(event)" ondrop="kanDrop(event)">
+          <div class="kan-col-head"><span>${c.label}</span><span class="kan-count">${byCol[c.key].length}</span></div>
+          <div>${byCol[c.key].map(kanCard).join('') || '<p class="text-dim text-sm" style="text-align:center;padding:1rem 0">—</p>'}</div>
+        </div>`).join('')
+        + (listed ? `<p class="text-dim text-sm" style="margin:0.5rem 0 0">${listed} item${listed === 1 ? '' : 's'} (votes, applications, assignments) stay in list view — <a href="#" onclick="switchPendingView('list');return false">switch to list</a>.</p>` : '');
+    }
+
+    function kanCard(item) {
+      const ageDays = item.created_at ? Math.floor((Date.now() - new Date(item.created_at)) / 86400000) : 0;
+      const age = ageDays <= 0 ? 'Today' : ageDays === 1 ? 'Yesterday' : ageDays + 'd ago';
+      let pub = '';
+      if (item.status === 'approved') {
+        if (item.item_type === 'article' && api.hasCap('articles.publish')) pub = `<button class="btn btn-outline btn-xs" onclick="event.stopPropagation();actOnItem('article','publish',${item.id})">Publish</button>`;
+        if (item.item_type === 'event' && api.hasCap('events.publish')) pub = `<button class="btn btn-outline btn-xs" onclick="event.stopPropagation();actOnItem('event','publish',${item.id})">Publish</button>`;
+        if (item.item_type === 'document' && api.hasCap('documents.publish')) pub = `<button class="btn btn-outline btn-xs" onclick="event.stopPropagation();actOnItem('document','publish',${item.id})">Publish</button>`;
+        if (item.item_type === 'project' && api.hasCap('projects.approve')) pub = `<button class="btn btn-outline btn-xs" onclick="event.stopPropagation();actOnItem('project','publish',${item.id})">Publish</button>`;
+      }
+      return `
+        <div class="kan-card" draggable="true" ondragstart="kanDragStart(event)" ondragend="kanDragEnd(event)" onclick="kanCardClick(event, '${item.item_type}', ${item.id})"
+          data-type="${item.item_type}" data-id="${item.id}">
+          <span class="pending-type-badge ${esc(item.item_type)}">${esc(item.item_type)}</span>
+          <h5>${esc(item.title || item.name)}</h5>
+          <div class="text-dim text-sm">by ${esc(item.author_name || 'Unknown')} · ${age}</div>
+          ${pub ? `<div style="margin-top:0.35rem">${pub}</div>` : ''}
+        </div>`;
+    }
+
+    let kanJustDragged = false;
+    function kanCardClick(e, type, id) {
+      if (kanJustDragged) return;
+      showItemDetail(type, id);
+    }
+    function kanDragStart(e) {
+      const card = e.target.closest('.kan-card');
+      if (!card) return;
+      e.dataTransfer.setData('text/plain', JSON.stringify({ type: card.dataset.type, id: parseInt(card.dataset.id, 10) }));
+      e.dataTransfer.effectAllowed = 'move';
+      card.classList.add('dragging');
+    }
+    function kanDragEnd(e) {
+      const card = e.target.closest('.kan-card');
+      if (card) card.classList.remove('dragging');
+      document.querySelectorAll('.kan-col.dragover').forEach(c => c.classList.remove('dragover'));
+      kanJustDragged = true;
+      setTimeout(() => { kanJustDragged = false; }, 250);
+    }
+    function kanOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const col = e.target.closest('.kan-col');
+      if (col) col.classList.add('dragover');
+    }
+    function kanLeave(e) {
+      const col = e.target.closest('.kan-col');
+      if (col) col.classList.remove('dragover');
+    }
+    async function kanDrop(e) {
+      e.preventDefault();
+      const col = e.target.closest('.kan-col');
+      if (!col) return;
+      col.classList.remove('dragover');
+      let d;
+      try { d = JSON.parse(e.dataTransfer.getData('text/plain')); } catch (err) { return; }
+      const item = allPendingData.find(i => i.item_type === d.type && Number(i.id) === Number(d.id));
+      if (!item) return;
+      const from = boardCol(item);
+      const to = col.dataset.col;
+      if (from === to) return;
+      if (to === 'submitted') { toast('Work only moves forward — reopen from the item details if needed', 'warning'); return; }
+      if (to === 'review') {
+        if (item.item_type !== 'article' || item.status !== 'submitted') {
+          toast('Only submitted articles pause in Under Review', 'warning');
+          return;
+        }
+        if (!api.hasCap('articles.review') && !api.hasCap('articles.approve')) { toast('You cannot review articles', 'warning'); return; }
+        try {
+          await api.request(`/articles/${item.id}/review`, { method: 'POST' });
+          toast('Review started', 'success');
+          const pending = await api.getPending();
+          renderOverview(pending);
+          renderPending(pending);
+        } catch (err) { toast(err.error || 'Action failed', 'error'); }
+        return;
+      }
+      if (to === 'approved') {
+        if (!['submitted', 'under_review', 'draft'].includes(item.status)) { toast('Only submitted work can be approved', 'warning'); return; }
+        const need = { article: 'articles.approve', event: 'events.approve', project: 'projects.approve', document: 'documents.approve' }[item.item_type];
+        if (need && !api.hasCap(need)) { toast('You cannot approve ' + item.item_type + 's', 'warning'); return; }
+        actOnItem(item.item_type, 'approve', item.id);
+        return;
+      }
+    }
+
     function renderPending(pending) {
       allPendingData = pending;
       renderPendingCalendar();
       renderPendingList();
+      applyPendingView();
 
       // Update counts
       const counts = {};
@@ -3417,6 +3593,7 @@
           { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts, value: opts.programme_id || '' },
           { name: 'description', label: 'Description', type: 'textarea', rows: 4, required: true },
           { name: 'objectives', label: 'Objectives', type: 'textarea', rows: 3 },
+          { name: 'start_date', label: 'Start Date', type: 'date' },
           { name: 'deadline', label: 'Deadline', type: 'date' },
           { name: 'video_url', label: 'Video URL (optional)', type: 'text', placeholder: 'YouTube or Vimeo link', help: 'Embedded on the project page. Never hosted here.' },
         ];
@@ -3990,31 +4167,136 @@
       } catch (e) { toast(e.error || 'Failed','error'); }
     }
 
+    // ── Project milestones (progress feeds the timeline) ──
+    function projMilestoneList(d) {
+      try {
+        const ms = Array.isArray(d.milestones) ? d.milestones : JSON.parse(d.milestones || '[]');
+        return Array.isArray(ms) ? ms : [];
+      } catch (e) { return []; }
+    }
+
+    function projMilestonesHtml(data, id) {
+      const ms = projMilestoneList(data);
+      const done = ms.filter(m => m.done).length;
+      const canEdit = (typeof data.viewer_can_edit === 'boolean') ? data.viewer_can_edit : (api.hasCap('projects.approve') || (api._user && data.created_by === api._user.id));
+      const rows = ms.length ? ms.map((m, i) => `
+        <div style="display:flex;gap:0.5rem;align-items:center;padding:0.3rem 0;border-bottom:1px solid var(--border);font-size:0.85rem">
+          ${canEdit ? `<input type="checkbox"${m.done ? ' checked' : ''} onchange="toggleMilestone(${id}, ${i}, this.checked)" style="width:1rem;height:1rem;flex-shrink:0">` : (m.done ? '<span style="color:var(--success)">✓</span>' : '<span class="text-dim">○</span>')}
+          <span style="flex:1;min-width:0;${m.done ? 'text-decoration:line-through;color:var(--text-dim)' : ''}">${esc(m.title)}</span>
+          ${m.due_date ? `<span class="text-dim text-sm" style="white-space:nowrap">${esc(m.due_date)}</span>` : ''}
+          ${canEdit ? `<button class="btn btn-outline btn-xs" style="color:var(--danger)" onclick="deleteMilestone(${id}, ${i})">✕</button>` : ''}
+        </div>`).join('') : '<p class="text-dim text-sm">No milestones yet.</p>';
+      return `<div class="field"><div class="field-label">Milestones${ms.length ? ` (${done}/${ms.length})` : ''}</div>
+        <div style="max-height:180px;overflow-y:auto">${rows}</div>
+        ${canEdit ? `<div style="display:flex;gap:0.4rem;margin-top:0.5rem;flex-wrap:wrap">
+          <input id="ms-title-${id}" placeholder="New milestone" style="flex:1;min-width:140px;padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);font-size:0.85rem">
+          <input id="ms-due-${id}" type="date" style="padding:0.4rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);font-size:0.85rem">
+          <button class="btn btn-outline btn-sm" onclick="addMilestone(${id})">Add</button>
+        </div>` : ''}</div>`;
+    }
+
+    async function saveMilestones(id, ms) {
+      try {
+        await api.updateProject(id, { milestones: ms });
+        showItemDetail('project', id);
+      } catch (e) { toast(e.error || 'Failed to save milestones', 'error'); }
+    }
+
+    async function toggleMilestone(id, i, done) {
+      try {
+        const p = await api.getProject(id);
+        const ms = projMilestoneList(p);
+        if (!ms[i]) return;
+        ms[i].done = !!done;
+        await saveMilestones(id, ms);
+      } catch (e) { toast(e.error || 'Failed', 'error'); }
+    }
+
+    async function addMilestone(id) {
+      const title = (document.getElementById(`ms-title-${id}`)?.value || '').trim();
+      if (!title) { toast('Milestone title is required', 'warning'); return; }
+      const due = document.getElementById(`ms-due-${id}`)?.value || null;
+      try {
+        const p = await api.getProject(id);
+        const ms = projMilestoneList(p);
+        ms.push({ title, due_date: due || null, done: false });
+        await saveMilestones(id, ms);
+        toast('Milestone added', 'success');
+      } catch (e) { toast(e.error || 'Failed', 'error'); }
+    }
+
+    async function deleteMilestone(id, i) {
+      if (!confirm('Delete this milestone?')) return;
+      try {
+        const p = await api.getProject(id);
+        const ms = projMilestoneList(p);
+        ms.splice(i, 1);
+        await saveMilestones(id, ms);
+      } catch (e) { toast(e.error || 'Failed', 'error'); }
+    }
+
+    const progProjView = {};
+    const progCache = {};
     async function loadProgProjects(pid) {
       const box = document.getElementById(`prog-projects-${pid}`);
       if (!box) return;
       box.innerHTML = '<p class="text-dim">Loading projects…</p>';
       try {
-        const all = await api.request('/projects').catch(()=>[]);
+        const [all, events] = await Promise.all([
+          api.request('/projects').catch(() => []),
+          api.request(`/events?programme_id=${pid}`).catch(() => []),
+        ]);
         const filtered = all.filter(p => String(p.programme_id) === String(pid));
-        if (!filtered.length) {
-          box.innerHTML = '<div class="empty-state" style="padding:1rem"><p>No projects in this programme yet.</p></div>'
-            + `<button class="btn btn-primary btn-sm" onclick="switchTab('create'); showCreateForm('project', {programme_id: ${pid}})">New Project in this Programme</button>`;
-          return;
-        }
-        box.innerHTML = filtered.map(pr => `
-          <div class="wg-card" style="margin-bottom:0.5rem">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem">
-              <div style="flex:1; min-width:0; cursor:pointer" onclick="showItemDetail('project', ${pr.id})">
-                <h4 style="margin:0">${esc(pr.title)} <span class="badge badge-${esc(pr.status)}" style="font-size:0.65rem">${esc(pr.status)}</span></h4>
-                <p class="text-dim text-sm">${esc(stripHtml(pr.description||'').slice(0,120))}</p>
-                <div class="text-dim text-sm">${pr.deadline ? 'Due: '+esc(pr.deadline) : ''}</div>
-              </div>
-              <button class="btn btn-outline btn-xs" id="proj-parts-btn-${pid}-${pr.id}" onclick="toggleProjParts(${pid}, ${pr.id})">Team</button>
-            </div>
-            <div id="proj-parts-${pid}-${pr.id}" style="display:none; margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border)"></div>
-          </div>`).join('') + `<div style="margin-top:0.75rem"><button class="btn btn-outline btn-sm" onclick="switchTab('create'); showCreateForm('project', {programme_id: ${pid}})">New Project</button></div>`;
+        progCache[pid] = { projects: filtered, events: events || [] };
+        if (!progProjView[pid]) progProjView[pid] = window.matchMedia('(min-width: 900px)').matches ? 'timeline' : 'list';
+        renderProgProjectsView(pid);
       } catch (e) { box.innerHTML = `<p class="text-dim">Failed: ${esc(e.error||'')}</p>`; }
+    }
+
+    function switchProgProjView(pid, v) {
+      if (v === 'timeline' && !window.matchMedia('(min-width: 900px)').matches) v = 'list';
+      progProjView[pid] = v;
+      renderProgProjectsView(pid);
+    }
+
+    function renderProgProjectsView(pid) {
+      const box = document.getElementById(`prog-projects-${pid}`);
+      const data = progCache[pid] || { projects: [], events: [] };
+      const view = progProjView[pid] || 'list';
+      const toolbar = `<div style="display:flex;gap:0.4rem;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap">
+        <div style="display:flex;gap:0.3rem" class="tl-toggle">
+          <button class="btn btn-xs ${view === 'list' ? 'btn-primary' : 'btn-outline'}" onclick="switchProgProjView(${pid}, 'list')">List</button>
+          <button class="btn btn-xs ${view === 'timeline' ? 'btn-primary' : 'btn-outline'}" onclick="switchProgProjView(${pid}, 'timeline')">Timeline</button>
+        </div>
+        <button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="switchTab('create'); showCreateForm('project', {programme_id: ${pid}})">New Project</button>
+      </div>`;
+      if (!data.projects.length) {
+        box.innerHTML = '<div class="empty-state" style="padding:1rem"><p>No projects in this programme yet.</p></div>'
+          + `<button class="btn btn-primary btn-sm" onclick="switchTab('create'); showCreateForm('project', {programme_id: ${pid}})">New Project in this Programme</button>`;
+        return;
+      }
+      if (view === 'timeline') {
+        box.innerHTML = toolbar + `<div id="prog-timeline-${pid}"></div>`;
+        renderTimeline(document.getElementById(`prog-timeline-${pid}`), {
+          projects: data.projects,
+          events: data.events,
+          onProject: prId => showItemDetail('project', prId),
+          onEvent: evId => showItemDetail('event', evId),
+        });
+        return;
+      }
+      box.innerHTML = toolbar + data.projects.map(pr => `
+        <div class="wg-card" style="margin-bottom:0.5rem">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem">
+            <div style="flex:1; min-width:0; cursor:pointer" onclick="showItemDetail('project', ${pr.id})">
+              <h4 style="margin:0">${esc(pr.title)} <span class="badge badge-${esc(pr.status)}" style="font-size:0.65rem">${esc(pr.status)}</span></h4>
+              <p class="text-dim text-sm">${esc(stripHtml(pr.description||'').slice(0,120))}</p>
+              <div class="text-dim text-sm">${pr.start_date ? esc(pr.start_date) + ' → ' : ''}${pr.deadline ? 'Due: '+esc(pr.deadline) : ''}</div>
+            </div>
+            <button class="btn btn-outline btn-xs" id="proj-parts-btn-${pid}-${pr.id}" onclick="toggleProjParts(${pid}, ${pr.id})">Team</button>
+          </div>
+          <div id="proj-parts-${pid}-${pr.id}" style="display:none; margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border)"></div>
+        </div>`).join('');
     }
 
     // ── Event attendance: RSVPs + guests, managed per event ──
@@ -4996,6 +5278,7 @@
             ${data.image_url ? `<div class="field"><div class="field-label">Cover</div><img src="${esc(publicCover(data.image_url, ''))}" alt="" style="max-width:100%;border-radius:var(--radius);border:1px solid var(--border)"></div>` : ''}
             ${data.description ? `<div class="field"><div class="field-label">Description</div><div style="max-height:200px;overflow-y:auto;padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${data.description}</div></div>` : ''}
             ${data.objectives ? `<div class="field"><div class="field-label">Objectives</div><div style="max-height:200px;overflow-y:auto;padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${data.objectives}</div></div>` : ''}
+            ${projMilestonesHtml(data, id)}
             <div class="field"><div class="field-label">Team (${parts.length})</div>
               ${parts.length ? `<div style="max-height:150px;overflow-y:auto">${parts.map(m => `<div style="padding:0.3rem 0;font-size:0.85rem;display:flex;justify-content:space-between;border-bottom:1px solid var(--border)"><span>${esc(m.user_name)}</span><span class="cap-tag">${esc(m.role || 'Member')}</span></div>`).join('')}</div>` : '<p class="text-dim text-sm">No participants yet — leads manage the team from My Programmes.</p>'}
             </div>
@@ -5298,6 +5581,7 @@
           { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts, value: p.programme_id || '' },
           { name: 'description', label: 'Description', type: 'textarea', rows: 4, required: true, value: stripHtml(p.description || '') },
           { name: 'objectives', label: 'Objectives', type: 'textarea', rows: 3, value: stripHtml(p.objectives || '') },
+          { name: 'start_date', label: 'Start Date', type: 'date', value: p.start_date || '' },
           { name: 'deadline', label: 'Deadline', type: 'date', value: p.deadline || '' },
           { name: 'video_url', label: 'Video URL (optional)', type: 'text', value: '', placeholder: 'YouTube or Vimeo link', help: p.video_url ? 'A video is already attached (replaced if you paste a new link).' : 'Embedded on the project page. Never hosted here.' },
         ];

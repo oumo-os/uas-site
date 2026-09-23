@@ -189,6 +189,24 @@ function sanitize_rich_html($html): ?string {
   return $html;
 }
 
+/**
+ * Validate project milestones: [{title, due_date|null, done}].
+ * Titles are plain text (stripped), max 30 entries.
+ */
+function clean_milestones($v): array {
+  if (!is_array($v)) return [];
+  $out = [];
+  foreach (array_slice(array_values($v), 0, 30) as $m) {
+    if (!is_array($m)) continue;
+    $title = trim(preg_replace('/\s+/', ' ', strip_tags((string) ($m['title'] ?? ''))));
+    if ($title === '') continue;
+    $due = $m['due_date'] ?? null;
+    if ($due !== null && $due !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $due)) $due = null;
+    $out[] = ['title' => mb_substr($title, 0, 200), 'due_date' => ($due === '' ? null : $due), 'done' => !empty($m['done'])];
+  }
+  return $out;
+}
+
 // Role inbox offices (must match the directory on contact.html).
 function office_list(): array {
   return [

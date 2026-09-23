@@ -129,6 +129,10 @@
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span> Projects</h3>
             <div id="pProjects"></div>
           </div>
+          <div class="card-section" id="pTimelineSection" style="display:none">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><path d="M5 7h14"/><path d="M5 12h14"/><path d="M5 17h14"/></svg></span> Timeline</h3>
+            <div id="pTimelineChart"></div>
+          </div>
           <div class="card-section" id="pEventsSection" style="display:none">
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span> Events</h3>
             <div id="pEvents"></div>
@@ -351,6 +355,23 @@
             (pr.budget && Number(pr.budget) > 0 ? '<div class="budget-bar"><div class="budget-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' : '') +
             '</div>';
         }).join('');
+      }
+
+      // Timeline (desktop only; lists remain primary on phones)
+      if (window.matchMedia('(min-width: 900px)').matches && ((p.projects && p.projects.length) || (p.events && p.events.length))) {
+        document.getElementById('pTimelineSection').style.display = 'block';
+        renderTimeline(document.getElementById('pTimelineChart'), {
+          projects: p.projects || [],
+          events: p.events || [],
+          onProject: function(prId) {
+            var pr = (p.projects || []).filter(function(x){ return Number(x.id) === Number(prId); })[0];
+            location.href = ua('/' + ((pr && (pr.slug || pr.id)) || prId));
+          },
+          onEvent: function(evId) {
+            var ev = (p.events || []).filter(function(x){ return Number(x.id) === Number(evId); })[0];
+            location.href = ua('/events/' + ((ev && (ev.slug || ev.id)) || evId));
+          },
+        });
       }
 
       // Events

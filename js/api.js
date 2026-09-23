@@ -653,6 +653,79 @@ const RichTextEditor = {
   },
 };
 
+// --- Project timeline renderer (shared by dashboard + public programme page) ---
+// opts: { projects: [{id,title,slug?,status,deadline,start_date,created_at,milestones?}],
+//         events: [{id,title,slug?,date,end_date,status}], onProject?, onEvent? }
+// Desktop companion to the list views; phones keep lists (callers gate this).
+window.renderTimeline = function (el, opts) {
+  if (!el) return;
+  opts = opts || {};
+  const projects = opts.projects || [];
+  const events = opts.events || [];
+  const parse = s => { if (!s) return null; const d = new Date(String(s).replace(' ', 'T')); return isNaN(d) ? null : d; };
+  const day = 86400000;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let min = null, max = null;
+  const touch = d => { if (!d) return; if (!min || d < min) min = d; if (!max || d > max) max = d; };
+  projects.forEach(p => { touch(parse(p.start_date) || parse(p.created_at)); touch(parse(p.deadline)); });
+  events.forEach(e => { touch(parse(e.date)); touch(parse(e.end_date)); });
+  touch(today);
+  if (!min || !max) { el.innerHTML = '<p class="text-dim text-sm">No dated items yet.</p>'; return; }
+  let r0 = new Date(min.getFullYear(), min.getMonth(), 1);
+  let r1 = new Date(max.getFullYear(), max.getMonth() + 1, 0);
+  const maxSpan = 14 * 31 * day;
+  if (r1 - r0 > maxSpan) r0 = new Date(max.getFullYear(), max.getMonth() - 13, 1);
+  const span = r1 - r0 || day;
+  const pct = d => Math.max(0, Math.min(100, ((d - r0) / span) * 100));
+  const months = [];
+  for (let m = new Date(r0); m <= r1; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) months.push(new Date(m));
+  const monthHtml = months.map(m => {
+    const nx = new Date(m.getFullYear(), m.getMonth() + 1, 1);
+    return `<div class="tl-month" style="left:${pct(m)}%;width:${Math.max(0, pct(nx > r1 ? r1 : nx) - pct(m))}%">${m.toLocaleString('en', { month: 'short' })} ${(m.getMonth() === 0 || m.getTime() === r0.getTime()) ? m.getFullYear() : ''}</div>`;
+  }).join('');
+  const todayHtml = (today >= r0 && today <= r1) ? `<div class="tl-today" style="left:${pct(today)}%" title="Today"></div>` : '';
+  const statusColor = s => s === 'published' ? 'var(--success)' : (s === 'approved' ? 'var(--accent)' : (s === 'rejected' ? 'var(--danger)' : 'var(--gold)'));
+  const msOf = p => { try { const ms = Array.isArray(p.milestones) ? p.milestones : JSON.parse(p.milestones || '[]'); return Array.isArray(ms) ? ms : []; } catch (e) { return []; } };
+  const rows = projects.map(p => {
+    const ms = msOf(p);
+    const done = ms.filter(m => m.done).length;
+    const prog = ms.length ? Math.round((done / ms.length) * 100) : null;
+    const s = parse(p.start_date) || parse(p.created_at);
+    const e = parse(p.deadline);
+    let bar;
+    if (s && e) {
+      bar = `<div class="tl-bar" style="left:${pct(s)}%;width:${Math.max(1.5, pct(e) - pct(s))}%" title="${esc(p.title)}: ${s.toLocaleDateString()} → ${e.toLocaleDateString()}">` +
+        (prog !== null ? `<div class="tl-fill" style="width:${prog}%;background:${statusColor(p.status)}"></div>` : '') + `</div>`;
+    } else if (e) {
+      bar = `<div class="tl-dot" style="left:${pct(e)}%;background:${statusColor(p.status)}" title="${esc(p.title)} — due ${e.toLocaleDateString()}"></div>`;
+    } else {
+      bar = `<span class="text-dim text-sm">No dates set</span>`;
+    }
+    return `<div class="tl-row">
+      <div class="tl-label"${opts.onProject ? ` style="cursor:pointer" data-proj="${p.id}"` : ''}>
+        <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.title)}</div>
+        <div class="text-dim text-sm">${prog !== null ? prog + '% · ' + ms.length + ' milestones' : esc(p.status || '')}</div>
+      </div>
+      <div class="tl-track">${bar}${todayHtml}</div>
+    </div>`;
+  }).join('');
+  const evDots = events
+    .filter(e => e.date && e.status !== 'cancelled')
+    .map(e => {
+      const d = parse(e.date);
+      const st = `left:${pct(d)};background:var(--gold)${opts.onEvent ? ';cursor:pointer' : ''}`;
+      return `<div class="tl-dot" style="${st}" title="${esc(e.title)} — ${d.toLocaleDateString()}"${opts.onEvent ? ` data-ev="${e.id}"` : ''}></div>`;
+    })
+    .join('');
+  el.innerHTML = `<div class="tl"><div class="tl-inner">
+    <div class="tl-row tl-headrow"><div class="tl-label"></div><div class="tl-track"><div style="position:relative;height:100%">${monthHtml}${todayHtml}</div></div></div>
+    ${rows || '<p class="text-dim text-sm">No projects yet.</p>'}
+    ${events.length ? `<div class="tl-row"><div class="tl-label"><div style="font-weight:600">Events</div><div class="text-dim text-sm">${events.length} on timeline</div></div><div class="tl-track">${evDots}${todayHtml}</div></div>` : ''}
+  </div></div>`;
+  if (opts.onProject) el.querySelectorAll('[data-proj]').forEach(n => n.addEventListener('click', () => opts.onProject(parseInt(n.dataset.proj, 10))));
+  if (opts.onEvent) el.querySelectorAll('[data-ev]').forEach(n => n.addEventListener('click', () => opts.onEvent(parseInt(n.dataset.ev, 10))));
+};
+
 // --- Theme toggle (dark/light) ---
 (function () {
   const saved = localStorage.getItem('uas-theme');

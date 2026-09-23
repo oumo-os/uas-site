@@ -841,3 +841,18 @@ tr:hover td { background: var(--accent-glow); }
 @media (max-width: 480px) {
   .info-grid { grid-template-columns: 1fr; }
 }
+
+/* Project timeline (Gantt-style; shared renderer in js/api.js) */
+.tl { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-card); }
+.tl-inner { min-width: 720px; position: relative; padding: 0.75rem; }
+.tl-row { display: flex; gap: 0.5rem; align-items: center; padding: 0.3rem 0; }
+.tl-headrow { border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 0.25rem; }
+.tl-label { flex: 0 0 190px; min-width: 0; font-size: 0.8rem; }
+.tl-track { flex: 1; position: relative; height: 28px; min-width: 0; }
+.tl-headrow .tl-track { height: 20px; }
+.tl-month { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--border); font-size: 0.65rem; color: var(--text-dim); padding-left: 4px; white-space: nowrap; }
+.tl-bar { position: absolute; top: 6px; height: 16px; border-radius: 999px; background: var(--border); min-width: 8px; }
+.tl-fill { height: 100%; border-radius: 999px; }
+.tl-dot { position: absolute; top: 9px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; }
+.tl-today { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--danger); opacity: 0.65; }
+@media (max-width: 899px) { .tl-toggle { display: none; } }

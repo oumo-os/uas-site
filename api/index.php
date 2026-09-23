@@ -1432,8 +1432,10 @@ try {
     }
     if (empty($data['title'])) json_error('Title is required', 400);
     $slug = makeSlug($data['slug'] ?? $data['title'], 'projects');
-    db()->prepare('INSERT INTO projects (programme_id, title, slug, description, objectives, deadline, video_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      ->execute([$progId, $data['title'], $slug, sanitize_rich_html($data['description'] ?? null), $data['objectives'] ?? null, $data['deadline'] ?? null, video_embed_url($data['video_url'] ?? null), $user['id']]);
+    if (!empty($data['start_date']) && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['start_date'])) json_error('Invalid start date', 400);
+    if (!empty($data['deadline']) && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['deadline'])) json_error('Invalid deadline', 400);
+    db()->prepare('INSERT INTO projects (programme_id, title, slug, description, objectives, deadline, start_date, video_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      ->execute([$progId, $data['title'], $slug, sanitize_rich_html($data['description'] ?? null), $data['objectives'] ?? null, $data['deadline'] ?: null, $data['start_date'] ?? null, video_embed_url($data['video_url'] ?? null), $user['id']]);
     $id = (int) db()->lastInsertId();
     transition('project', $id, 'submitted', $user['id']);
     audit_log('project_create', 'project', $id);
@@ -1518,9 +1520,16 @@ try {
     if (!can_manage_project($user['id'], $proj)) json_error('Insufficient permissions: cannot edit this project', 403);
     $data = input_json();
     $sets = []; $args = [];
-    foreach (['title', 'objectives', 'deadline', 'programme_id'] as $f) {
+    foreach (['title', 'objectives', 'programme_id'] as $f) {
       if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = ($data[$f] === '' ? null : $data[$f]); }
     }
+    foreach (['deadline', 'start_date'] as $f) {
+      if (array_key_exists($f, $data)) {
+        if ($data[$f] !== '' && $data[$f] !== null && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $data[$f])) json_error('Invalid ' . str_replace('_', ' ', $f), 400);
+        $sets[] = "$f = ?"; $args[] = ($data[$f] === '' ? null : $data[$f]);
+      }
+    }
+    if (array_key_exists('milestones', $data)) { $sets[] = 'milestones = ?'; $args[] = json_encode(clean_milestones($data['milestones'])); }
     if (array_key_exists('description', $data)) { $sets[] = 'description = ?'; $args[] = sanitize_rich_html($data['description']); }
     if (array_key_exists('video_url', $data)) { $sets[] = 'video_url = ?'; $args[] = video_embed_url($data['video_url']); }
     if (array_key_exists('slug', $data) && $data['slug'] !== null && $data['slug'] !== '') { $sets[] = 'slug = ?'; $args[] = makeSlug($data['slug'], 'projects', $pid); }
@@ -2085,6 +2094,24 @@ try {
     audit_log('article_create', 'article', $id);
     notify_capability('articles.approve', 'article_submitted', 'Article awaiting review: ' . $data['title'], 'Submitted by ' . $user['name'] . '.', '/admin?tab=articles');
     json_response(['id' => $id], 201);
+  }
+  elseif (preg_match('#^/articles/(\d+)/review$#', $path, $m) && $method === 'POST') {
+    // Start review: submitted → under_review (reviewer claims the piece).
+    // Reviewers (articles.review) or approvers; the author is notified.
+    $user = require_login();
+    $aid = (int) $m[1];
+    if (!user_has_cap($user['id'], 'articles.review') && !user_has_cap($user['id'], 'articles.approve')) {
+      json_error('Insufficient permissions: articles.review', 403);
+    }
+    $stmt = db()->prepare('SELECT author_id, title, status FROM articles WHERE id = ?');
+    $stmt->execute([$aid]);
+    $art = $stmt->fetch();
+    if (!$art) json_error('Article not found', 404);
+    if ($art['status'] !== 'submitted') json_error('Only submitted articles can start review', 400);
+    transition('article', $aid, 'under_review', $user['id']);
+    audit_log('article_review_start', 'article', $aid);
+    notify_user((int) $art['author_id'], 'article_review', 'Under review: ' . $art['title'], $user['name'] . ' started reviewing your article.', '/article/' . $aid);
+    json_response(['ok' => true]);
   }
   elseif (preg_match('#^/articles/(\d+)/approve$#', $path, $m) && $method === 'POST') {
     $user = require_cap('articles.approve');
@@ -3619,11 +3646,11 @@ try {
       if (!$ok) json_error('Programme not found', 404);
     }
 
-    // Projects — budget/spent only for members; guests see published only
+    // Projects — budget/spent/milestones only for members; guests see published only
     if ($requester) {
-      $stmt = db()->prepare('SELECT id, title, slug, description, status, deadline, budget, spent FROM projects WHERE programme_id = ? ORDER BY title');
+      $stmt = db()->prepare('SELECT id, title, slug, description, status, deadline, start_date, milestones, budget, spent FROM projects WHERE programme_id = ? ORDER BY title');
     } else {
-      $stmt = db()->prepare('SELECT id, title, slug, description, status, deadline FROM projects WHERE programme_id = ? AND status = "published" ORDER BY title');
+      $stmt = db()->prepare('SELECT id, title, slug, description, status, deadline, start_date FROM projects WHERE programme_id = ? AND status = "published" ORDER BY title');
     }
     $stmt->execute([$pid]);
     $programme['projects'] = $stmt->fetchAll();

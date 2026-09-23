@@ -94,7 +94,10 @@ function transition(string $objectType, int $objectId, string $newState, int $us
     // access, so the workflow must too — endpoint permissions gate first).
     if ($progId && is_programme_lead($userId, (int)$progId)) {
       // lead override: satisfied
-    } elseif (!user_has_cap($userId, $capRequired, $scopeType, $scopeId)) {
+    } else    $capOk = user_has_cap($userId, $capRequired, $scopeType, $scopeId);
+    // Starting article review accepts reviewers and approvers alike.
+    if (!$capOk && $objectType === 'article' && $newState === 'under_review' && user_has_cap($userId, 'articles.approve')) $capOk = true;
+    if (!$capOk) {
       json_error("Insufficient permissions: {$capRequired}", 403);
     }
   }
