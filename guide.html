@@ -77,6 +77,7 @@
         <a href="#g-govern" data-toc="govern">Governance</a>
         <a href="#g-finance" data-toc="finance">Dues & finance</a>
         <a href="#g-mail" data-toc="always">Inbox & mail</a>
+        <a href="#g-meet" data-toc="always">Meetings & videos</a>
         <a href="#g-help" data-toc="always">Troubleshooting</a>
       </div>
 
@@ -178,8 +179,19 @@
           </ul>
         </div>
 
+        <div class="card-section" id="g-meet">
+          <h3>10. Meetings &amp; videos</h3>
+          <ul class="guide-list">
+            <li><strong>Joining a meeting:</strong> open it under Dashboard → Groups &amp; Meetings and press <strong>Join video room</strong> — the meeting plays inside the page with your name prefilled. Nothing to install; it also works from the Jitsi mobile app.</li>
+            <li><strong>Hosting:</strong> the organizer opens the room first and signs in once with a Google/GitHub login on Jitsi's side; everyone else joins as a guest, no account needed. The room link is stable and unguessable — share it in the event chatroom, not publicly.</li>
+            <li><strong>Scheduling:</strong> organizers can generate the room link in the meeting details, or paste their own Jitsi link when scheduling.</li>
+            <li><strong>Virtual events:</strong> events marked <strong>Online</strong> show a Join button on the event page instead of a map link.</li>
+            <li><strong>Videos:</strong> nothing is hosted here — paste a <strong>YouTube or Vimeo</strong> link (event video field, or the video button in the editor) and it embeds. Any other iframe or script is stripped on save for everyone's safety.</li>
+          </ul>
+        </div>
+
         <div class="card-section" id="g-help">
-          <h3>10. Troubleshooting</h3>
+          <h3>11. Troubleshooting</h3>
           <ul class="guide-list">
             <li><strong>Page looks outdated?</strong> Hard-refresh: <kbd>Ctrl+Shift+R</kbd> (Windows) or <kbd>Cmd+Shift+R</kbd> (Mac). The site caches aggressively for speed.</li>
             <li><strong>Button missing?</strong> Actions appear only when your roles allow them — check <em>Your access</em> above, or ask a lead/approver.</li>
@@ -203,7 +215,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260922-11"></script>
+  <script src="js/api.js?v=20260922-12"></script>
   <script>
     function showSec(name, on) {
       document.querySelectorAll('[data-sec="' + name + '"]').forEach(function(el){ el.style.display = on ? '' : 'none'; });

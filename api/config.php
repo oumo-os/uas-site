@@ -121,6 +121,74 @@ function clean_image_url($v): ?string {
   return null;
 }
 
+// ---- Video meetings & embeds (nothing is hosted here) ----
+if (!defined('JITSI_DOMAIN')) define('JITSI_DOMAIN', 'https://meet.jit.si');
+
+// URL allowlist for link/redirect fields (Jitsi rooms, online venues).
+function clean_link_url($v): ?string {
+  if (!is_string($v)) return null;
+  $v = trim($v);
+  if ($v === '' || strlen($v) > 500) return null;
+  if (preg_match('#^https?://[^\s<>"\']+$#i', $v)) return $v;
+  return null;
+}
+
+/**
+ * Convert a YouTube / Vimeo URL into a privacy-enhanced embed URL.
+ * Returns null for anything else (including raw iframes and file URLs) —
+ * videos are linked, never uploaded or proxied.
+ */
+function video_embed_url($url): ?string {
+  if (!is_string($url)) return null;
+  $url = trim($url);
+  if ($url === '' || strlen($url) > 1000) return null;
+  // YouTube: watch?v=, youtu.be/, /shorts/, /live/, /embed/
+  if (preg_match('#^(?:https?://)?(?:www\.|m\.)?(?:youtube\.com/(?:watch\?.*v=|shorts/|live/|embed/)|youtu\.be/)([A-Za-z0-9_-]{6,20})#i', $url, $m)) {
+    return 'https://www.youtube-nocookie.com/embed/' . $m[1];
+  }
+  // Vimeo: vimeo.com/<id> (channels/groups/on-demand paths included)
+  if (preg_match('#^(?:https?://)?(?:www\.)?vimeo\.com/(?:.*?/)?(\d{5,12})(?:[/?#]|$)#i', $url, $m)) {
+    return 'https://player.vimeo.com/video/' . $m[1];
+  }
+  return null;
+}
+
+/**
+ * Strip dangerous markup from rich-text fields while preserving the editor's
+ * formatting. Scripts/styles/event handlers go; iframes survive ONLY from
+ * the video allowlist (YouTube-nocookie, Vimeo player) and Jitsi rooms.
+ */
+function sanitize_rich_html($html): ?string {
+  if ($html === null) return null;
+  if (!is_string($html)) return '';
+  $html = preg_replace('#<(script|style|object|embed|form|input|button|link|meta)[^>]*>.*?</\\1>#is', '', $html);
+  $html = preg_replace('#<(script|style|object|embed|form|input|button|link|meta)[^>]*/?>#i', '', $html);
+  // Event-handler attributes (onclick=, onerror=, …) on any tag.
+  $html = preg_replace('#\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)#i', '', $html);
+  // javascript:/data:/vbscript: URLs anywhere.
+  $html = preg_replace('#\b(href|src|action|xlink:href)\s*=\s*("|\')(javascript|data|vbscript):.*?\2#is', '$1=$2#$2', $html);
+  // Iframes: keep only the media allowlist, drop the rest entirely.
+  $html = preg_replace_callback('#<iframe\b[^>]*>#i', function ($m) {
+    $tag = $m[0];
+    if (!preg_match('#\bsrc\s*=\s*("|\')([^"\']+)#i', $tag, $s)) return '';
+    $src = $s[2];
+    $ok = preg_match('#^https://www\.youtube-nocookie\.com/embed/#', $src)
+      || preg_match('#^https://player\.vimeo\.com/video/#', $src)
+      || preg_match('#^https://meet\.jit\.si/#', $src);
+    if (!$ok) return '';
+    // Rebuild a minimal safe iframe: sandboxed, no fullscreen abuse beyond playback.
+    $id = preg_match('#\bid\s*=\s*("|\')([^"\']+)#i', $tag, $im) ? $im[2] : null;
+    $safe = '<iframe src="' . htmlspecialchars($src, ENT_QUOTES, 'UTF-8') . '"';
+    if ($id !== null) $safe .= ' id="' . htmlspecialchars($id, ENT_QUOTES, 'UTF-8') . '"';
+    return $safe . ' style="width:100%;height:360px;border:0;border-radius:8px" allow="camera; microphone; fullscreen; display-capture; autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>';
+  }, $html);
+  // Remove stray closing iframe tags left behind by stripped opens.
+  $html = preg_replace('#</iframe>#i', '', $html);
+  // NOTE: closing tags of kept iframes were removed above; re-close them.
+  $html = preg_replace('#(<iframe\b[^>]*style="[^"]*"[^>]*>)#i', '$1</iframe>', $html);
+  return $html;
+}
+
 // Role inbox offices (must match the directory on contact.html).
 function office_list(): array {
   return [

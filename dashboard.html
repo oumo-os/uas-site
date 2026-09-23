@@ -1089,7 +1089,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260922-11"></script>
+  <script src="js/api.js?v=20260922-12"></script>
   <script>
     let health = {};
     let allPendingData = [];
@@ -1673,6 +1673,7 @@
                 <div class="wg-meta" style="margin-top:0.35rem">
                   <span>${when}</span>
                   ${m.location ? `<span style="margin-left:0.5rem">${esc(m.location)}</span>` : ''}
+                  ${m.meeting_url ? `<span style="margin-left:0.5rem" class="cap-tag">Video room ready</span>` : ''}
                   <span style="margin-left:0.5rem;text-transform:capitalize">${esc(m.meeting_type)}</span>
                   ${agendaCount}
                   ${m.attendees ? `<span style="margin-left:0.5rem">${m.attendees} on record</span>` : ''}
@@ -1686,13 +1687,85 @@
       }).join('');
     }
 
+    // ── Jitsi video rooms (meet.jit.si; host opens with a Google/GitHub login, guests join free) ──
+    function jitsiRoomName(url) {
+      try { return new URL(url).pathname.replace(/^\/+|\/+$/g, ''); } catch (e) { return null; }
+    }
+    function jitsiDomain(url) {
+      try { return new URL(url).origin; } catch (e) { return null; }
+    }
+    function loadJitsiApi(domain) {
+      return new Promise((resolve, reject) => {
+        if (window.JitsiMeetExternalAPI) return resolve();
+        const s = document.createElement('script');
+        s.src = domain + '/external_api.js';
+        s.onload = resolve;
+        s.onerror = () => reject(new Error('Could not load the video library'));
+        document.head.appendChild(s);
+      });
+    }
+    async function toggleJitsi(url) {
+      const box = document.getElementById('jitsi-wrap');
+      const btn = document.getElementById('jitsi-toggle');
+      if (!box) return;
+      if (box.style.display !== 'none') {
+        box.style.display = 'none';
+        if (btn) btn.textContent = 'Join video room';
+        try { window._jitsiApi && window._jitsiApi.dispose(); } catch (e) {}
+        window._jitsiApi = null;
+        box.innerHTML = '';
+        return;
+      }
+      const room = jitsiRoomName(url);
+      const domain = jitsiDomain(url);
+      if (!room || !domain) { toast('Invalid room link', 'error'); return; }
+      box.innerHTML = '<p class="text-dim text-sm">Loading video room…</p>';
+      box.style.display = '';
+      if (btn) btn.textContent = 'Leave video room';
+      try {
+        await loadJitsiApi(domain);
+        box.innerHTML = '';
+        window._jitsiApi = new window.JitsiMeetExternalAPI(domain, {
+          roomName: room,
+          parentNode: box,
+          width: '100%',
+          height: 480,
+          userInfo: { displayName: (api._user && api._user.name) || 'UAS member' },
+          configOverwrite: { startWithAudioMuted: true, prejoinPageEnabled: false },
+          interfaceConfigOverwrite: { SHOW_JITSI_WATERMARK: false },
+        });
+      } catch (e) {
+        box.innerHTML = `<p class="text-dim text-sm">Could not load the room here. <a href="${esc(url)}" target="_blank" rel="noopener">Open it in a new tab instead</a>.</p>`;
+      }
+    }
+    async function generateMeetingRoom(id) {
+      try {
+        const r = await api.request('/meetings/' + id + '/room', { method: 'POST' });
+        toast('Video room ready', 'success');
+        showMeetingDetail(id);
+      } catch (e) { toast(e.error || 'Failed to generate room', 'error'); }
+    }
+
     async function showMeetingDetail(id) {
       try {
         const m = await api.request('/meetings/' + id);
         const decisions = (m.decisions || []).map(d => `• ${esc(d.text)}${d.assignee_id ? ' (assignee ' + d.assignee_id + ')' : ''}${d.due_date ? ' due ' + esc(d.due_date) : ''}`).join('\n') || 'None recorded';
         const attendance = (m.attendance || []).map(a => `${esc(a.user_name)} — ${esc(a.status)}${a.notes ? ' (' + esc(a.notes) + ')' : ''}`).join('\n') || 'None recorded';
+        const canRoom = api._user && ((m.created_by === api._user.id) || api.hasCap('meetings.manage'));
+        const roomHtml = m.meeting_url ? `
+          <div style="padding:0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:1rem">
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+              <button class="btn btn-primary btn-sm" id="jitsi-toggle" onclick="toggleJitsi('${esc(m.meeting_url)}')">Join video room</button>
+              <a class="btn btn-outline btn-sm" href="${esc(m.meeting_url)}" target="_blank" rel="noopener">Open in new tab</a>
+            </div>
+            <p class="text-dim text-sm" style="margin:0.5rem 0 0">The host opens the room first (Google/GitHub sign-in on Jitsi) — everyone else joins as a guest, no account needed.</p>
+            <div id="jitsi-wrap" style="display:none;margin-top:0.75rem"></div>
+          </div>` : (canRoom ? `
+          <div style="margin-bottom:1rem"><button class="btn btn-outline btn-sm" onclick="generateMeetingRoom(${m.id})">Generate Jitsi video room</button>
+          <p class="text-dim text-sm" style="margin:0.35rem 0 0">Creates a stable, unguessable room link for this meeting.</p></div>` : '');
         openModal('Meeting: ' + m.title, `
           <div style="font-size:0.9rem;line-height:1.6">
+            ${roomHtml}
             <p class="text-dim">${esc(m.description || 'No description')}</p>
             <p class="text-dim">Scheduled: ${m.scheduled_at || 'TBD'} · ${esc(m.meeting_type)} · ${esc(m.location || 'No location')}</p>
             <h5>Agenda</h5>
@@ -1789,7 +1862,8 @@
             <option value="board">Board</option><option value="general">General</option><option value="committee">Committee</option>
             <option value="working_group">Working Group</option><option value="other">Other</option></select></label>
           <label>Scheduled<input id="mWhen" type="datetime-local" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)"></label>
-          <label>Location<input id="mLoc" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)"></label>
+          <label>Location<input id="mLoc" placeholder="e.g. Makerere, or Online" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)"></label>
+          <label>Video room link (optional — or generate one after scheduling)<input id="mRoom" placeholder="https://meet.jit.si/…" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)"></label>
           <label>Agenda items — one per line<textarea id="mAgenda" rows="3" placeholder="Budget review&#10;Sponsorship update" style="width:100%;padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-subtle);color:var(--text)"></textarea></label>
           <button class="btn btn-primary" onclick="createMeeting()">Schedule Meeting</button>
         </div>`;
@@ -1811,6 +1885,7 @@
           meeting_type: document.getElementById('mType').value,
           scheduled_at: when,
           location: document.getElementById('mLoc').value || null,
+          meeting_url: document.getElementById('mRoom').value || null,
           agenda,
         }});
         closeModal(); toast('Meeting scheduled', 'success');
@@ -3312,6 +3387,9 @@
           { name: 'date', label: 'Start Date & Time', type: 'datetime-local', required: true },
           { name: 'end_date', label: 'End Date & Time', type: 'datetime-local' },
           { name: 'location', label: 'Location', type: 'text', placeholder: 'e.g. Kampala, Uganda' },
+          { name: 'is_online', label: 'Online event', type: 'checkbox', checkLabel: 'This event meets online (hides the map link)' },
+          { name: 'online_url', label: 'Online meeting link (optional)', type: 'text', placeholder: 'https://meet.jit.si/…', help: 'Shown as a Join button on the event page' },
+          { name: 'video_url', label: 'Video URL (optional)', type: 'text', placeholder: 'YouTube or Vimeo link — trailer or recording', help: 'Embedded on the event page. Never hosted here.' },
           { name: 'capacity', label: 'Capacity', type: 'number', min: 0, placeholder: 'Leave blank for unlimited', help: 'Leave blank for open attendance' },
           { name: 'description', label: 'Description', type: 'rich-text', rows: 4, required: true },
           { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image' },
@@ -5003,6 +5081,9 @@
           { name: 'date', label: 'Start Date & Time', type: 'datetime-local', required: true, value: dt(e.date) },
           { name: 'end_date', label: 'End Date & Time', type: 'datetime-local', value: dt(e.end_date) },
           { name: 'location', label: 'Location', type: 'text', value: e.location || '' },
+          { name: 'is_online', label: 'Online event', type: 'checkbox', checkLabel: 'This event meets online (hides the map link)', value: !!Number(e.is_online) },
+          { name: 'online_url', label: 'Online meeting link (optional)', type: 'text', value: e.online_url || '', help: 'Shown as a Join button on the event page' },
+          { name: 'video_url', label: 'Video URL (optional)', type: 'text', value: '', placeholder: 'YouTube or Vimeo link', help: e.video_url ? 'A video is already attached (replaced if you paste a new link).' : 'Embedded on the event page. Never hosted here.' },
           { name: 'capacity', label: 'Capacity', type: 'number', min: 0, value: e.capacity || '', help: 'Leave blank for open attendance' },
           { name: 'description', label: 'Description', type: 'rich-text', required: true, value: e.description || '' },
           { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image', value: e.image_url || '' },
@@ -5010,6 +5091,7 @@
         openModal('Edit Event', FormBuilder.render(fields, { id: 'edit-event', submitLabel: 'Save Changes' }));
         FormBuilder.init('edit-event', fields, async (data) => {
           if (data.end_date && data.date && data.end_date <= data.date) throw { error: 'End date must be after the start date' };
+          if (!data.video_url) delete data.video_url; // empty = keep the attached video
           await api.updateEvent(id, data);
           closeModal(); toast('Event updated', 'success');
           showItemDetail('event', id);

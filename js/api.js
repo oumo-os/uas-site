@@ -548,6 +548,18 @@ const FormBuilder = {
   },
 };
 
+// --- Video embeds (URL-only, never hosted): mirrors PHP video_embed_url() ---
+window.videoEmbedUrl = function (url) {
+  if (typeof url !== 'string') return null;
+  url = url.trim();
+  if (!url || url.length > 1000) return null;
+  let m = url.match(/^(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?.*v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{6,20})/i);
+  if (m) return 'https://www.youtube-nocookie.com/embed/' + m[1];
+  m = url.match(/^(?:https?:\/\/)?(?:www\.)?vimeo\.com\/(?:.*?\/)?(\d{5,12})(?:[/?#]|$)/i);
+  if (m) return 'https://player.vimeo.com/video/' + m[1];
+  return null;
+};
+
 // --- RichTextEditor: lightweight contenteditable toolbar ---
 const RichTextEditor = {
   init(toolbarId, editorId) {
@@ -564,6 +576,7 @@ const RichTextEditor = {
       { cmd: 'formatBlock', val: 'p', icon: 'P', title: 'Paragraph' },
       { cmd: 'createLink', icon: '<svg viewBox="0 0 24 24" width="14" height="14"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>', title: 'Link' },
       { cmd: 'insertImage', icon: '<svg viewBox="0 0 24 24" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>', title: 'Insert image' },
+      { cmd: 'insertVideo', icon: '<svg viewBox="0 0 24 24" width="14" height="14"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>', title: 'Insert video (YouTube/Vimeo link)' },
     ];
     toolbar.innerHTML = cmds.map((c, i) =>
       `<button type="button" class="rte-btn" data-cmd="${c.cmd}" data-val="${c.val || ''}" title="${c.title}">${c.icon}</button>`
@@ -603,6 +616,14 @@ const RichTextEditor = {
         if (url) document.execCommand(cmd, false, url);
       } else if (cmd === 'insertImage') {
         imgInput.click();
+      } else if (cmd === 'insertVideo') {
+        const url = prompt('Paste a YouTube or Vimeo link:');
+        if (!url) { editor.focus(); return; }
+        const embed = window.videoEmbedUrl(url);
+        if (!embed) { alert('That link is not a supported video (YouTube or Vimeo only).'); editor.focus(); return; }
+        editor.focus();
+        document.execCommand('insertHTML', false,
+          '<iframe src="' + embed + '" style="width:100%;height:360px;border:0;border-radius:8px" allow="fullscreen; autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe><p></p>');
       } else {
         document.execCommand(cmd, false, val);
       }

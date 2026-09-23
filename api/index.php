@@ -175,21 +175,42 @@ try {
     $validTypes = ['board', 'general', 'committee', 'working_group', 'other'];
     $type = $data['meeting_type'] ?? 'board';
     if (!in_array($type, $validTypes, true)) json_error('Invalid meeting type', 400);
-    db()->prepare('INSERT INTO meetings (title, meeting_type, description, scheduled_at, location, agenda, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    db()->prepare('INSERT INTO meetings (title, meeting_type, description, scheduled_at, location, meeting_url, agenda, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
       ->execute([
         $data['title'],
         $type,
-        $data['description'] ?? null,
+        sanitize_rich_html($data['description'] ?? null),
         $data['scheduled_at'] ?? null,
         $data['location'] ?? null,
+        clean_link_url($data['meeting_url'] ?? null),
         isset($data['agenda']) ? json_encode($data['agenda']) : null,
         $data['status'] ?? 'scheduled',
         $user['id']
       ]);
     $id = (int) db()->lastInsertId();
-    audit_log('article_create', 'article', $id);
-    notify_capability('articles.approve', 'article_submitted', 'Article awaiting review: ' . $data['title'], 'Submitted by ' . $user['name'] . '.', '/admin?tab=articles');
+    audit_log('meeting_create', 'meeting', $id);
+    notify_capability('meetings.manage', 'meeting_scheduled', 'Meeting scheduled: ' . $data['title'], 'Scheduled by ' . $user['name'] . '.', '/dashboard');
     json_response(['id' => $id], 201);
+  }
+  elseif (preg_match('#^/meetings/(\d+)/room$#', $path, $m) && $method === 'POST') {
+    // Generate (or regenerate) the stable Jitsi room for a meeting.
+    // Creator or meetings.manage. The room name is unguessable; the host
+    // opens it with a Google/GitHub login, everyone else joins as guests.
+    $user = require_login();
+    $mid = (int) $m[1];
+    $stmt = db()->prepare('SELECT id, title, created_by FROM meetings WHERE id = ?');
+    $stmt->execute([$mid]);
+    $mtg = $stmt->fetch();
+    if (!$mtg) json_error('Meeting not found', 404);
+    if ((int) $mtg['created_by'] !== (int) $user['id'] && !user_has_cap($user['id'], 'meetings.manage')) {
+      json_error('Insufficient permissions: meetings.manage', 403);
+    }
+    $rand = substr(str_shuffle('abcdefghjkmnpqrstuvwxyz23456789'), 0, 6);
+    $room = 'uas-meeting-' . $mid . '-' . $rand;
+    $url = rtrim(JITSI_DOMAIN, '/') . '/' . $room;
+    db()->prepare('UPDATE meetings SET meeting_url = ? WHERE id = ?')->execute([$url, $mid]);
+    audit_log('meeting_room', 'meeting', $mid, ['room' => $room]);
+    json_response(['room' => $room, 'url' => $url]);
   }
   elseif (preg_match('#^/articles/(\d+)$#', $path, $m) && $method === 'GET') {
     // Full article detail for authors and approvers (any status) — powers
@@ -228,9 +249,11 @@ try {
     $id = (int) $m[1];
     $sets = [];
     $args = [];
-    foreach (['title', 'meeting_type', 'description', 'location'] as $f) {
+    foreach (['title', 'meeting_type', 'location'] as $f) {
       if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = $data[$f]; }
     }
+    if (array_key_exists('description', $data)) { $sets[] = 'description = ?'; $args[] = sanitize_rich_html($data['description']); }
+    if (array_key_exists('meeting_url', $data)) { $sets[] = 'meeting_url = ?'; $args[] = clean_link_url($data['meeting_url']); }
     if (array_key_exists('scheduled_at', $data)) { $sets[] = 'scheduled_at = ?'; $args[] = $data['scheduled_at'] ?: null; }
     if (array_key_exists('agenda', $data)) { $sets[] = 'agenda = ?'; $args[] = json_encode($data['agenda']); }
     if (!$sets) json_error('Nothing to update', 400);
@@ -1312,7 +1335,7 @@ try {
     if (empty($data['title'])) json_error('Title is required', 400);
     $slug = makeSlug($data['slug'] ?? $data['title'], 'programmes');
     db()->prepare('INSERT INTO programmes (title, slug, description, objectives, image_url, created_by) VALUES (?, ?, ?, ?, ?, ?)')
-      ->execute([$data['title'], $slug, $data['description'] ?? null, $data['objectives'] ?? null, clean_image_url($data['image_url'] ?? null), $user['id']]);
+      ->execute([$data['title'], $slug, sanitize_rich_html($data['description'] ?? null), $data['objectives'] ?? null, clean_image_url($data['image_url'] ?? null), $user['id']]);
     $id = (int) db()->lastInsertId();
     audit_log('programme_create', 'programme', $id);
     notify_capability('programmes.approve', 'programme_submitted', 'Programme awaiting activation: ' . $data['title'], 'Proposed by ' . $user['name'] . '. Review and activate it from Pending.', '/dashboard');
@@ -1410,7 +1433,7 @@ try {
     if (empty($data['title'])) json_error('Title is required', 400);
     $slug = makeSlug($data['slug'] ?? $data['title'], 'projects');
     db()->prepare('INSERT INTO projects (programme_id, title, slug, description, objectives, deadline, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      ->execute([$progId, $data['title'], $slug, $data['description'] ?? null, $data['objectives'] ?? null, $data['deadline'] ?? null, $user['id']]);
+      ->execute([$progId, $data['title'], $slug, sanitize_rich_html($data['description'] ?? null), $data['objectives'] ?? null, $data['deadline'] ?? null, $user['id']]);
     $id = (int) db()->lastInsertId();
     transition('project', $id, 'submitted', $user['id']);
     audit_log('project_create', 'project', $id);
@@ -1495,9 +1518,10 @@ try {
     if (!can_manage_project($user['id'], $proj)) json_error('Insufficient permissions: cannot edit this project', 403);
     $data = input_json();
     $sets = []; $args = [];
-    foreach (['title', 'description', 'objectives', 'deadline', 'programme_id'] as $f) {
+    foreach (['title', 'objectives', 'deadline', 'programme_id'] as $f) {
       if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = ($data[$f] === '' ? null : $data[$f]); }
     }
+    if (array_key_exists('description', $data)) { $sets[] = 'description = ?'; $args[] = sanitize_rich_html($data['description']); }
     if (array_key_exists('slug', $data) && $data['slug'] !== null && $data['slug'] !== '') { $sets[] = 'slug = ?'; $args[] = makeSlug($data['slug'], 'projects', $pid); }
     if (!$sets) json_error('Nothing to update', 400);
     $args[] = $pid;
@@ -1592,8 +1616,8 @@ try {
     if (empty($data['title'])) json_error('Title is required', 400);
     if (empty($data['date'])) json_error('Date is required', 400);
     $slug = makeSlug($data['slug'] ?? $data['title'], 'events');
-    db()->prepare('INSERT INTO events (programme_id, project_id, title, slug, description, organizer_id, date, end_date, location, capacity, image_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      ->execute([$progId, $data['project_id'] ?? null, $data['title'], $slug, $data['description'] ?? null, $user['id'], $data['date'], $data['end_date'] ?? null, $data['location'] ?? null, $data['capacity'] ?? null, clean_image_url($data['image_url'] ?? null), $user['id']]);
+    db()->prepare('INSERT INTO events (programme_id, project_id, title, slug, description, organizer_id, date, end_date, location, is_online, online_url, capacity, image_url, video_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      ->execute([$progId, $data['project_id'] ?? null, $data['title'], $slug, sanitize_rich_html($data['description'] ?? null), $user['id'], $data['date'], $data['end_date'] ?? null, $data['location'] ?? null, !empty($data['is_online']) ? 1 : 0, clean_link_url($data['online_url'] ?? null), $data['capacity'] ?? null, clean_image_url($data['image_url'] ?? null), video_embed_url($data['video_url'] ?? null), $user['id']]);
     $id = (int) db()->lastInsertId();
     transition('event', $id, 'submitted', $user['id']);
     audit_log('event_create', 'event', $id);
@@ -1672,9 +1696,13 @@ try {
     if (($isOwner || $isLead) && !$isApprover && in_array($ev['status'], ['completed', 'cancelled'], true)) json_error('Completed or cancelled events cannot be edited', 400);
     $data = input_json();
     $sets = []; $args = [];
-    foreach (['title', 'description', 'date', 'end_date', 'location', 'capacity'] as $f) {
+    foreach (['title', 'date', 'end_date', 'location', 'capacity'] as $f) {
       if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = ($data[$f] === '' ? null : $data[$f]); }
     }
+    if (array_key_exists('description', $data)) { $sets[] = 'description = ?'; $args[] = sanitize_rich_html($data['description']); }
+    if (array_key_exists('is_online', $data)) { $sets[] = 'is_online = ?'; $args[] = !empty($data['is_online']) ? 1 : 0; }
+    if (array_key_exists('online_url', $data)) { $sets[] = 'online_url = ?'; $args[] = clean_link_url($data['online_url']); }
+    if (array_key_exists('video_url', $data)) { $sets[] = 'video_url = ?'; $args[] = video_embed_url($data['video_url']); }
     if (array_key_exists('image_url', $data)) { $sets[] = 'image_url = ?'; $args[] = clean_image_url($data['image_url']); }
     if ($isApprover) {
       // Only approvers may move an event across programmes/projects
@@ -2012,7 +2040,7 @@ try {
       $tags = is_array($decoded) ? $decoded : array_map('trim', explode(',', $tags));
     }
     db()->prepare('INSERT INTO articles (author_id, title, body, category, tags, image_url, approver_role_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      ->execute([$user['id'], $data['title'], $data['body'] ?? null, $data['category'] ?? 'article', json_encode(array_values(array_filter($tags))), clean_image_url($data['image_url'] ?? null), $data['approver_role_id'] ?? null]);
+      ->execute([$user['id'], $data['title'], sanitize_rich_html($data['body'] ?? null), $data['category'] ?? 'article', json_encode(array_values(array_filter($tags))), clean_image_url($data['image_url'] ?? null), $data['approver_role_id'] ?? null]);
     $id = (int) db()->lastInsertId();
     transition('article', $id, 'submitted', $user['id']);
     audit_log('article_create', 'article', $id);
@@ -2102,9 +2130,10 @@ try {
     }
     $data = input_json();
     $sets = []; $args = [];
-    foreach (['title', 'body', 'category'] as $f) {
+    foreach (['title', 'category'] as $f) {
       if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = $data[$f]; }
     }
+    if (array_key_exists('body', $data)) { $sets[] = 'body = ?'; $args[] = sanitize_rich_html($data['body']); }
     if (array_key_exists('tags', $data)) {
       $tags = $data['tags'];
       if (is_string($tags)) { $decoded = json_decode($tags, true); $tags = is_array($decoded) ? $decoded : array_map('trim', explode(',', $tags)); }
@@ -3372,7 +3401,7 @@ try {
     json_response($article);
   }
   elseif ($path === '/public/events' && $method === 'GET') {
-    $stmt = db()->prepare("SELECT e.id, e.title, e.slug, e.description, e.date, e.end_date, e.location, e.status, e.capacity, e.image_url, e.category, e.organizer_id,
+    $stmt = db()->prepare("SELECT e.id, e.title, e.slug, e.description, e.date, e.end_date, e.location, e.is_online, e.status, e.capacity, e.image_url, e.category, e.organizer_id,
       (SELECT COUNT(*) FROM event_registrations r WHERE r.event_id = e.id AND r.status = 'registered') AS rsvp_count
       FROM events e WHERE (e.status = 'published' AND e.date >= NOW()) OR e.status = 'cancelled' ORDER BY e.date ASC");
     $stmt->execute();
@@ -3381,7 +3410,7 @@ try {
     json_response($events);
   }
   elseif ($path === '/public/past-events' && $method === 'GET') {
-    $stmt = db()->prepare("SELECT e.id, e.title, e.slug, e.description, e.date, e.end_date, e.location, e.status, e.capacity, e.image_url, e.category, e.organizer_id,
+    $stmt = db()->prepare("SELECT e.id, e.title, e.slug, e.description, e.date, e.end_date, e.location, e.is_online, e.status, e.capacity, e.image_url, e.category, e.organizer_id,
       (SELECT COUNT(*) FROM event_registrations r WHERE r.event_id = e.id AND r.status = 'registered') AS rsvp_count
       FROM events e WHERE e.status = 'published' AND e.date < NOW() ORDER BY e.date DESC LIMIT 20");
     $stmt->execute();
@@ -3587,8 +3616,11 @@ try {
     $data = input_json();
     $sets = [];
     $args = [];
-    foreach (['title', 'description', 'objectives', 'outputs', 'status'] as $f) {
+    foreach (['title', 'objectives', 'status'] as $f) {
       if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = $data[$f]; }
+    }
+    foreach (['description', 'outputs'] as $f) {
+      if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = sanitize_rich_html($data[$f]); }
     }
     if (array_key_exists('image_url', $data)) { $sets[] = 'image_url = ?'; $args[] = clean_image_url($data['image_url']); }
     if (array_key_exists('slug', $data)) { $s = makeSlug($data['slug'], 'programmes', $id); $sets[] = 'slug = ?'; $args[] = $s; }

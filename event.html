@@ -114,8 +114,12 @@
         <div class="content-main">
           <div class="info-grid" id="eDetails"></div>
           <div class="card-section">
-            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span> About This Event</h3>
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2h12a2 2 0 0 0-2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span> About This Event</h3>
             <div class="description-body" id="eBody"></div>
+          </div>
+          <div class="card-section" id="eVideoSection" style="display:none">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg></span> Video</h3>
+            <div id="eVideo"></div>
           </div>
           <div id="eTags" class="tags-row" style="margin-bottom:1.5rem"></div>
           <div id="eAttendeesSection"></div>
@@ -163,7 +167,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260922-11"></script>
+  <script src="js/api.js?v=20260922-12"></script>
   <script>
     var eventImgs = {'lecture':ua('/img/event-lecture.jpg'),'workshop':ua('/img/event-workshop.jpg'),'observing':ua('/img/event-nightwatch.jpg'),'conference':ua('/img/event-lecture.jpg'),'outreach':ua('/img/event-workshop.jpg')};
     var eventId = null;
@@ -256,11 +260,28 @@
       document.getElementById('eDetails').innerHTML =
         '<div class="info-box"><div class="label"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span> Date</div><div class="value">' + d2.toLocaleDateString('en',{weekday:'long',year:'numeric',month:'long',day:'numeric'}) + '</div></div>' +
         '<div class="info-box"><div class="label"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span> Time</div><div class="value">' + d2.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}) + (dEnd ? ' — ' + dEnd.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}) : '') + (duration ? ' <span class="sub">(' + duration + ')</span>' : '') + '</div></div>' +
-        '<div class="info-box"><div class="label"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> Location</div><div class="value">' + (e.location ? esc(e.location) : 'To be confirmed') + '</div>' + (e.location ? '<a class="map-link" href="https://maps.google.com/?q=' + encodeURIComponent(e.location) + '" target="_blank" rel="noopener">View on map <span aria-hidden="true">&rarr;</span></a>' : '') + '</div>' +
+        '<div class="info-box"><div class="label"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> Location</div><div class="value">' + (e.is_online ? 'Online' + (e.location ? ' · ' + esc(e.location) : '') : (e.location ? esc(e.location) : 'To be confirmed')) + '</div>' + ((!e.is_online && e.location) ? '<a class="map-link" href="https://maps.google.com/?q=' + encodeURIComponent(e.location) + '" target="_blank" rel="noopener">View on map <span aria-hidden="true">&rarr;</span></a>' : '') + '</div>' +
         '<div class="info-box"><div class="label"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Capacity</div><div class="value">' + (e.capacity ? d.stats.total + ' / ' + e.capacity : d.stats.total + ' registered') + '</div>' + (e.capacity ? '<div class="sub">' + Math.min(100, Math.round(d.stats.total / e.capacity * 100)) + '% filled</div>' : '') + '</div>';
 
       // Rich HTML description
       document.getElementById('eBody').innerHTML = e.description || '<p class="text-dim">No description provided.</p>';
+
+      // Attached video (URL-only embed, never hosted here)
+      if (e.video_url) {
+        document.getElementById('eVideoSection').style.display = 'block';
+        document.getElementById('eVideo').innerHTML =
+          '<iframe src="' + esc(e.video_url) + '" style="width:100%;height:360px;border:0;border-radius:8px" allow="fullscreen; autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy" title="Event video"></iframe>';
+      }
+
+      // Online room link for upcoming events
+      if (e.is_online && e.online_url && !past && !cancelled) {
+        document.getElementById('eActions').innerHTML +=
+          '<a class="btn btn-primary" style="width:100%;margin-top:0.75rem" href="' + esc(e.online_url) + '" target="_blank" rel="noopener">Join online</a>' +
+          '<p class="text-dim" style="font-size:0.8rem;margin-top:0.4rem">Opens the video room in a new tab. No account needed for guests.</p>';
+      } else if (e.is_online && e.online_url && !cancelled) {
+        document.getElementById('eActions').innerHTML +=
+          '<p class="text-dim" style="font-size:0.85rem;margin-top:0.75rem">This was an online event.</p>';
+      }
 
       // Tags
       var tags = parseTags(e.tags);
@@ -458,6 +479,10 @@
         '<input class="form-input" id="eeLoc" style="width:100%" value="' + esc(e.location || '') + '"></div>' +
         '<div style="flex:0 0 110px"><label style="font-size:0.78rem;font-weight:600;color:var(--text-dim)">Capacity</label>' +
         '<input class="form-input" id="eeCap" type="number" min="0" style="width:100%" value="' + (e.capacity || '') + '"></div></div>' +
+        '<div style="margin-bottom:0.75rem"><label style="font-size:0.85rem;display:flex;gap:0.4rem;align-items:center;cursor:pointer">' +
+        '<input type="checkbox" id="eeOnline"' + (e.is_online ? ' checked' : '') + '> This event meets online</label></div>' +
+        '<div style="margin-bottom:0.75rem"><label style="font-size:0.78rem;font-weight:600;color:var(--text-dim)">Online meeting link</label>' +
+        '<input class="form-input" id="eeOnlineUrl" placeholder="https://meet.jit.si/…" style="width:100%" value="' + esc(e.online_url || '') + '"></div>' +
         '<div style="margin-bottom:0.75rem"><label style="font-size:0.78rem;font-weight:600;color:var(--text-dim)">Description *</label>' +
         '<div id="eeDesc" contenteditable="true" style="min-height:140px;max-height:300px;overflow-y:auto;padding:0.6rem;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:0.9rem;line-height:1.6">' + (e.description || '') + '</div></div>' +
         '<p class="text-dim" id="eeMsg" style="font-size:0.82rem"></p>' +
@@ -486,6 +511,8 @@
           date: date.replace('T', ' ') + ':00',
           end_date: end ? end.replace('T', ' ') + ':00' : null,
           location: (document.getElementById('eeLoc').value || '').trim() || null,
+          is_online: document.getElementById('eeOnline').checked,
+          online_url: (document.getElementById('eeOnlineUrl').value || '').trim() || null,
           capacity: capRaw === '' ? null : parseInt(capRaw, 10),
           description: document.getElementById('eeDesc').innerHTML,
         });
