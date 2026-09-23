@@ -3282,6 +3282,122 @@ try {
     json_response(['ok' => true, 'emailed' => true, 'via' => $via]);
   }
 
+  // --- MASS MAIL BROADCASTS (queued; browser fires small send-chunks) ---
+  elseif ($path === '/mail/broadcasts/preview' && $method === 'POST') {
+    $user = require_login();
+    if ($user['status'] !== 'active') json_error('Account is not active', 403);
+    if (!can_broadcast($user['id'])) json_error('Insufficient permissions: mail.broadcast', 403);
+    $data = input_json();
+    if (!in_array($data['office'] ?? '', user_inbox_offices($user['id']), true)) {
+      json_error('No access to this office inbox', 403);
+    }
+    $aud = $data['audience'] ?? [];
+    $opts = (isset($aud['opts']) && is_array($aud['opts'])) ? $aud['opts'] : [];
+    $list = broadcast_audience($aud['type'] ?? '', $aud['ref'] ?? null, $opts);
+    json_response(['total' => count($list), 'sample' => array_slice($list, 0, 8)]);
+  }
+  elseif ($path === '/mail/broadcasts' && $method === 'POST') {
+    $user = require_login();
+    if ($user['status'] !== 'active') json_error('Account is not active', 403);
+    if (!can_broadcast($user['id'])) json_error('Insufficient permissions: mail.broadcast', 403);
+    $data = input_json();
+    $office = $data['office'] ?? '';
+    if (!in_array($office, user_inbox_offices($user['id']), true)) {
+      json_error('No access to this office inbox', 403);
+    }
+    $subject = trim($data['subject'] ?? '');
+    $body = trim($data['body'] ?? '');
+    if ($subject === '' || mb_strlen($subject) > 255) json_error('Subject is required (max 255 characters)', 400);
+    if ($body === '' || mb_strlen($body) > 10000) json_error('Message must be 1–10000 characters', 400);
+    if (!rate_limit('mail-bcast-new:' . $user['id'], 'mail-broadcast', 5, 86400)) {
+      json_error('Max 5 broadcasts per day. Try again tomorrow.', 429);
+    }
+    $aud = $data['audience'] ?? [];
+    $opts = (isset($aud['opts']) && is_array($aud['opts'])) ? $aud['opts'] : [];
+    $list = broadcast_audience($aud['type'] ?? '', $aud['ref'] ?? null, $opts);
+    if (!count($list)) json_error('Audience is empty — nothing to send to', 400);
+    if (count($list) > 500) json_error('Audience too large (max 500 recipients per broadcast)', 400);
+    db()->prepare('INSERT INTO mail_broadcasts (office, subject, body, audience_type, audience_ref, audience_opts, created_by, status, total) VALUES (?, ?, ?, ?, ?, ?, ?, "sending", ?)')
+      ->execute([$office, $subject, $body, $aud['type'], is_numeric($aud['ref'] ?? null) ? (int) $aud['ref'] : null, json_encode($opts), $user['id'], count($list)]);
+    $bid = (int) db()->lastInsertId();
+    $ins = db()->prepare('INSERT INTO mail_broadcast_recipients (broadcast_id, email, user_id, name) VALUES (?, ?, ?, ?)');
+    foreach ($list as $r) $ins->execute([$bid, $r['email'], $r['user_id'], $r['name']]);
+    audit_log('mail_broadcast_create', 'broadcast', $bid, ['office' => $office, 'total' => count($list), 'audience' => $aud['type'] ?? '']);
+    json_response(['id' => $bid, 'total' => count($list)], 201);
+  }
+  elseif ($path === '/mail/broadcasts' && $method === 'GET') {
+    $user = require_login();
+    $stmt = db()->prepare('SELECT id, office, subject, audience_type, audience_ref, status, total, sent_count, fail_count, created_at FROM mail_broadcasts WHERE created_by = ? ORDER BY id DESC LIMIT 50');
+    $stmt->execute([$user['id']]);
+    $rows = $stmt->fetchAll();
+    foreach ($rows as &$r) $r['audience_label'] = broadcast_label($r['audience_type'], $r['audience_ref']);
+    json_response($rows);
+  }
+  elseif (preg_match('#^/mail/broadcasts/(\d+)$#', $path, $m) && $method === 'GET') {
+    $user = require_login();
+    $stmt = db()->prepare('SELECT * FROM mail_broadcasts WHERE id = ?');
+    $stmt->execute([(int) $m[1]]);
+    $b = $stmt->fetch();
+    if (!$b) json_error('Broadcast not found', 404);
+    if ((int) $b['created_by'] !== (int) $user['id'] && !user_has_cap($user['id'], 'admin.system')) {
+      json_error('Not your broadcast', 403);
+    }
+    $b['audience_label'] = broadcast_label($b['audience_type'], $b['audience_ref']);
+    $stmt = db()->prepare("SELECT email, name, status, error, sent_at FROM mail_broadcast_recipients WHERE broadcast_id = ? AND status = 'failed' ORDER BY id LIMIT 50");
+    $stmt->execute([(int) $m[1]]);
+    $b['failures'] = $stmt->fetchAll();
+    json_response($b);
+  }
+  elseif (preg_match('#^/mail/broadcasts/(\d+)/send$#', $path, $m) && $method === 'POST') {
+    $user = require_login();
+    if ($user['status'] !== 'active') json_error('Account is not active', 403);
+    $stmt = db()->prepare('SELECT * FROM mail_broadcasts WHERE id = ?');
+    $stmt->execute([(int) $m[1]]);
+    $b = $stmt->fetch();
+    if (!$b) json_error('Broadcast not found', 404);
+    if ((int) $b['created_by'] !== (int) $user['id'] && !user_has_cap($user['id'], 'admin.system')) {
+      json_error('Not your broadcast', 403);
+    }
+    if (!can_broadcast($user['id'])) json_error('Insufficient permissions: mail.broadcast', 403);
+    if (!in_array($b['office'], user_inbox_offices($user['id']), true)) {
+      json_error('No access to this office inbox', 403);
+    }
+    if (!rate_limit('mail-bcast-send:' . $user['id'], 'mail-broadcast-send', 60, 3600)) {
+      json_error('Send rate limit reached. Resume in a while.', 429);
+    }
+    $data = input_json();
+    $limit = min(max((int) ($data['limit'] ?? 5), 1), 8);
+    $stmt = db()->prepare('SELECT id, email, name FROM mail_broadcast_recipients WHERE broadcast_id = ? AND status = "queued" ORDER BY id LIMIT ' . $limit);
+    $stmt->execute([(int) $m[1]]);
+    $batch = $stmt->fetchAll();
+    $text = $b['body'] . "\n\n—\n" . mail_signature((int) $user['id'], $user['name']);
+    $sent = 0; $failed = 0;
+    foreach ($batch as $r) {
+      $via = null; $msgId = null;
+      $ok = send_office_email($b['office'], $r['email'], $b['subject'] . ' [UAS]', $text, $via, $msgId, [], (int) $user['id'], $user['name']);
+      if ($ok) {
+        record_sent($b['office'], $r['email'], $b['subject'] . ' [UAS]', $text, $msgId, 'broadcast', (int) $m[1], (int) $user['id'], $via);
+        db()->prepare("UPDATE mail_broadcast_recipients SET status = 'sent', sent_at = NOW() WHERE id = ?")->execute([$r['id']]);
+        $sent++;
+      } else {
+        db()->prepare("UPDATE mail_broadcast_recipients SET status = 'failed', error = ? WHERE id = ?")->execute([substr((string) $via, 0, 500), $r['id']]);
+        $failed++;
+      }
+    }
+    db()->prepare('UPDATE mail_broadcasts SET sent_count = sent_count + ?, fail_count = fail_count + ? WHERE id = ?')->execute([$sent, $failed, (int) $m[1]]);
+    $stmt = db()->prepare('SELECT COUNT(*) FROM mail_broadcast_recipients WHERE broadcast_id = ? AND status = "queued"');
+    $stmt->execute([(int) $m[1]]);
+    $remaining = (int) $stmt->fetchColumn();
+    if ($remaining === 0) {
+      db()->prepare("UPDATE mail_broadcasts SET status = 'done' WHERE id = ?")->execute([(int) $m[1]]);
+    }
+    $stmt = db()->prepare('SELECT sent_count, fail_count FROM mail_broadcasts WHERE id = ?');
+    $stmt->execute([(int) $m[1]]);
+    $totals = $stmt->fetch();
+    audit_log('mail_broadcast_send', 'broadcast', (int) $m[1], ['sent' => $sent, 'failed' => $failed, 'remaining' => $remaining]);
+    json_response(['sent_this_round' => $sent, 'failed_this_round' => $failed, 'sent_total' => (int) $totals['sent_count'], 'fail_total' => (int) $totals['fail_count'], 'remaining' => $remaining, 'done' => $remaining === 0]);
+  }
+
   // --- SEARCH ---
   elseif ($path === '/search' && $method === 'GET') {
     $q = trim($_GET['q'] ?? '');

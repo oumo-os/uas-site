@@ -838,6 +838,138 @@ function notify_capability(string $capability, string $type, string $title, stri
   return $count;
 }
 
+// ---- Mass mail broadcasts ----
+// Who may send to many at once: dedicated mail.broadcast cap, or officers
+// who already review/manage content or members. The sending office must
+// additionally be one of the user's own inboxes (checked at the endpoints).
+function can_broadcast(int $userId): bool {
+  foreach (['mail.broadcast', 'members.manage', 'programmes.manage', 'events.approve', 'projects.approve', 'admin.system'] as $c) {
+    if (user_has_cap($userId, $c)) return true;
+  }
+  return false;
+}
+
+function broadcast_member_classes(): array {
+  return ['Regular Member', 'Student Member', 'Honorary Member', 'Institutional Member', 'Affiliate Member', 'Corporate Member'];
+}
+
+/**
+ * Resolve a broadcast audience to recipients: [['email'=>, 'user_id'=>?int, 'name'=>], ...]
+ * Deduped by email. Member lists require an active membership row (this also
+ * keeps service accounts out); participation audiences resolve through
+ * registrations/seats, which are real people by construction.
+ */
+function broadcast_audience(string $type, $ref, array $opts = []): array {
+  $out = [];
+  $add = function ($email, $uid, $name) use (&$out) {
+    $email = strtolower(trim((string) $email));
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return;
+    if (isset($out[$email])) return;
+    $out[$email] = ['email' => $email, 'user_id' => $uid ? (int) $uid : null, 'name' => trim((string) $name) ?: null];
+  };
+  switch ($type) {
+    case 'member_class': {
+      $class = trim((string) $ref);
+      if (!in_array($class, broadcast_member_classes(), true)) json_error('Unknown member class', 400);
+      $stmt = db()->prepare("SELECT u.id, u.name, u.email FROM users u JOIN members m ON m.user_id = u.id AND m.status = 'active' JOIN role_assignments ra ON ra.user_id = u.id AND ra.status = 'active' JOIN roles r ON r.id = ra.role_id AND r.role_type = 'member_class' AND r.status = 'active' WHERE u.status = 'active' AND r.title = ? ORDER BY u.name");
+      $stmt->execute([$class]);
+      foreach ($stmt->fetchAll() as $r) $add($r['email'], $r['id'], $r['name']);
+      break;
+    }
+    case 'all': {
+      $stmt = db()->prepare("SELECT u.id, u.name, u.email FROM users u JOIN members m ON m.user_id = u.id AND m.status = 'active' WHERE u.status = 'active' ORDER BY u.name");
+      $stmt->execute();
+      foreach ($stmt->fetchAll() as $r) $add($r['email'], $r['id'], $r['name']);
+      break;
+    }
+    case 'event': {
+      $eid = (int) $ref;
+      $chk = db()->prepare('SELECT id FROM events WHERE id = ?');
+      $chk->execute([$eid]);
+      if (!$chk->fetch()) json_error('Event not found', 404);
+      $stmt = db()->prepare("SELECT u.id, u.name, u.email FROM event_registrations er JOIN users u ON u.id = er.user_id WHERE er.event_id = ? AND er.status IN ('registered','attended') AND u.status = 'active' ORDER BY u.name");
+      $stmt->execute([$eid]);
+      foreach ($stmt->fetchAll() as $r) $add($r['email'], $r['id'], $r['name']);
+      if (!empty($opts['waitlist'])) {
+        $stmt = db()->prepare("SELECT u.id, u.name, u.email FROM event_waitlist w JOIN users u ON u.id = w.user_id WHERE w.event_id = ? AND u.status = 'active' ORDER BY w.created_at, w.id");
+        $stmt->execute([$eid]);
+        foreach ($stmt->fetchAll() as $r) $add($r['email'], $r['id'], $r['name']);
+      }
+      if (!empty($opts['guests'])) {
+        try {
+          $stmt = db()->prepare("SELECT name, email FROM event_guests WHERE event_id = ? AND status = 'registered' ORDER BY created_at");
+          $stmt->execute([$eid]);
+          foreach ($stmt->fetchAll() as $r) $add($r['email'], null, $r['name']);
+        } catch (Exception $e) { /* guests table not imported yet */ }
+      }
+      break;
+    }
+    case 'project': {
+      $pid = (int) $ref;
+      $chk = db()->prepare('SELECT id FROM projects WHERE id = ?');
+      $chk->execute([$pid]);
+      if (!$chk->fetch()) json_error('Project not found', 404);
+      $stmt = db()->prepare("SELECT u.id, u.name, u.email FROM project_participants pp JOIN users u ON u.id = pp.user_id WHERE pp.project_id = ? AND pp.status = 'active' AND u.status = 'active' ORDER BY u.name");
+      $stmt->execute([$pid]);
+      foreach ($stmt->fetchAll() as $r) $add($r['email'], $r['id'], $r['name']);
+      break;
+    }
+    case 'role': {
+      $rid = (int) $ref;
+      $chk = db()->prepare('SELECT id FROM roles WHERE id = ? AND status = "active"');
+      $chk->execute([$rid]);
+      if (!$chk->fetch()) json_error('Role not found', 404);
+      $stmt = db()->prepare("SELECT u.id, u.name, u.email FROM role_assignments ra JOIN users u ON u.id = ra.user_id WHERE ra.role_id = ? AND ra.status = 'active' AND u.status = 'active' ORDER BY u.name");
+      $stmt->execute([$rid]);
+      foreach ($stmt->fetchAll() as $r) $add($r['email'], $r['id'], $r['name']);
+      break;
+    }
+    case 'group': {
+      $gid = (int) $ref;
+      $chk = db()->prepare('SELECT id FROM working_groups WHERE id = ?');
+      $chk->execute([$gid]);
+      if (!$chk->fetch()) json_error('Group not found', 404);
+      $stmt = db()->prepare("SELECT u.id, u.name, u.email FROM working_group_members wgm JOIN users u ON u.id = wgm.user_id WHERE wgm.group_id = ? AND wgm.status = 'active' AND u.status = 'active' ORDER BY u.name");
+      $stmt->execute([$gid]);
+      foreach ($stmt->fetchAll() as $r) $add($r['email'], $r['id'], $r['name']);
+      break;
+    }
+    default:
+      json_error('Unknown audience type', 400);
+  }
+  return array_values($out);
+}
+
+function broadcast_label(string $type, $ref): string {
+  try {
+    switch ($type) {
+      case 'member_class': return (string) $ref;
+      case 'all': return 'All active members';
+      case 'event': {
+        $s = db()->prepare('SELECT title FROM events WHERE id = ?');
+        $s->execute([(int) $ref]);
+        return 'Event: ' . ($s->fetchColumn() ?: ('#' . (int) $ref));
+      }
+      case 'project': {
+        $s = db()->prepare('SELECT title FROM projects WHERE id = ?');
+        $s->execute([(int) $ref]);
+        return 'Project: ' . ($s->fetchColumn() ?: ('#' . (int) $ref));
+      }
+      case 'role': {
+        $s = db()->prepare('SELECT title FROM roles WHERE id = ?');
+        $s->execute([(int) $ref]);
+        return 'Role: ' . ($s->fetchColumn() ?: ('#' . (int) $ref));
+      }
+      case 'group': {
+        $s = db()->prepare('SELECT name FROM working_groups WHERE id = ?');
+        $s->execute([(int) $ref]);
+        return 'Group: ' . ($s->fetchColumn() ?: ('#' . (int) $ref));
+      }
+    }
+  } catch (Exception $e) { /* fall through */ }
+  return $type . ' #' . (int) $ref;
+}
+
 // Event waitlist: promote the earliest waitlisted member when capacity frees up.
 // Guest headcount for an event (0 when migration 039 not yet imported).
 function event_guest_count(int $eventId): int {

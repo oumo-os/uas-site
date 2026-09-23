@@ -1007,6 +1007,7 @@
           <h4>Office Mail</h4>
           <div style="display:flex;gap:0.5rem">
             <button class="btn btn-primary btn-xs" onclick="showMailCompose()">Compose</button>
+            <button class="btn btn-outline btn-xs" onclick="showBroadcastForm()">Broadcast</button>
             <button class="btn btn-outline btn-xs" onclick="loadDashMail()">Refresh</button>
           </div>
         </div>
@@ -4386,6 +4387,164 @@
             </div>
           </div>`);
       }
+    }
+
+    // ── Mass mail broadcasts ──
+    function canBroadcast() {
+      return ['mail.broadcast', 'members.manage', 'programmes.manage', 'events.approve', 'projects.approve', 'admin.system'].some(c => api.hasCap(c));
+    }
+
+    async function showBroadcastForm() {
+      if (!mailOffices.length) { toast('No office inbox access', 'warning'); return; }
+      if (!canBroadcast()) { toast('Your roles cannot send mass mail', 'warning'); return; }
+      const defOffice = mailOffices.includes(dashMailOffice) ? dashMailOffice : mailOffices[0];
+      openModal('Broadcast Email', `
+        <div style="display:flex;flex-direction:column;gap:0.75rem">
+          <div class="form-group" style="margin:0"><label class="form-label">From office</label>
+            <select id="bcOffice" class="form-select">${mailOffices.map(o => `<option value="${o}"${o === defOffice ? ' selected' : ''}>${esc(MAIL_OFFICE_LABELS[o] || o)}</option>`).join('')}</select>
+          </div>
+          <div class="form-group" style="margin:0"><label class="form-label">Audience</label>
+            <select id="bcType" class="form-select" onchange="bcTypeChanged()">
+              <option value="member_class">Member class</option>
+              <option value="event">Event subscribers</option>
+              <option value="project">Project participants</option>
+              <option value="role">Role holders</option>
+              <option value="group">Committee / working group</option>
+              <option value="all">All active members</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0" id="bcTargetWrap"><label class="form-label">Target</label><div id="bcTarget"></div></div>
+          <div id="bcEventOpts" style="display:none;gap:0.5rem;flex-wrap:wrap">
+            <label class="text-sm" style="display:flex;gap:0.35rem;align-items:center"><input type="checkbox" id="bcGuests" checked> Include guest signups</label>
+            <label class="text-sm" style="display:flex;gap:0.35rem;align-items:center"><input type="checkbox" id="bcWaitlist"> Include waitlist</label>
+          </div>
+          <div class="form-group" style="margin:0"><label class="form-label">Subject</label>
+            <input id="bcSubject" class="form-input" placeholder="Subject">
+          </div>
+          <div class="form-group" style="margin:0"><label class="form-label">Message</label>
+            <textarea id="bcBody" class="form-textarea" rows="6" placeholder="Write your message..."></textarea>
+          </div>
+          <p class="text-dim text-sm" style="margin:0">Sent one-by-one from the office (max 500 per broadcast, 5 broadcasts/day). Your institutional signature is added automatically.</p>
+          <div id="bcPreview"></div>
+          <div id="bcProgress"></div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+            <button class="btn btn-outline" id="bcPreviewBtn" onclick="bcPreview()">Preview audience</button>
+            <button class="btn btn-primary" id="bcSendBtn" onclick="bcSend()">Send broadcast</button>
+          </div>
+          <div id="bcRecent"></div>
+        </div>
+      `);
+      bcTypeChanged();
+      bcRecent();
+    }
+
+    async function bcTypeChanged() {
+      const type = document.getElementById('bcType').value;
+      const wrap = document.getElementById('bcTargetWrap');
+      const box = document.getElementById('bcTarget');
+      document.getElementById('bcEventOpts').style.display = type === 'event' ? 'flex' : 'none';
+      document.getElementById('bcPreview').innerHTML = '';
+      if (type === 'all') { wrap.style.display = 'none'; return; }
+      wrap.style.display = '';
+      box.innerHTML = '<p class="text-dim text-sm">Loading…</p>';
+      try {
+        if (type === 'member_class') {
+          const classes = ['Regular Member', 'Student Member', 'Honorary Member', 'Institutional Member', 'Affiliate Member', 'Corporate Member'];
+          box.innerHTML = `<select id="bcRef" class="form-select">${classes.map(c => `<option value="${c}">${c}</option>`).join('')}</select>`;
+        } else if (type === 'event') {
+          const evts = await api.getEvents().catch(() => []);
+          box.innerHTML = `<select id="bcRef" class="form-select">${evts.map(e => `<option value="${e.id}">${esc(e.title)} (${esc(String(e.date).slice(0, 10))} · ${esc(e.status)})</option>`).join('') || '<option value="">No events</option>'}</select>`;
+        } else if (type === 'project') {
+          const projs = await api.getProjects().catch(() => []);
+          box.innerHTML = `<select id="bcRef" class="form-select">${projs.map(p => `<option value="${p.id}">${esc(p.title)}${p.programme_title ? ' — ' + esc(p.programme_title) : ''}</option>`).join('') || '<option value="">No projects</option>'}</select>`;
+        } else if (type === 'role') {
+          const roles = await api.getRoles().catch(() => []);
+          box.innerHTML = `<select id="bcRef" class="form-select">${roles.map(r => `<option value="${r.id}">${esc(r.title)}${r.member_count ? ' (' + r.member_count + ')' : ''}</option>`).join('') || '<option value="">No roles</option>'}</select>`;
+        } else if (type === 'group') {
+          const groups = await api.getWorkingGroups().catch(() => []);
+          box.innerHTML = `<select id="bcRef" class="form-select">${groups.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('') || '<option value="">No groups</option>'}</select>`;
+        }
+      } catch (e) { box.innerHTML = `<p class="text-dim text-sm">Failed to load: ${esc(e.error || '')}</p>`; }
+    }
+
+    function bcAudience() {
+      const type = document.getElementById('bcType').value;
+      const refEl = document.getElementById('bcRef');
+      const aud = { type, ref: type === 'member_class' ? (refEl ? refEl.value : '') : (refEl && refEl.value !== '' ? parseInt(refEl.value, 10) : null), opts: {} };
+      if (type === 'event') {
+        aud.opts.guests = document.getElementById('bcGuests').checked;
+        aud.opts.waitlist = document.getElementById('bcWaitlist').checked;
+      }
+      return aud;
+    }
+
+    async function bcPreview() {
+      const box = document.getElementById('bcPreview');
+      box.innerHTML = '<p class="text-dim text-sm">Counting recipients…</p>';
+      try {
+        const r = await api.request('/mail/broadcasts/preview', { method: 'POST', body: { office: document.getElementById('bcOffice').value, audience: bcAudience() } });
+        box.innerHTML = `<div style="padding:0.75rem;border:1px solid var(--border);border-radius:var(--radius);font-size:0.88rem">
+          <strong>${r.total} recipient${r.total === 1 ? '' : 's'}</strong>
+          ${(r.sample || []).length ? `<div class="text-dim text-sm" style="margin-top:0.3rem">${r.sample.map(s => esc(s.name || s.email)).join(', ')}${r.total > r.sample.length ? ', …' : ''}</div>` : ''}
+        </div>`;
+      } catch (e) { box.innerHTML = `<p style="color:var(--danger);font-size:0.85rem">${esc(e.error || 'Preview failed')}</p>`; }
+    }
+
+    async function bcSend() {
+      const office = document.getElementById('bcOffice').value;
+      const subject = (document.getElementById('bcSubject').value || '').trim();
+      const body = (document.getElementById('bcBody').value || '').trim();
+      if (!subject || !body) { toast('Subject and message are required', 'warning'); return; }
+      if (!confirm('Send this broadcast? Emails go out one by one; you can close this dialog and resume later.')) return;
+      const prog = document.getElementById('bcProgress');
+      document.getElementById('bcSendBtn').disabled = true;
+      try {
+        const created = await api.request('/mail/broadcasts', { method: 'POST', body: { office, subject, body, audience: bcAudience() } });
+        await bcRunLoop(created.id, prog);
+        bcRecent();
+      } catch (e) {
+        prog.innerHTML = `<p style="color:var(--danger);font-size:0.85rem">${esc(e.error || 'Failed to create broadcast')}</p>`;
+        document.getElementById('bcSendBtn').disabled = false;
+      }
+    }
+
+    async function bcRunLoop(id, prog) {
+      prog = prog || document.getElementById('bcProgress');
+      for (;;) {
+        const r = await api.request(`/mail/broadcasts/${id}/send`, { method: 'POST', body: { limit: 5 } });
+        const pct = r.sent_total + r.fail_total > 0 ? Math.round(((r.sent_total + r.fail_total) / (r.sent_total + r.fail_total + r.remaining)) * 100) : 0;
+        if (prog) prog.innerHTML = `<div style="font-size:0.88rem">Sending… ${r.sent_total} sent${r.fail_total ? `, ${r.fail_total} failed` : ''} (${r.remaining} left)</div>
+          <div class="budget-bar" style="margin-top:0.35rem"><div class="budget-bar-fill income" style="width:${pct}%"></div></div>`;
+        if (r.done) {
+          if (prog) prog.innerHTML = `<div style="padding:0.75rem;border:1px solid var(--success);border-radius:var(--radius);background:rgba(45,106,79,0.08);font-size:0.88rem"><strong>Broadcast complete:</strong> ${r.sent_total} sent${r.fail_total ? `, ${r.fail_total} failed` : ''}.</div>`;
+          const btn = document.getElementById('bcSendBtn');
+          if (btn) btn.disabled = false;
+          loadDashMail();
+          return r;
+        }
+      }
+    }
+
+    async function bcRecent() {
+      const box = document.getElementById('bcRecent');
+      if (!box) return;
+      try {
+        const rows = await api.request('/mail/broadcasts');
+        if (!rows.length) { box.innerHTML = ''; return; }
+        box.innerHTML = `<div style="margin-top:0.5rem;border-top:1px solid var(--border);padding-top:0.5rem">
+          <h5 style="margin:0 0 0.4rem;font-size:0.85rem">My recent broadcasts</h5>` +
+          rows.slice(0, 5).map(b => `
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;padding:0.35rem 0;border-bottom:1px solid var(--border);font-size:0.82rem">
+              <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.subject)} <span class="text-dim">· ${esc(b.audience_label || b.audience_type)} · ${b.sent_count}/${b.total}${b.fail_count ? ` (${b.fail_count} failed)` : ''} · ${esc(b.status)}</span></span>
+              ${b.status !== 'done' ? `<button class="btn btn-outline btn-xs" onclick="bcResume(${b.id})">Resume</button>` : ''}
+            </div>`).join('') + `</div>`;
+      } catch (e) { /* not critical */ }
+    }
+
+    async function bcResume(id) {
+      document.getElementById('bcProgress').innerHTML = '<p class="text-dim text-sm">Resuming…</p>';
+      try { await bcRunLoop(id); bcRecent(); }
+      catch (e) { document.getElementById('bcProgress').innerHTML = `<p style="color:var(--danger);font-size:0.85rem">${esc(e.error || 'Resume failed')}</p>`; }
     }
 
     // ── Profile ──
