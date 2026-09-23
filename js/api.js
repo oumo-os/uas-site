@@ -717,8 +717,10 @@ window.renderTimeline = function (el, opts) {
       return `<div class="tl-dot" style="${st}" title="${esc(e.title)} — ${d.toLocaleDateString()}"${opts.onEvent ? ` data-ev="${e.id}"` : ''}></div>`;
     })
     .join('');
+  const inRange = today >= r0 && today <= r1;
+  const todayTag = inRange ? `<div class="tl-today-tag" style="left:${pct(today)}%">Today</div>` : '';
   el.innerHTML = `<div class="tl"><div class="tl-inner">
-    <div class="tl-row tl-headrow"><div class="tl-label"></div><div class="tl-track"><div style="position:relative;height:100%">${monthHtml}${todayHtml}</div></div></div>
+    <div class="tl-row tl-headrow"><div class="tl-label"></div><div class="tl-track"><div style="position:relative;height:100%">${monthHtml}${todayTag}${todayHtml}</div></div></div>
     ${rows || '<p class="text-dim text-sm">No projects yet.</p>'}
     ${events.length ? `<div class="tl-row"><div class="tl-label"><div style="font-weight:600">Events</div><div class="text-dim text-sm">${events.length} on timeline</div></div><div class="tl-track">${evDots}${todayHtml}</div></div>` : ''}
   </div></div>`;

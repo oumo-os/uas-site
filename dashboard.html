@@ -10,7 +10,7 @@
   <meta property="og:url" content="https://astronomy.ug/dashboard">
   <meta name="robots" content="noindex, nofollow">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="stylesheet" href="css/base.css?v=20260923-1">
+  <link rel="stylesheet" href="css/base.css?v=20260923-2">
   <style>
     /* ── Hero ── */
     .dash-hero {
@@ -319,10 +319,20 @@
     .kan-col.dragover { border-color: var(--accent); background: var(--accent-glow); }
     .kan-col-head { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
     .kan-count { background: var(--border); border-radius: 999px; padding: 0.05rem 0.5rem; font-size: 0.7rem; }
-    .kan-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem; margin-bottom: 0.5rem; cursor: grab; font-size: 0.82rem; }
+    .kan-pill { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.65rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; text-transform: none; letter-spacing: 0; }
+    .kan-pill::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .kan-submitted { background: rgba(184,134,11,0.12); color: var(--gold); }
+    .kan-review { background: rgba(30,96,145,0.12); color: var(--info); }
+    .kan-approved { background: rgba(45,106,79,0.12); color: var(--success); }
+    .kan-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.65rem 0.7rem; margin-bottom: 0.5rem; cursor: grab; font-size: 0.82rem; box-shadow: var(--shadow); }
+    .kan-card:hover { border-color: var(--border-focus); }
     .kan-card:active { cursor: grabbing; }
     .kan-card.dragging { opacity: 0.35; }
-    .kan-card h5 { font-size: 0.85rem; margin: 0 0 0.2rem; line-height: 1.35; }
+    .kan-card h5 { font-size: 0.85rem; margin: 0.3rem 0 0.15rem; line-height: 1.35; }
+    .kan-card-top { display: flex; justify-content: space-between; align-items: center; gap: 0.4rem; }
+    .kan-card-foot { display: flex; justify-content: space-between; align-items: center; gap: 0.4rem; margin-top: 0.45rem; }
+    .kan-who { display: flex; align-items: center; gap: 0.35rem; min-width: 0; font-size: 0.75rem; color: var(--text-dim); }
+    .kan-ava { width: 22px; height: 22px; border-radius: 50%; background: var(--accent-glow); color: var(--accent); font-size: 0.6rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
     @media (max-width: 899px) { #pendingViewToggle { display: none; } }
 
     /* ── Modal ── */
@@ -1111,7 +1121,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260923-1"></script>
+  <script src="js/api.js?v=20260923-2"></script>
   <script>
     let health = {};
     let allPendingData = [];
@@ -2836,9 +2846,9 @@
       const div = document.getElementById('pendingBoard');
       if (!div) return;
       const cols = [
-        { key: 'submitted', label: 'Submitted' },
-        { key: 'review', label: 'Under Review' },
-        { key: 'approved', label: 'Approved' },
+        { key: 'submitted', label: 'Submitted', pill: 'kan-submitted' },
+        { key: 'review', label: 'Under Review', pill: 'kan-review' },
+        { key: 'approved', label: 'Approved', pill: 'kan-approved' },
       ];
       const byCol = { submitted: [], review: [], approved: [] };
       let listed = 0;
@@ -2848,7 +2858,7 @@
       });
       div.innerHTML = cols.map(c => `
         <div class="kan-col" data-col="${c.key}" ondragover="kanOver(event)" ondragleave="kanLeave(event)" ondrop="kanDrop(event)">
-          <div class="kan-col-head"><span>${c.label}</span><span class="kan-count">${byCol[c.key].length}</span></div>
+          <div class="kan-col-head"><span class="kan-pill ${c.pill}">${c.label}</span><span class="kan-count">${byCol[c.key].length}</span></div>
           <div>${byCol[c.key].map(kanCard).join('') || '<p class="text-dim text-sm" style="text-align:center;padding:1rem 0">—</p>'}</div>
         </div>`).join('')
         + (listed ? `<p class="text-dim text-sm" style="margin:0.5rem 0 0">${listed} item${listed === 1 ? '' : 's'} (votes, applications, assignments) stay in list view — <a href="#" onclick="switchPendingView('list');return false">switch to list</a>.</p>` : '');
@@ -2864,13 +2874,19 @@
         if (item.item_type === 'document' && api.hasCap('documents.publish')) pub = `<button class="btn btn-outline btn-xs" onclick="event.stopPropagation();actOnItem('document','publish',${item.id})">Publish</button>`;
         if (item.item_type === 'project' && api.hasCap('projects.approve')) pub = `<button class="btn btn-outline btn-xs" onclick="event.stopPropagation();actOnItem('project','publish',${item.id})">Publish</button>`;
       }
+      const initials = ((item.author_name || '?').split(' ').map(w => w[0]).filter(Boolean).join('') || '?').toUpperCase().slice(0, 2);
       return `
         <div class="kan-card" draggable="true" ondragstart="kanDragStart(event)" ondragend="kanDragEnd(event)" onclick="kanCardClick(event, '${item.item_type}', ${item.id})"
           data-type="${item.item_type}" data-id="${item.id}">
-          <span class="pending-type-badge ${esc(item.item_type)}">${esc(item.item_type)}</span>
+          <div class="kan-card-top">
+            <span class="pending-type-badge ${esc(item.item_type)}">${esc(item.item_type)}</span>
+            <span class="text-dim" style="font-size:0.7rem">${age}</span>
+          </div>
           <h5>${esc(item.title || item.name)}</h5>
-          <div class="text-dim text-sm">by ${esc(item.author_name || 'Unknown')} · ${age}</div>
-          ${pub ? `<div style="margin-top:0.35rem">${pub}</div>` : ''}
+          <div class="kan-card-foot">
+            <span class="kan-who"><span class="kan-ava">${esc(initials)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(item.author_name || 'Unknown')}</span></span>
+            ${pub ? `<span onclick="event.stopPropagation()">${pub}</span>` : ''}
+          </div>
         </div>`;
     }
 
