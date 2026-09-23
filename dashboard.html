@@ -4737,7 +4737,11 @@
           `;
 
         } else if (type === 'event') {
-          data = await api.request('/events/' + id);
+          // NOTE: GET /events/:id returns a wrapper {event, stats, ...} —
+          // unwrap to the row before rendering.
+          const evRes = await api.request('/events/' + id);
+          data = (evRes && evRes.event) || evRes;
+          if (evRes && typeof evRes.viewer_can_edit === 'boolean') data.viewer_can_edit = evRes.viewer_can_edit;
           const rsvps = await api.getEventRsvps(id).catch(() => null);
           const actions = [];
           const isOwner = api._user && (data.organizer_id === api._user.id || data.created_by === api._user.id);
@@ -5090,10 +5094,11 @@
 
     async function editEventForm(id) {
       try {
-        const [e, progs] = await Promise.all([
+        const [evRes, progs] = await Promise.all([
           api.request('/events/' + id),
           api.getProgrammes().catch(() => []),
         ]);
+        const e = (evRes && evRes.event) || evRes;
         const dt = v => v ? String(v).replace(' ', 'T').slice(0, 16) : '';
         const progOpts = [{ label: '— None —', value: '' }];
         (progs || []).forEach(p => progOpts.push({ label: p.title, value: p.id }));
