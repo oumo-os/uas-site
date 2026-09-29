@@ -1446,15 +1446,19 @@ try {
     $pid = (int) $m[1];
     // Check global projects.approve OR scoped to the project's programme OR programme lead
     $user = require_login();
-    $stmt = db()->prepare('SELECT programme_id, status FROM projects WHERE id = ?');
+    $stmt = db()->prepare('SELECT pr.programme_id, pr.status, p.title AS programme_title FROM projects pr LEFT JOIN programmes p ON p.id = pr.programme_id WHERE pr.id = ?');
     $stmt->execute([$pid]);
-    $chk = $stmt->fetch();
-    $progId = $chk ? $chk['programme_id'] : null;
-    if (!user_has_cap($user['id'], 'projects.approve') && !($progId && user_has_cap($user['id'], 'projects.approve', 'programme', (int)$progId)) && !($progId && is_programme_lead($user['id'], (int)$progId))) {
-      json_error('Insufficient permissions: projects.approve', 403);
+    $projRow = $stmt->fetch();
+    if (!$projRow) json_error('Project not found', 404);
+    $progId = $projRow['programme_id'] ? (int) $projRow['programme_id'] : null;
+    if (!user_has_cap($user['id'], 'projects.approve') && !($progId && user_has_cap($user['id'], 'projects.approve', 'programme', $progId)) && !($progId && is_programme_lead($user['id'], $progId))) {
+      if (!$progId) {
+        json_error('This project is not attached to any programme, so only system-wide approvers can approve it. Attach it to your programme first (Edit), then approve.', 403);
+      }
+      json_error('Only leads of ' . ($projRow['programme_title'] ?: 'this programme') . ' or system-wide approvers can approve this project.', 403);
     }
     // Approving a draft pulls it into review as-is
-    if ($chk && $chk['status'] === 'draft') {
+    if ($projRow && $projRow['status'] === 'draft') {
       db()->prepare("INSERT INTO workflow_states (object_type, object_id, state, assignee_id, notes) VALUES ('project', ?, 'submitted', ?, 'submitted on approval')")->execute([$pid, $user['id']]);
       update_object_status('project', $pid, 'submitted');
     }
@@ -1652,13 +1656,19 @@ try {
   }
   elseif (preg_match('#^/events/(\d+)/approve$#', $path, $m) && $method === 'POST') {
     $eid = (int) $m[1];
-    // Check global events.approve OR scoped to the event's programme
+    // Check global events.approve OR scoped to the event's programme.
+    // Rejections explain exactly what is missing so officers can act on them.
     $user = require_login();
-    $stmt = db()->prepare('SELECT programme_id FROM events WHERE id = ?');
+    $stmt = db()->prepare('SELECT e.programme_id, p.title AS programme_title FROM events e LEFT JOIN programmes p ON p.id = e.programme_id WHERE e.id = ?');
     $stmt->execute([$eid]);
-    $progId = $stmt->fetchColumn();
-    if (!user_has_cap($user['id'], 'events.approve') && !($progId && user_has_cap($user['id'], 'events.approve', 'programme', (int)$progId))) {
-      json_error('Insufficient permissions: events.approve', 403);
+    $evRow = $stmt->fetch();
+    if (!$evRow) json_error('Event not found', 404);
+    $progId = $evRow['programme_id'] ? (int) $evRow['programme_id'] : null;
+    if (!user_has_cap($user['id'], 'events.approve') && !($progId && user_has_cap($user['id'], 'events.approve', 'programme', $progId))) {
+      if (!$progId) {
+        json_error('This event is not attached to any programme, so only system-wide approvers can approve it. Attach it to your programme first (Edit), then approve.', 403);
+      }
+      json_error('Only leads of ' . ($evRow['programme_title'] ?: 'this programme') . ' or system-wide approvers can approve this event.', 403);
     }
     // Approving a draft pulls it into review as-is
     $st = db()->prepare('SELECT status FROM events WHERE id = ?');
@@ -1730,8 +1740,11 @@ try {
     if (array_key_exists('online_url', $data)) { $sets[] = 'online_url = ?'; $args[] = clean_link_url($data['online_url']); }
     if (array_key_exists('video_url', $data)) { $sets[] = 'video_url = ?'; $args[] = video_embed_url($data['video_url']); }
     if (array_key_exists('image_url', $data)) { $sets[] = 'image_url = ?'; $args[] = clean_image_url($data['image_url']); }
-    if ($isApprover) {
-      // Only approvers may move an event across programmes/projects
+    // Approvers may move an event across programmes/projects. Owners and leads
+    // may only ATTACH a currently-unattached event (moving stays approver-only
+    // so items cannot be shuffled out of another team's review queue).
+    $canAttach = $isApprover || (($isOwner || $isLead) && empty($ev['programme_id']) && empty($ev['project_id']));
+    if ($isApprover || $canAttach) {
       foreach (['programme_id', 'project_id'] as $f) {
         if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = ($data[$f] === '' ? null : (int) $data[$f]); }
       }

@@ -55,13 +55,14 @@ function icon(name, cls) {
 const api = {
   // Client build tag — dashboard compares this against its own tag and
   // prompts a refresh on mismatch (stale cached JS is otherwise silent).
-  BUILD: '20260923-3',
+  BUILD: '20260923-4',
   _token: null,
   _user: null,
   _capabilities: [],
 
   _setCaps(data) {
-    this._capabilities = (data.capabilities || []).map(c => typeof c === 'string' ? c : c.slug).filter(Boolean);
+    // Dedupe: global + scoped grants of the same slug arrive as separate rows.
+    this._capabilities = [...new Set((data.capabilities || []).map(c => typeof c === 'string' ? c : c.slug).filter(Boolean))];
   },
 
   async request(path, opts = {}) {
