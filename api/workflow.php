@@ -264,7 +264,7 @@ function get_pending_items(?int $userId = null): array {
     $sql = "SELECT e.id, e.title, e.status, e.created_at, u.name AS author_name,
             'event' AS item_type, e.id AS related_id
             FROM events e JOIN users u ON u.id = e.created_by
-            WHERE e.created_by = ? AND e.status IN ('submitted','draft')
+            WHERE e.created_by = ? AND e.status IN ('submitted','draft','approved')
             AND e.approval_required = 1";
     $stmt = db()->prepare($sql);
     $stmt->execute([$userId]);
@@ -274,7 +274,7 @@ function get_pending_items(?int $userId = null): array {
     $sql = "SELECT d.id, d.title, d.status, d.created_at, u.name AS author_name,
             'document' AS item_type, d.id AS related_id
             FROM documents d JOIN users u ON u.id = d.owner_id
-            WHERE d.owner_id = ? AND d.status IN ('submitted','draft')";
+            WHERE d.owner_id = ? AND d.status IN ('submitted','draft','approved')";
     $stmt = db()->prepare($sql);
     $stmt->execute([$userId]);
     $items = array_merge($items, $stmt->fetchAll());
@@ -344,7 +344,7 @@ function get_pending_items(?int $userId = null): array {
     $sql = "SELECT p.id, p.title, p.status, p.created_at, u.name AS author_name,
             'project' AS item_type, p.id AS related_id
             FROM projects p JOIN users u ON u.id = p.created_by
-            WHERE p.created_by = ? AND p.status IN ('submitted','draft')";
+            WHERE p.created_by = ? AND p.status IN ('submitted','draft','approved')";
     $stmt = db()->prepare($sql);
     $stmt->execute([$userId]);
     $items = array_merge($items, $stmt->fetchAll());
@@ -366,7 +366,7 @@ function get_pending_items(?int $userId = null): array {
             FROM articles a
             JOIN users u ON u.id = a.author_id
             LEFT JOIN roles r ON r.id = a.approver_role_id
-            WHERE a.status IN ('submitted','under_review')";
+            WHERE a.status IN ('submitted','under_review','approved')";
     $stmt = db()->prepare($sql);
     $stmt->execute();
     $items = array_merge($items, $stmt->fetchAll());
@@ -383,7 +383,7 @@ function get_pending_items(?int $userId = null): array {
               WHERE c.slug = 'events.approve' AND ra.status = 'active'
               LIMIT 1
             )
-            WHERE e.status IN ('submitted','draft')
+            WHERE e.status IN ('submitted','draft','approved')
             AND e.approval_required = 1";
     $stmt = db()->prepare($sql);
     $stmt->execute();
@@ -394,7 +394,7 @@ function get_pending_items(?int $userId = null): array {
             'document' AS item_type, 'Documents' AS approver_role
             FROM documents d
             JOIN users u ON u.id = d.owner_id
-            WHERE d.status IN ('submitted','draft')";
+            WHERE d.status IN ('submitted','draft','approved')";
     $stmt = db()->prepare($sql);
     $stmt->execute();
     $items = array_merge($items, $stmt->fetchAll());
@@ -422,7 +422,7 @@ function get_pending_items(?int $userId = null): array {
               WHERE c.slug = 'projects.approve' AND ra.status = 'active'
               LIMIT 1
             )
-            WHERE p.status IN ('submitted','draft')";
+            WHERE p.status IN ('submitted','draft','approved')";
     $stmt = db()->prepare($sql);
     $stmt->execute();
     $items = array_merge($items, $stmt->fetchAll());

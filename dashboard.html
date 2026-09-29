@@ -3169,14 +3169,16 @@
       if (item.item_type === 'article' && (item.status === 'submitted' || item.status === 'under_review' || item.status === 'draft')) {
         out.push(`<button class="btn btn-outline btn-xs" onclick="showItemDetail('article', ${item.id}, 'preview')">Preview</button>`);
         if (api.hasCap('articles.approve')) out.push(`<button class="btn btn-primary btn-xs" onclick="actOnItem('article', 'approve', ${item.id})">Approve</button>`);
-        if (api.hasCap('articles.publish') && item.status !== 'approved') out.push(`<button class="btn btn-outline btn-xs" onclick="actOnItem('article', 'publish', ${item.id})">Publish</button>`);
+        if (api.hasCap('articles.publish') && item.status === 'approved') out.push(`<button class="btn btn-outline btn-xs" onclick="actOnItem('article', 'publish', ${item.id})">Publish</button>`);
         if (item.status !== 'draft' && api.hasCap('articles.approve')) out.push(`<button class="btn btn-outline btn-xs" onclick="rejectArticle(${item.id})">Reject</button>`);
       }
       if (item.item_type === 'event' && (item.status === 'submitted' || item.status === 'draft')) {
         out.push(`<button class="btn btn-outline btn-xs" onclick="showItemDetail('event', ${item.id}, 'preview')">Preview</button>`);
         if (api.hasCap('events.approve')) out.push(`<button class="btn btn-primary btn-xs" onclick="actOnItem('event', 'approve', ${item.id})">Approve</button>`);
-        if (item.status === 'submitted' && api.hasCap('events.publish')) out.push(`<button class="btn btn-outline btn-xs" onclick="actOnItem('event', 'publish', ${item.id})">Publish</button>`);
         if (item.status === 'submitted' && api.hasCap('events.approve')) out.push(`<button class="btn btn-outline btn-xs" onclick="rejectEventItem(${item.id})">Reject</button>`);
+      }
+      if (item.item_type === 'event' && item.status === 'approved') {
+        if (api.hasCap('events.publish')) out.push(`<button class="btn btn-outline btn-xs" onclick="actOnItem('event', 'publish', ${item.id})">Publish</button>`);
       }
       if (item.item_type === 'project' && (item.status === 'submitted' || item.status === 'draft')) {
         if (api.hasCap('projects.approve')) out.push(`<button class="btn btn-primary btn-xs" onclick="actOnItem('project', 'approve', ${item.id})">Approve</button>`);
@@ -3190,6 +3192,8 @@
       }
       if (item.item_type === 'document' && (item.status === 'submitted' || item.status === 'draft')) {
         if (api.hasCap('documents.approve')) out.push(`<button class="btn btn-primary btn-xs" onclick="actOnItem('document', 'approve', ${item.id})">Approve</button>`);
+      }
+      if (item.item_type === 'document' && item.status === 'approved') {
         if (api.hasCap('documents.publish')) out.push(`<button class="btn btn-outline btn-xs" onclick="actOnItem('document', 'publish', ${item.id})">Publish</button>`);
       }
       if (item.item_type === 'resolution' && item.status === 'voting' && api.hasCap('resolutions.vote')) {
@@ -5207,7 +5211,7 @@
           if (canEditEvent) actions.push(`<button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="modalDelete('event', ${id})">Delete</button>`);
           if (data.status === 'submitted' || data.status === 'draft') {
             if (api.hasCap('events.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('event','approve',${id})">Approve</button>`);
-            if (data.status === 'submitted' && api.hasCap('events.publish')) actions.push(`<button class="btn btn-outline btn-sm" onclick="modalAction('event','publish',${id})">Publish</button>`);
+            if (data.status === 'approved' && api.hasCap('events.publish')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('event','publish',${id})">Publish</button>`);
             if (data.status === 'submitted' && api.hasCap('events.approve')) actions.push(`<button class="btn btn-danger btn-sm" onclick="modalRejectEvent(${id})">Reject</button>`);
           }
           if (data.status === 'draft' && data.rejection_reason && isOwner) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('event','resubmit',${id})">Revise & Resubmit</button>`);
@@ -5259,7 +5263,9 @@
           if (canEditDoc) actions.push(`<button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="modalDelete('document', ${id})">Delete</button>`);
           if (data.status === 'submitted' || data.status === 'draft') {
             if (api.hasCap('documents.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('document','approve',${id})">Approve</button>`);
-            if (api.hasCap('documents.publish')) actions.push(`<button class="btn btn-outline btn-sm" onclick="modalAction('document','publish',${id})">Publish</button>`);
+          }
+          if (data.status === 'approved' && api.hasCap('documents.publish')) {
+            actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('document','publish',${id})">Publish</button>`);
           }
 
           html = `
