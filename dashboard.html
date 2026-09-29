@@ -4388,8 +4388,8 @@
           <div class="wg-card" style="margin-bottom:0.5rem">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem">
               <div style="flex:1; min-width:0; cursor:pointer" onclick="showItemDetail('event', ${ev.id})">
-                <h4 style="margin:0">${esc(ev.title)} <span class="badge badge-${esc(ev.status)}" style="font-size:0.65rem">${esc(ev.status)}</span></h4>
-                <div class="text-dim text-sm">${esc(ev.location||'TBA')} · ${new Date(ev.date).toLocaleDateString()}</div>
+                <h4 style="margin:0">${esc(ev.title)} <span class="badge badge-${esc(ev.status)}" style="font-size:0.65rem">${esc(ev.status)}</span>${ev.is_online ? ' <span class="badge badge-active" style="font-size:0.65rem">online</span>' : ''}</h4>
+                <div class="text-dim text-sm">${ev.is_online ? 'Online' : esc(ev.location||'TBA')} · ${new Date(ev.date).toLocaleDateString()}</div>
               </div>
               <button class="btn btn-outline btn-xs" id="ev-attend-btn-${pid}-${ev.id}" onclick="toggleEvAttend(${pid}, ${ev.id})">Attendance</button>
             </div>
@@ -5123,32 +5123,9 @@
       }
     }
 
-    // Client freshness guard: HTML revalidates but api.js is cached a year.
-    // If the script running is older than this page, prompts a hard refresh
-    // instead of failing mysteriously on unknown api.* methods.
-    (function checkClientFreshness() {
-      const DASH_BUILD = '20260923-4';
-      try {
-        // Stale when: no api at all, a mismatched build tag, or a pre-tag
-        // api.js missing methods this page calls (updateProject era).
-        const stale = !window.api
-          || (typeof window.api.BUILD === 'string' && window.api.BUILD !== DASH_BUILD)
-          || (typeof window.api.BUILD !== 'string' && typeof window.api.updateProject !== 'function');
-        if (stale) {
-          const bar = document.createElement('div');
-          bar.id = 'staleClientBar';
-          bar.style.cssText = 'position:sticky;top:0;z-index:3000;background:#92400e;color:#fff;padding:0.6rem 1rem;font-size:0.85rem;display:flex;gap:0.75rem;align-items:center;justify-content:center';
-          bar.innerHTML = '<span><strong>A newer version is available.</strong> Refresh to get the latest buttons and fixes.</span>';
-          const btn = document.createElement('button');
-          btn.className = 'btn btn-sm';
-          btn.style.cssText = 'background:#fff;color:#92400e;border:none;font-weight:700';
-          btn.textContent = 'Refresh now';
-          btn.onclick = () => window.location.reload();
-          bar.appendChild(btn);
-          document.body.prepend(bar);
-        }
-      } catch (e) {}
-    })();
+    // NOTE: a stale-client refresh banner lived here during the Sept 2026
+    // rollout; removed once the fleet was current. api.BUILD remains as a
+    // quiet version marker for future diagnostics.
 
     // ── Modal ──
     function openModal(title, html, opts = {}) {
@@ -5277,7 +5254,8 @@
             <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
             <div class="field"><div class="field-label">Date</div>${data.date ? new Date(String(data.date).replace(' ', 'T')).toLocaleDateString('en', {weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Date TBC'}</div>
             ${data.end_date ? `<div class="field"><div class="field-label">End</div>${new Date(String(data.end_date).replace(' ', 'T')).toLocaleDateString('en', {weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>` : ''}
-            <div class="field"><div class="field-label">Location</div>${esc(data.location || 'TBA')}</div>
+            <div class="field"><div class="field-label">Location</div>${data.is_online ? 'Online' + (data.location ? ' · ' + esc(data.location) : '') : esc(data.location || 'TBA')}</div>
+            ${data.is_online && data.online_url ? `<div class="field"><div class="field-label">Online room</div><a href="${esc(data.online_url)}" target="_blank" rel="noopener" style="color:var(--accent)">Join online &rarr;</a></div>` : ''}
             <div class="field"><div class="field-label">Organizer</div>${esc(data.organiser_name || data.organizer_name || 'Unknown')}</div>
             <div class="field"><div class="field-label">Capacity</div>${data.capacity ? data.capacity + ' attendees' : 'Unlimited'}</div>
             ${data.image_url ? `<div class="field"><div class="field-label">Cover</div><img src="${esc(publicCover(data.image_url, ''))}" alt="" style="max-width:100%;border-radius:var(--radius);border:1px solid var(--border)"></div>` : ''}
