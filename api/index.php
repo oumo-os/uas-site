@@ -1401,7 +1401,7 @@ try {
   elseif (preg_match('#^/projects/(\d+)$#', $path, $m) && $method === 'GET') {
     $user = require_login();
     $pid = (int) $m[1];
-    $stmt = db()->prepare('SELECT p.*, pr.title AS programme_title FROM projects p LEFT JOIN programmes pr ON pr.id = p.programme_id WHERE p.id = ?');
+    $stmt = db()->prepare('SELECT p.*, pr.title AS programme_title, u.name AS creator_name FROM projects p LEFT JOIN programmes pr ON pr.id = p.programme_id LEFT JOIN users u ON u.id = p.created_by WHERE p.id = ?');
     $stmt->execute([$pid]);
     $proj = $stmt->fetch();
     if (!$proj) json_error('Project not found', 404);
@@ -2255,6 +2255,62 @@ try {
     notify_capability('documents.approve', 'document_submitted', 'Document awaiting review: ' . $data['title'], 'Uploaded by ' . $user['name'] . '.', '/admin?tab=documents');
     json_response(['id' => $id], 201);
   }
+  elseif (preg_match('#^/documents/(\d+)$#', $path, $m) && $method === 'GET') {
+    $user = require_login();
+    $stmt = db()->prepare('SELECT d.*, u.name AS owner_name FROM documents d LEFT JOIN users u ON u.id = d.owner_id WHERE d.id = ?');
+    $stmt->execute([(int) $m[1]]);
+    $doc = $stmt->fetch();
+    if (!$doc) json_error('Document not found', 404);
+    $mine = (int) $doc['owner_id'] === (int) $user['id'];
+    if (!$mine && !user_has_cap($user['id'], 'documents.approve') && !user_has_cap($user['id'], 'documents.publish')
+        && !($doc['visibility'] === 'public' && $doc['status'] === 'published')) {
+      json_error('Document not found', 404);
+    }
+    json_response($doc);
+  }
+  elseif (preg_match('#^/documents/(\d+)$#', $path, $m) && $method === 'PUT') {
+    $user = require_login();
+    $did = (int) $m[1];
+    $stmt = db()->prepare('SELECT * FROM documents WHERE id = ?');
+    $stmt->execute([$did]);
+    $doc = $stmt->fetch();
+    if (!$doc) json_error('Document not found', 404);
+    $isOwner = (int) $doc['owner_id'] === (int) $user['id'];
+    $isApprover = user_has_cap($user['id'], 'documents.approve');
+    if (!$isOwner && !$isApprover) json_error('Insufficient permissions: cannot edit this document', 403);
+    if ($isOwner && !$isApprover && $doc['status'] === 'archived') json_error('Archived documents cannot be edited', 400);
+    $data = input_json();
+    $sets = []; $args = [];
+    if (array_key_exists('title', $data)) { $sets[] = 'title = ?'; $args[] = $data['title']; }
+    if (array_key_exists('category', $data)) { $sets[] = 'category = ?'; $args[] = $data['category']; }
+    if (array_key_exists('visibility', $data) && in_array($data['visibility'], ['public', 'internal', 'restricted'], true)) {
+      $sets[] = 'visibility = ?'; $args[] = $data['visibility'];
+    }
+    if (array_key_exists('file_path', $data)) { $sets[] = 'file_path = ?'; $args[] = $data['file_path']; }
+    if (!$sets) json_error('Nothing to update', 400);
+    $args[] = $did;
+    db()->prepare('UPDATE documents SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($args);
+    audit_log('document_update', 'document', $did);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/documents/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    $user = require_login();
+    $did = (int) $m[1];
+    $stmt = db()->prepare('SELECT owner_id, title FROM documents WHERE id = ?');
+    $stmt->execute([$did]);
+    $doc = $stmt->fetch();
+    if (!$doc) json_error('Document not found', 404);
+    $isOwner = (int) $doc['owner_id'] === (int) $user['id'];
+    if (!$isOwner && !user_has_cap($user['id'], 'documents.approve')) {
+      json_error('Insufficient permissions: cannot delete this document', 403);
+    }
+    db()->prepare('DELETE FROM documents WHERE id = ?')->execute([$did]);
+    audit_log('document_delete', 'document', $did, ['title' => $doc['title']]);
+    if (!$isOwner) {
+      notify_user((int) $doc['owner_id'], 'document_deleted', 'Document deleted: ' . $doc['title'], 'Deleted by ' . $user['name'] . '.', '/dashboard');
+    }
+    json_response(['ok' => true]);
+  }
   elseif (preg_match('#^/documents/(\d+)/approve$#', $path, $m) && $method === 'POST') {
     $user = require_cap('documents.approve');
     transition('document', (int) $m[1], 'approved', $user['id']);
@@ -2671,6 +2727,9 @@ try {
     $stmt->execute([(int) $m[1]]);
     $group = $stmt->fetch();
     if (!$group) json_error('Working group not found', 404);
+    $s = db()->prepare("SELECT u.name FROM working_group_members wgm JOIN users u ON u.id = wgm.user_id WHERE wgm.group_id = ? AND wgm.status = 'active' AND wgm.role = 'chair' ORDER BY u.name LIMIT 1");
+    $s->execute([(int) $m[1]]);
+    $group['chair_name'] = $s->fetchColumn() ?: null;
     json_response($group);
   }
   elseif (preg_match('#^/working-groups/(\d+)$#', $path, $m) && $method === 'PUT') {

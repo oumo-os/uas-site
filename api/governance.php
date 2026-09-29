@@ -429,7 +429,7 @@ function apply_resolution(int $resolutionId): void {
  * Get a resolution with all related data.
  */
 function get_resolution(int $id): ?array {
-  $stmt = db()->prepare('SELECT * FROM resolutions WHERE id = ?');
+  $stmt = db()->prepare('SELECT r.*, u.name AS proposer_name FROM resolutions r LEFT JOIN users u ON u.id = r.proposed_by WHERE r.id = ?');
   $stmt->execute([$id]);
   $res = $stmt->fetch();
   if (!$res) return null;

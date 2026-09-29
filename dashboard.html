@@ -3166,11 +3166,11 @@
 
     function pendingActions(item) {
       const out = [];
-      if (item.item_type === 'article' && (item.status === 'submitted' || item.status === 'under_review')) {
+      if (item.item_type === 'article' && (item.status === 'submitted' || item.status === 'under_review' || item.status === 'draft')) {
         out.push(`<button class="btn btn-outline btn-xs" onclick="showItemDetail('article', ${item.id}, 'preview')">Preview</button>`);
         if (api.hasCap('articles.approve')) out.push(`<button class="btn btn-primary btn-xs" onclick="actOnItem('article', 'approve', ${item.id})">Approve</button>`);
         if (api.hasCap('articles.publish') && item.status !== 'approved') out.push(`<button class="btn btn-outline btn-xs" onclick="actOnItem('article', 'publish', ${item.id})">Publish</button>`);
-        if (api.hasCap('articles.approve')) out.push(`<button class="btn btn-outline btn-xs" onclick="rejectArticle(${item.id})">Reject</button>`);
+        if (item.status !== 'draft' && api.hasCap('articles.approve')) out.push(`<button class="btn btn-outline btn-xs" onclick="rejectArticle(${item.id})">Reject</button>`);
       }
       if (item.item_type === 'event' && (item.status === 'submitted' || item.status === 'draft')) {
         out.push(`<button class="btn btn-outline btn-xs" onclick="showItemDetail('event', ${item.id}, 'preview')">Preview</button>`);
@@ -5162,9 +5162,9 @@
           const canEditArticle = (typeof data.viewer_can_edit === 'boolean') ? data.viewer_can_edit : (api.hasCap('articles.approve') || (isAuthor && ['draft','submitted','rejected'].includes(data.status)));
           if (canEditArticle) actions.push(`<button class="btn btn-outline btn-sm" onclick="editArticleForm(${id})">Edit</button>`);
           if (canEditArticle) actions.push(`<button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="modalDelete('article', ${id})">Delete</button>`);
-          if (data.status === 'submitted' || data.status === 'under_review') {
+          if (data.status === 'submitted' || data.status === 'under_review' || data.status === 'draft') {
             if (api.hasCap('articles.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('article','approve',${id})">Approve</button>`);
-            if (api.hasCap('articles.approve')) actions.push(`<button class="btn btn-danger btn-sm" onclick="modalRejectArticle(${id})">Reject</button>`);
+            if (data.status !== 'draft' && api.hasCap('articles.approve')) actions.push(`<button class="btn btn-danger btn-sm" onclick="modalRejectArticle(${id})">Reject</button>`);
           }
           if (data.status === 'approved' && api.hasCap('articles.publish')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('article','publish',${id})">Publish</button>`);
           if (data.status === 'rejected' && isAuthor) actions.push(`<button class="btn btn-outline btn-sm" onclick="modalAction('article','resubmit',${id})">Revise & Resubmit</button>`);
@@ -5253,6 +5253,10 @@
         } else if (type === 'document') {
           data = await api.request('/documents/' + id);
           const actions = [];
+          const isDocOwner = api._user && data.owner_id === api._user.id;
+          const canEditDoc = api.hasCap('documents.approve') || isDocOwner;
+          if (canEditDoc) actions.push(`<button class="btn btn-outline btn-sm" onclick="editDocumentForm(${id})">Edit</button>`);
+          if (canEditDoc) actions.push(`<button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="modalDelete('document', ${id})">Delete</button>`);
           if (data.status === 'submitted' || data.status === 'draft') {
             if (api.hasCap('documents.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('document','approve',${id})">Approve</button>`);
             if (api.hasCap('documents.publish')) actions.push(`<button class="btn btn-outline btn-sm" onclick="modalAction('document','publish',${id})">Publish</button>`);
@@ -5288,7 +5292,7 @@
             ${viewToggle(type, id)}
             <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
             ${data.programme_title ? `<div class="field"><div class="field-label">Programme</div>${esc(data.programme_title)}</div>` : ''}
-            <div class="field"><div class="field-label">Created by</div>${esc(data.author_name || 'Unknown')}</div>
+            <div class="field"><div class="field-label">Created by</div>${esc(data.creator_name || data.author_name || 'Unknown')}</div>
             <div class="field"><div class="field-label">Created</div>${new Date(data.created_at).toLocaleDateString('en', {year:'numeric',month:'long',day:'numeric'})}</div>
             ${data.deadline ? `<div class="field"><div class="field-label">Deadline</div>${new Date(data.deadline).toLocaleDateString('en', {year:'numeric',month:'long',day:'numeric'})}</div>` : ''}
             ${data.image_url ? `<div class="field"><div class="field-label">Cover</div><img src="${esc(publicCover(data.image_url, ''))}" alt="" style="max-width:100%;border-radius:var(--radius);border:1px solid var(--border)"></div>` : ''}
@@ -5377,6 +5381,7 @@
           const members = await api.getWorkingGroupMembers(id).catch(() => []);
           const wgActions = [];
           if (api.hasCap('roles.manage')) wgActions.push(`<button class="btn btn-outline btn-sm" onclick="editGroupForm(${id})">Edit</button>`);
+          if (api.hasCap('roles.manage')) wgActions.push(`<button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="modalDelete('working_group', ${id})">Delete</button>`);
           html = `
             <div class="field"><div class="field-label">Type</div><span class="wg-badge ${data.type === 'committee' ? 'committee' : (data.type === 'task_force' ? 'task_force' : '')}">${esc(data.type?.replace('_', ' '))}</span></div>
             <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
@@ -5518,10 +5523,33 @@
         else if (type === 'project') await api.deleteProject(id);
         else if (type === 'article') await api.deleteArticle(id);
         else if (type === 'programme') await api.deleteProgramme(id);
+        else if (type === 'document') await api.request('/documents/' + id, { method: 'DELETE' });
+        else if (type === 'working_group') await api.request('/working-groups/' + id, { method: 'DELETE' });
         else return;
         closeModal(); toast('Deleted', 'success');
         load();
       } catch(e) { toast(e.error || 'Delete failed', 'error'); }
+    }
+
+    async function editDocumentForm(id) {
+      try {
+        const d = await api.request('/documents/' + id);
+        const fields = [
+          { name: 'title', label: 'Title', type: 'text', required: true, value: d.title || '' },
+          { name: 'category', label: 'Category', type: 'text', value: d.category || '' },
+          { name: 'visibility', label: 'Visibility', type: 'select', value: d.visibility || 'public', options: [
+            { label: 'Public', value: 'public' },
+            { label: 'Internal (members)', value: 'internal' },
+            { label: 'Restricted', value: 'restricted' },
+          ]},
+        ];
+        openModal('Edit Document', FormBuilder.render(fields, { id: 'edit-document', submitLabel: 'Save Changes' }));
+        FormBuilder.init('edit-document', fields, async (data) => {
+          await api.request('/documents/' + id, { method: 'PUT', body: data });
+          closeModal(); toast('Document updated', 'success');
+          showItemDetail('document', id);
+        });
+      } catch(e) { toast(e.error || 'Failed to load document', 'error'); }
     }
 
     // ── Edit forms (prefilled create forms → PUT; backend enforces permissions) ──
