@@ -1664,12 +1664,7 @@ try {
     $evRow = $stmt->fetch();
     if (!$evRow) json_error('Event not found', 404);
     $progId = $evRow['programme_id'] ? (int) $evRow['programme_id'] : null;
-    $diagGlobal = user_has_cap($user['id'], 'events.approve');
-    $diagScoped = $progId ? user_has_cap($user['id'], 'events.approve', 'programme', $progId) : false;
-    if (!$diagGlobal && !$diagScoped) {
-      // TEMPORARY diagnostic (remove after approve investigation): record the
-      // exact server-side inputs behind this denial.
-      @error_log('APPROVE-DIAG ' . json_encode(['uid' => $user['id'], 'eid' => $eid, 'prog' => $progId, 'status' => $evRow['status'] ?? null, 'global' => $diagGlobal, 'scoped' => $diagScoped]));
+    if (!user_has_cap($user['id'], 'events.approve') && !($progId && user_has_cap($user['id'], 'events.approve', 'programme', $progId))) {
       if (!$progId) {
         json_error('This event is not attached to any programme, so only system-wide approvers can approve it. Attach it to your programme first (Edit), then approve.', 403);
       }
