@@ -1121,7 +1121,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260923-2"></script>
+  <script src="js/api.js?v=20260923-3"></script>
   <script>
     let health = {};
     let allPendingData = [];
@@ -5105,17 +5105,50 @@
     // Modal functions
     // ── Toast notifications ──
     function toast(message, type = 'info', duration = 3500) {
-      const container = document.getElementById('toastContainer');
-      const el = document.createElement('div');
-      el.className = 'toast ' + type;
-      el.textContent = message;
-      container.appendChild(el);
-      requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
-      setTimeout(() => {
-        el.classList.remove('show');
-        setTimeout(() => el.remove(), 300);
-      }, duration);
+      try {
+        const container = document.getElementById('toastContainer');
+        if (!container) throw new Error('toast container missing');
+        const el = document.createElement('div');
+        el.className = 'toast ' + type;
+        el.textContent = message;
+        container.appendChild(el);
+        requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
+        setTimeout(() => {
+          el.classList.remove('show');
+          setTimeout(() => el.remove(), 300);
+        }, duration);
+      } catch (err) {
+        try { console.warn('[toast:%s]', type, message); } catch (e) {}
+        try { alert(message); } catch (e) {}
+      }
     }
+
+    // Client freshness guard: HTML revalidates but api.js is cached a year.
+    // If the script running is older than this page, prompts a hard refresh
+    // instead of failing mysteriously on unknown api.* methods.
+    (function checkClientFreshness() {
+      const DASH_BUILD = '20260923-3';
+      try {
+        // Stale when: no api at all, a mismatched build tag, or a pre-tag
+        // api.js missing methods this page calls (updateProject era).
+        const stale = !window.api
+          || (typeof window.api.BUILD === 'string' && window.api.BUILD !== DASH_BUILD)
+          || (typeof window.api.BUILD !== 'string' && typeof window.api.updateProject !== 'function');
+        if (stale) {
+          const bar = document.createElement('div');
+          bar.id = 'staleClientBar';
+          bar.style.cssText = 'position:sticky;top:0;z-index:3000;background:#92400e;color:#fff;padding:0.6rem 1rem;font-size:0.85rem;display:flex;gap:0.75rem;align-items:center;justify-content:center';
+          bar.innerHTML = '<span><strong>A newer version is available.</strong> Refresh to get the latest buttons and fixes.</span>';
+          const btn = document.createElement('button');
+          btn.className = 'btn btn-sm';
+          btn.style.cssText = 'background:#fff;color:#92400e;border:none;font-weight:700';
+          btn.textContent = 'Refresh now';
+          btn.onclick = () => window.location.reload();
+          bar.appendChild(btn);
+          document.body.prepend(bar);
+        }
+      } catch (e) {}
+    })();
 
     // ── Modal ──
     function openModal(title, html, opts = {}) {
