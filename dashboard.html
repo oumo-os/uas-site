@@ -4420,12 +4420,16 @@
     }
 
     // ── Inbox ──
+    let dashNotifCache = {};
+
     async function loadDashInbox() {
       const div = document.getElementById('dashInbox');
       if (!div) return;
       try {
         const data = await api.request('/notifications');
         const items = data.items || [];
+        dashNotifCache = {};
+        items.forEach(n => { dashNotifCache[n.id] = n; });
         const badge = document.getElementById('inboxTabCount');
         if (badge) { badge.textContent = data.unread || ''; badge.style.display = data.unread ? '' : 'none'; }
         if (!items.length) {
@@ -4433,7 +4437,7 @@
           return;
         }
         div.innerHTML = items.map(n => `
-          <div class="inbox-item ${n.is_read ? '' : 'unread'}" data-id="${n.id}" onclick="readDashNotif(${n.id}, '${esc(n.link || '')}')" style="cursor:pointer">
+          <div class="inbox-item ${n.is_read ? '' : 'unread'}" data-id="${n.id}" onclick="previewDashNotif(${n.id})" style="cursor:pointer">
             <div style="font-weight:${n.is_read ? '400' : '600'};font-size:0.9rem;margin-bottom:0.2rem">${esc(n.title)}</div>
             ${n.body ? `<div class="text-dim text-sm">${esc(n.body).slice(0, 120)}${n.body.length > 120 ? '...' : ''}</div>` : ''}
             <div class="text-faint text-sm" style="margin-top:0.3rem">${fmtTimeAgo(new Date(n.created_at.replace(' ', 'T')))}</div>
@@ -4442,10 +4446,10 @@
       } catch(e) { div.innerHTML = '<div class="empty-state"><p>Failed to load notifications</p></div>'; }
     }
 
-    async function readDashNotif(id, link) {
+    async function markNotifRead(id) {
       try {
         await api.request('/notifications/' + id + '/read', { method: 'POST' });
-      } catch(e) { toast('Could not mark notification as read', 'error'); return; }
+      } catch(e) { toast('Could not mark notification as read', 'error'); return false; }
       const el = document.querySelector(`.inbox-item[data-id="${id}"]`);
       if (el) el.classList.remove('unread');
       const badge = document.getElementById('inboxTabCount');
@@ -4454,7 +4458,37 @@
         badge.textContent = n || '';
         badge.style.display = n ? '' : 'none';
       }
+      const cached = dashNotifCache[id];
+      if (cached) cached.is_read = 1;
+      return true;
+    }
+
+    async function readDashNotif(id, link) {
+      if (!(await markNotifRead(id))) return;
       if (link) location.href = ua(link);
+    }
+
+    function linkifyUrls(text) {
+      return esc(text).replace(/(https?:\/\/[^\s<]+)/g, (m) => {
+        let url = m, trail = '';
+        while (url.length && /[.,;:)}\]]/.test(url.slice(-1))) { trail = url.slice(-1) + trail; url = url.slice(0, -1); }
+        return `<a href="${url}" target="_blank" rel="noopener" style="color:var(--accent);overflow-wrap:anywhere">${url}</a>${trail}`;
+      });
+    }
+
+    async function previewDashNotif(id) {
+      const n = dashNotifCache[id];
+      if (!n) { toast('Notification not found — refresh the inbox', 'warning'); return; }
+      await markNotifRead(id);
+      const when = n.created_at ? new Date(String(n.created_at).replace(' ', 'T')).toLocaleString('en', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+      openModal(n.title || 'Notification', `
+        <div class="text-dim text-sm" style="margin-bottom:0.75rem">${esc(when)}</div>
+        ${n.body ? `<div style="font-size:0.92rem;line-height:1.65;white-space:pre-wrap">${linkifyUrls(n.body)}</div>` : '<p class="text-dim">No details.</p>'}
+        <div class="modal-actions">
+          ${n.link ? `<button class="btn btn-primary btn-sm" onclick="closeModal();location.href=ua('${esc(n.link)}')">Open linked item</button>` : ''}
+          <button class="btn btn-outline btn-sm" onclick="closeModal()">Close</button>
+        </div>
+      `);
     }
 
     async function markAllDashNotifsRead() {
