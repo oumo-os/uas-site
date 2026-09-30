@@ -1121,7 +1121,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260923-4"></script>
+  <script src="js/api.js?v=20260923-5"></script>
   <script>
     let health = {};
     let allPendingData = [];
@@ -1805,8 +1805,9 @@
           <div style="padding:0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:1rem">
             <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
               <button class="btn btn-primary btn-sm" id="jitsi-toggle" onclick="toggleJitsi('${esc(m.meeting_url)}')">Join video room</button>
-              <a class="btn btn-outline btn-sm" href="${esc(m.meeting_url)}" target="_blank" rel="noopener">Open in new tab</a>
+              <a class="btn btn-outline btn-sm" href="${esc(jitsiJoinUrl(m.meeting_url, api._user && api._user.name))}" target="_blank" rel="noopener">Open in new tab</a>
             </div>
+            ${m.room_pass ? `<p style="font-size:0.85rem;margin:0.5rem 0 0">Moderator passcode: <strong style="letter-spacing:0.1em">${esc(m.room_pass)}</strong> <span class="text-dim">— first to arrive signs in as moderator, sets this as the room password in Jitsi, and admits the rest from the lobby.</span></p>` : ''}
             <p class="text-dim text-sm" style="margin:0.5rem 0 0">The host opens the room first (Google/GitHub sign-in on Jitsi) — everyone else joins as a guest, no account needed.</p>
             <div id="jitsi-wrap" style="display:none;margin-top:0.75rem"></div>
           </div>` : (canRoom ? `
@@ -5255,7 +5256,7 @@
             <div class="field"><div class="field-label">Date</div>${data.date ? new Date(String(data.date).replace(' ', 'T')).toLocaleDateString('en', {weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Date TBC'}</div>
             ${data.end_date ? `<div class="field"><div class="field-label">End</div>${new Date(String(data.end_date).replace(' ', 'T')).toLocaleDateString('en', {weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>` : ''}
             <div class="field"><div class="field-label">Location</div>${data.is_online ? 'Online' + (data.location ? ' · ' + esc(data.location) : '') : esc(data.location || 'TBA')}</div>
-            ${data.is_online && data.online_url ? `<div class="field"><div class="field-label">Online room</div><a href="${esc(data.online_url)}" target="_blank" rel="noopener" style="color:var(--accent)">Join online &rarr;</a></div>` : ''}
+            ${data.is_online && data.online_url ? `<div class="field"><div class="field-label">Online room</div><a href="${esc(jitsiJoinUrl(data.online_url, api._user && api._user.name))}" target="_blank" rel="noopener" style="color:var(--accent)">Join online &rarr;</a>${data.room_pass ? `<div class="text-dim text-sm" style="margin-top:0.3rem">Moderator passcode: <strong style="letter-spacing:0.1em">${esc(data.room_pass)}</strong> — set it as the room password in Jitsi and admit from the lobby.</div>` : ''}</div>` : ''}
             ${data.is_online && !data.online_url ? `<div class="field"><div class="field-label">Online room</div><p class="text-dim text-sm" style="margin:0">No meeting link set yet — members won't see a Join button. Add one via Edit.</p></div>` : ''}
             <div class="field"><div class="field-label">Organizer</div>${esc(data.organiser_name || data.organizer_name || 'Unknown')}</div>
             <div class="field"><div class="field-label">Capacity</div>${data.capacity ? data.capacity + ' attendees' : 'Unlimited'}</div>

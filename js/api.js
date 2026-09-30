@@ -563,6 +563,15 @@ const FormBuilder = {
   },
 };
 
+// --- Jitsi join links: prefill the display name via URL fragment ---
+// Harmless when a client ignores it (prejoin screen still asks).
+window.jitsiJoinUrl = function (url, name) {
+  if (!url) return url;
+  name = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  if (!name) return url;
+  return url + '#userInfo.displayName=' + encodeURIComponent('"' + name + '"');
+};
+
 // --- Video embeds (URL-only, never hosted): mirrors PHP video_embed_url() ---
 window.videoEmbedUrl = function (url) {
   if (typeof url !== 'string') return null;

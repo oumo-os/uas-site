@@ -265,26 +265,47 @@ function event_link_email_body(array $event, string $name, string $kind): string
     $lines[] = '';
     $lines[] = 'Keep this email — your join link for the video room:';
   }
-  $lines[] = $event['online_url'];
+  $join = $event['online_url'];
+  if (stripos($join, 'jit.si') !== false || stripos($join, 'jitsi') !== false) {
+    $join = jitsi_join_url($join, $name);
+  }
+  $lines[] = $join;
   $lines[] = '';
   $lines[] = 'No account needed. If the room is not open yet, the host opens it shortly before start time.';
   return implode("\n", $lines);
 }
 
+// Random room/passcode alphabet (no ambiguous 0/O/1/l characters).
+function room_rand(int $len = 6): string {
+  return substr(str_shuffle('abcdefghjkmnpqrstuvwxyz23456789'), 0, $len);
+}
+
 // Ensure an online event has a meeting link: if it is flagged online but the
-// link is empty, generate a stable unguessable Jitsi room (past Meet/Zoom/
-// Teams links are kept as-is — only empty links trigger this). Returns the
-// new URL or null. The host opens it with a Google/GitHub login; guests join free.
-function ensure_event_room(int $eventId): ?string {
+// link is empty, generate a stable unguessable Jitsi room plus a moderator
+// passcode (past Meet/Zoom/Teams links are kept as-is — only empty links
+// trigger this). Returns ['url'=>, 'pass'=>] or null. The host opens it with
+// a Google/GitHub login, sets the passcode as the room password in Jitsi,
+// and admits everyone else from the lobby; guests join free.
+function ensure_event_room(int $eventId): ?array {
   $s = db()->prepare('SELECT id, is_online, online_url FROM events WHERE id = ?');
   $s->execute([$eventId]);
   $ev = $s->fetch();
   if (!$ev || empty($ev['is_online']) || !empty($ev['online_url'])) return null;
-  $rand = substr(str_shuffle('abcdefghjkmnpqrstuvwxyz23456789'), 0, 6);
+  $rand = room_rand();
   $url = rtrim(JITSI_DOMAIN, '/') . '/uas-event-' . $eventId . '-' . $rand;
-  db()->prepare('UPDATE events SET online_url = ? WHERE id = ?')->execute([$url, $eventId]);
+  $pass = room_rand();
+  db()->prepare('UPDATE events SET online_url = ?, room_pass = ? WHERE id = ?')->execute([$url, $pass, $eventId]);
   audit_log('event_room_auto', 'event', $eventId, ['room' => $url]);
-  return $url;
+  return ['url' => $url, 'pass' => $pass];
+}
+
+// Append a display-name hint to a Jitsi join URL so members/guests arrive
+// with their name prefilled (harmless if a client ignores the fragment).
+function jitsi_join_url(string $url, string $name): string {
+  $name = trim(preg_replace('/\s+/', ' ', $name));
+  if ($name === '') return $url;
+  $name = function_exists('mb_substr') ? mb_substr($name, 0, 60) : substr($name, 0, 60);
+  return $url . '#userInfo.displayName=' . rawurlencode('"' . $name . '"');
 }
 
 // Record a sent guest/event mail idempotently (one row per event+email+kind).

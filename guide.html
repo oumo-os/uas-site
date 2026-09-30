@@ -185,6 +185,8 @@
           <ul class="guide-list">
             <li><strong>Joining a meeting:</strong> open it under Dashboard → Groups &amp; Meetings and press <strong>Join video room</strong> — the meeting plays inside the page with your name prefilled. Nothing to install; it also works from the Jitsi mobile app.</li>
             <li><strong>Hosting:</strong> the organizer opens the room first and signs in once with a Google/GitHub login on Jitsi's side; everyone else joins as a guest, no account needed. The room link is stable and unguessable.</li>
+            <li><strong>Moderators:</strong> every auto-created room has a <strong>passcode</strong> visible only to the organizer, programme lead and approvers (meeting details / event Manage card). Whoever arrives first signs in as moderator, sets that passcode as the room password inside Jitsi, and admits everyone else from the lobby — so the organizer and the programme lead are interchangeable hosts.</li>
+            <li><strong>Names filled in:</strong> members joining from the site or their reminder emails arrive with their display name prefilled; guests join with the name they signed up with.</li>
             <li><strong>Scheduling:</strong> organizers can generate the room link in the meeting details, or paste their own Jitsi link when scheduling.</li>
             <li><strong>Virtual events:</strong> events marked <strong>Online</strong> show a Join button instead of a map link — but only to <strong>logged-in members</strong>, and only <strong>while the event runs</strong> (from its start time until its end, or one hour after start). Before that you'll see when the room opens.</li>
             <li><strong>Meeting links:</strong> paste any link — Jitsi, Google Meet, Zoom or Teams all work. Leave it blank on an online event and a <strong>Jitsi room is created automatically</strong>, with the link sent to the organizer. Untick Online to opt out.</li>
@@ -218,7 +220,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260923-4"></script>
+  <script src="js/api.js?v=20260923-5"></script>
   <script>
     function showSec(name, on) {
       document.querySelectorAll('[data-sec="' + name + '"]').forEach(function(el){ el.style.display = on ? '' : 'none'; });

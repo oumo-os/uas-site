@@ -167,7 +167,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260923-4"></script>
+  <script src="js/api.js?v=20260923-5"></script>
   <script>
     var eventImgs = {'lecture':ua('/img/event-lecture.jpg'),'workshop':ua('/img/event-workshop.jpg'),'observing':ua('/img/event-nightwatch.jpg'),'conference':ua('/img/event-lecture.jpg'),'outreach':ua('/img/event-workshop.jpg')};
     var eventId = null;
@@ -347,8 +347,8 @@
         var nowMs = Date.now();
         if (api._user && nowMs >= startMs && nowMs <= endMs) {
           document.getElementById('eActions').innerHTML +=
-            '<a class="btn btn-primary" style="width:100%;margin-top:0.75rem" href="' + esc(e.online_url) + '" target="_blank" rel="noopener">Join online</a>' +
-            '<p class="text-dim" style="font-size:0.8rem;margin-top:0.4rem">Opens the video room in a new tab.</p>';
+            '<a class="btn btn-primary" style="width:100%;margin-top:0.75rem" href="' + esc(jitsiJoinUrl(e.online_url, api._user.name)) + '" target="_blank" rel="noopener">Join online</a>' +
+            '<p class="text-dim" style="font-size:0.8rem;margin-top:0.4rem">Opens the video room in a new tab, with your name filled in.</p>';
         } else if (api._user && nowMs < startMs) {
           document.getElementById('eActions').innerHTML +=
             '<p class="text-dim" style="font-size:0.85rem;margin-top:0.75rem">The video room opens here when the event starts (' + d2.toLocaleString('en', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) + ').</p>';
@@ -474,6 +474,7 @@
       document.getElementById('eManagerSection').style.display = 'block';
       var el = document.getElementById('eManagerActions');
       el.innerHTML = (d.viewer_can_edit ? '<button class="btn btn-outline btn-sm" style="width:100%;margin-bottom:0.75rem" onclick="openEventEditor()">Edit event details</button>' : '') +
+        (d.room_pass ? '<p style="font-size:0.85rem;margin-bottom:0.75rem">Moderator passcode: <strong style="letter-spacing:0.1em">' + esc(d.room_pass) + '</strong><br><span class="text-dim">First to arrive signs in as moderator, sets this as the room password in Jitsi, and admits the rest from the lobby.</span></p>' : '') +
         '<p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:0.75rem">' + d.registrations.length + ' registered, ' + d.waitlist_count + ' waitlisted</p>' +
         '<button class="btn btn-outline btn-sm" style="width:100%" onclick="toggleAttendees()">View Attendees (' + d.registrations.length + ')</button>';
       if (d.waitlist && d.waitlist.length) {

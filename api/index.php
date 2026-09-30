@@ -159,6 +159,7 @@ try {
     $stmt->execute();
     $list = $stmt->fetchAll();
     foreach ($list as &$mtg) {
+      unset($mtg['room_pass']); // moderator passcode: detail view for managers only
       $mtg['agenda'] = $mtg['agenda'] ? json_decode($mtg['agenda'], true) : [];
       $mtg['decisions'] = $mtg['decisions'] ? json_decode($mtg['decisions'], true) : [];
       $mtg['my_attendance'] = null;
@@ -206,12 +207,12 @@ try {
     if ((int) $mtg['created_by'] !== (int) $user['id'] && !user_has_cap($user['id'], 'meetings.manage')) {
       json_error('Insufficient permissions: meetings.manage', 403);
     }
-    $rand = substr(str_shuffle('abcdefghjkmnpqrstuvwxyz23456789'), 0, 6);
-    $room = 'uas-meeting-' . $mid . '-' . $rand;
+    $room = 'uas-meeting-' . $mid . '-' . room_rand();
     $url = rtrim(JITSI_DOMAIN, '/') . '/' . $room;
-    db()->prepare('UPDATE meetings SET meeting_url = ? WHERE id = ?')->execute([$url, $mid]);
+    $pass = room_rand();
+    db()->prepare('UPDATE meetings SET meeting_url = ?, room_pass = ? WHERE id = ?')->execute([$url, $pass, $mid]);
     audit_log('meeting_room', 'meeting', $mid, ['room' => $room]);
-    json_response(['room' => $room, 'url' => $url]);
+    json_response(['room' => $room, 'url' => $url, 'pass' => $pass]);
   }
   elseif (preg_match('#^/articles/(\d+)$#', $path, $m) && $method === 'GET') {
     // Full article detail for authors and approvers (any status) — powers
@@ -231,12 +232,16 @@ try {
     json_response($article);
   }
   elseif (preg_match('#^/meetings/(\d+)$#', $path, $m) && $method === 'GET') {
-    require_login();
+    $user = require_login();
     $id = (int) $m[1];
     $stmt = db()->prepare('SELECT m.*, u.name AS created_by_name FROM meetings m LEFT JOIN users u ON u.id = m.created_by WHERE m.id = ?');
     $stmt->execute([$id]);
     $meeting = $stmt->fetch();
     if (!$meeting) json_error('Meeting not found', 404);
+    // Moderator passcode: creator and meeting managers only.
+    if ((int) $meeting['created_by'] !== (int) $user['id'] && !user_has_cap($user['id'], 'meetings.manage')) {
+      unset($meeting['room_pass']);
+    }
     $meeting['agenda'] = $meeting['agenda'] ? json_decode($meeting['agenda'], true) : [];
     $meeting['decisions'] = $meeting['decisions'] ? json_decode($meeting['decisions'], true) : [];
     $stmt = db()->prepare('SELECT ma.*, u.name AS user_name FROM meeting_attendance ma JOIN users u ON u.id = ma.user_id WHERE ma.meeting_id = ? ORDER BY u.name');
@@ -1635,7 +1640,10 @@ try {
     $sql .= ' ORDER BY e.date ASC';
     $stmt = db()->prepare($sql);
     $stmt->execute($params);
-    json_response($stmt->fetchAll());
+    $rows = $stmt->fetchAll();
+    // Moderator passcodes never travel in bulk lists (see detail endpoint).
+    foreach ($rows as &$erow) unset($erow['room_pass']);
+    json_response($rows);
   }
   elseif ($path === '/events' && $method === 'POST') {
     $data = input_json();
@@ -1659,11 +1667,11 @@ try {
     audit_log('event_create', 'event', $id);
     notify_capability('events.approve', 'event_submitted', 'Event awaiting approval: ' . $data['title'], 'Submitted by ' . $user['name'] . '.', '/admin?tab=events');
     // Online without a link (Meet/Zoom/Teams or blank) gets a Jitsi room auto-created.
-    $roomUrl = ensure_event_room($id);
-    if ($roomUrl) {
-      notify_user((int) $user['id'], 'event_room', 'Video room created: ' . $data['title'], 'No meeting link was given, so a Jitsi room was created: ' . $roomUrl . ' Open it first as host; guests join free.', '/event/' . $id);
+    $room = ensure_event_room($id);
+    if ($room) {
+      notify_user((int) $user['id'], 'event_room', 'Video room created: ' . $data['title'], 'No meeting link was given, so a Jitsi room was created: ' . $room['url'] . ' Moderator passcode: ' . $room['pass'] . '. Open it first as host, set this as the room password, and admit guests from the lobby.', '/event/' . $id);
     }
-    json_response(['id' => $id, 'slug' => $slug, 'room_url' => $roomUrl], 201);
+    json_response(['id' => $id, 'slug' => $slug, 'room_url' => $room ? $room['url'] : null], 201);
   }
   elseif (preg_match('#^/events/(\d+)/approve$#', $path, $m) && $method === 'POST') {
     $eid = (int) $m[1];
@@ -1771,11 +1779,11 @@ try {
     $args[] = $eid;
     db()->prepare('UPDATE events SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($args);
     audit_log('event_update', 'event', $eid);
-    $roomUrl = ensure_event_room($eid);
-    if ($roomUrl && !empty($ev['organizer_id'])) {
-      notify_user((int) $ev['organizer_id'], 'event_room', 'Video room created: ' . $ev['title'], 'No meeting link was set, so a Jitsi room was created: ' . $roomUrl . ' Open it first as host; guests join free.', '/event/' . $eid);
+    $room = ensure_event_room($eid);
+    if ($room && !empty($ev['organizer_id'])) {
+      notify_user((int) $ev['organizer_id'], 'event_room', 'Video room created: ' . $ev['title'], 'No meeting link was set, so a Jitsi room was created: ' . $room['url'] . ' Moderator passcode: ' . $room['pass'] . '. Open it first as host, set this as the room password, and admit guests from the lobby.', '/event/' . $eid);
     }
-    json_response(['ok' => true, 'room_url' => $roomUrl]);
+    json_response(['ok' => true, 'room_url' => $room ? $room['url'] : null]);
   }
   elseif (preg_match('#^/events/(\d+)$#', $path, $m) && $method === 'DELETE') {
     $user = require_login();
@@ -1877,6 +1885,9 @@ try {
       $evLead = $evProgId && is_programme_lead($user['id'], $evProgId);
       $evLocked = in_array($event['status'], ['completed', 'cancelled'], true);
       $viewer_can_edit = $evApprover || (($evOwner || $evLead) && !$evLocked);
+      // Moderator passcode: attendance managers and approvers only.
+      $event['can_see_pass'] = $is_manager || $evApprover;
+      if (!$event['can_see_pass']) unset($event['room_pass']);
       if ($is_manager) {
         $stmt = db()->prepare('SELECT er.*, u.name, u.email FROM event_registrations er JOIN users u ON u.id = er.user_id WHERE er.event_id = ? ORDER BY er.registered_at');
         $stmt->execute([$eventId]);
