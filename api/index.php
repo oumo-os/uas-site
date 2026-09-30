@@ -1658,7 +1658,12 @@ try {
     transition('event', $id, 'submitted', $user['id']);
     audit_log('event_create', 'event', $id);
     notify_capability('events.approve', 'event_submitted', 'Event awaiting approval: ' . $data['title'], 'Submitted by ' . $user['name'] . '.', '/admin?tab=events');
-    json_response(['id' => $id, 'slug' => $slug], 201);
+    // Online without a link (Meet/Zoom/Teams or blank) gets a Jitsi room auto-created.
+    $roomUrl = ensure_event_room($id);
+    if ($roomUrl) {
+      notify_user((int) $user['id'], 'event_room', 'Video room created: ' . $data['title'], 'No meeting link was given, so a Jitsi room was created: ' . $roomUrl . ' Open it first as host; guests join free.', '/event/' . $id);
+    }
+    json_response(['id' => $id, 'slug' => $slug, 'room_url' => $roomUrl], 201);
   }
   elseif (preg_match('#^/events/(\d+)/approve$#', $path, $m) && $method === 'POST') {
     $eid = (int) $m[1];
@@ -1766,7 +1771,11 @@ try {
     $args[] = $eid;
     db()->prepare('UPDATE events SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($args);
     audit_log('event_update', 'event', $eid);
-    json_response(['ok' => true]);
+    $roomUrl = ensure_event_room($eid);
+    if ($roomUrl && !empty($ev['organizer_id'])) {
+      notify_user((int) $ev['organizer_id'], 'event_room', 'Video room created: ' . $ev['title'], 'No meeting link was set, so a Jitsi room was created: ' . $roomUrl . ' Open it first as host; guests join free.', '/event/' . $eid);
+    }
+    json_response(['ok' => true, 'room_url' => $roomUrl]);
   }
   elseif (preg_match('#^/events/(\d+)$#', $path, $m) && $method === 'DELETE') {
     $user = require_login();

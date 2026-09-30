@@ -271,6 +271,22 @@ function event_link_email_body(array $event, string $name, string $kind): string
   return implode("\n", $lines);
 }
 
+// Ensure an online event has a meeting link: if it is flagged online but the
+// link is empty, generate a stable unguessable Jitsi room (past Meet/Zoom/
+// Teams links are kept as-is — only empty links trigger this). Returns the
+// new URL or null. The host opens it with a Google/GitHub login; guests join free.
+function ensure_event_room(int $eventId): ?string {
+  $s = db()->prepare('SELECT id, is_online, online_url FROM events WHERE id = ?');
+  $s->execute([$eventId]);
+  $ev = $s->fetch();
+  if (!$ev || empty($ev['is_online']) || !empty($ev['online_url'])) return null;
+  $rand = substr(str_shuffle('abcdefghjkmnpqrstuvwxyz23456789'), 0, 6);
+  $url = rtrim(JITSI_DOMAIN, '/') . '/uas-event-' . $eventId . '-' . $rand;
+  db()->prepare('UPDATE events SET online_url = ? WHERE id = ?')->execute([$url, $eventId]);
+  audit_log('event_room_auto', 'event', $eventId, ['room' => $url]);
+  return $url;
+}
+
 // Record a sent guest/event mail idempotently (one row per event+email+kind).
 function record_event_reminder(int $eventId, string $email, $userId, ?string $name, string $kind): void {
   try {
