@@ -410,6 +410,47 @@
       }
     }
 
+    function rsvpMsg(text, isError) {
+      var msg = document.getElementById('eMsg');
+      if (msg) {
+        msg.textContent = text;
+        msg.style.color = isError ? 'var(--danger)' : 'var(--success)';
+      }
+    }
+
+    async function rsvp() {
+      try {
+        await api.rsvpEvent(eventId);
+        rsvpMsg('You are registered! See you there.');
+        setTimeout(load, 900);
+      } catch (e) { rsvpMsg(e.error || 'Registration failed', true); }
+    }
+
+    async function cancelRsvp() {
+      if (!confirm('Cancel your registration?')) return;
+      try {
+        await api.cancelRsvp(eventId);
+        rsvpMsg('Registration cancelled.');
+        setTimeout(load, 900);
+      } catch (e) { rsvpMsg(e.error || 'Failed', true); }
+    }
+
+    async function joinWaitlist() {
+      try {
+        await api.request('/events/' + eventId + '/waitlist', { method: 'POST' });
+        rsvpMsg('You are on the waitlist. We will notify you if a spot opens.');
+        setTimeout(load, 900);
+      } catch (e) { rsvpMsg(e.error || 'Failed to join waitlist', true); }
+    }
+
+    async function leaveWaitlist() {
+      try {
+        await api.request('/events/' + eventId + '/waitlist', { method: 'DELETE' });
+        rsvpMsg('Removed from waitlist.');
+        setTimeout(load, 900);
+      } catch (e) { rsvpMsg(e.error || 'Failed', true); }
+    }
+
     async function guestRsvp() {
       var btn = document.getElementById('guestBtn');
       var msg = document.getElementById('guestMsg');
