@@ -1887,15 +1887,15 @@ try {
       $viewer_can_edit = $evApprover || (($evOwner || $evLead) && !$evLocked);
       // Moderator passcode: attendance managers and approvers only.
       $event['can_see_pass'] = $is_manager || $evApprover;
-      if (!$event['can_see_pass']) unset($event['room_pass']);
-      if ($is_manager) {
-        $stmt = db()->prepare('SELECT er.*, u.name, u.email FROM event_registrations er JOIN users u ON u.id = er.user_id WHERE er.event_id = ? ORDER BY er.registered_at');
-        $stmt->execute([$eventId]);
-        $registrations = $stmt->fetchAll();
-        $stmt = db()->prepare('SELECT w.id, w.created_at, u.name, u.email FROM event_waitlist w JOIN users u ON u.id = w.user_id WHERE w.event_id = ? ORDER BY w.created_at ASC, w.id ASC');
-        $stmt->execute([$eventId]);
-        $waitlist = $stmt->fetchAll();
-      }
+    }
+    if (empty($event['can_see_pass'])) unset($event['room_pass']);
+    if ($is_manager) {
+      $stmt = db()->prepare('SELECT er.*, u.name, u.email FROM event_registrations er JOIN users u ON u.id = er.user_id WHERE er.event_id = ? ORDER BY er.registered_at');
+      $stmt->execute([$eventId]);
+      $registrations = $stmt->fetchAll();
+      $stmt = db()->prepare('SELECT w.id, w.created_at, u.name, u.email FROM event_waitlist w JOIN users u ON u.id = w.user_id WHERE w.event_id = ? ORDER BY w.created_at ASC, w.id ASC');
+      $stmt->execute([$eventId]);
+      $waitlist = $stmt->fetchAll();
     }
 
     $stmt = db()->prepare('SELECT COUNT(*) FROM event_waitlist WHERE event_id = ?');
