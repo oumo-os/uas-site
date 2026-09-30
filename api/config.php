@@ -207,6 +207,75 @@ function clean_milestones($v): array {
   return $out;
 }
 
+// Cron token for scheduled jobs (api/cron.php). Rotate by changing this string
+// and updating the cPanel cron command. Worst case if leaked: premature but
+// legitimate, idempotent reminder emails — no data exposure, no writes else.
+if (!defined('CRON_KEY')) define('CRON_KEY', 'uas-cron-7f3k9q2x4m8z');
+
+// ---- Online event guest mail (join links by email, never on public pages) ----
+// Sending office for system event mail: programmes desk, else general inbox.
+function event_mail_office(): string {
+  try {
+    $s = db()->prepare("SELECT office FROM office_mailboxes WHERE office IN ('programmes','info') AND enabled = 1 ORDER BY FIELD(office, 'programmes', 'info') LIMIT 1");
+    $s->execute();
+    $office = $s->fetchColumn();
+    if ($office) return $office;
+  } catch (Exception $e) { /* fall through */ }
+  return 'info';
+}
+
+// Join window: [start, end or start+1h]. Guests/members join only inside it;
+// the host opens the room early from the dashboard (ungated member area).
+function event_join_open(array $event, ?int $now = null): bool {
+  if (empty($event['is_online']) || empty($event['online_url'])) return false;
+  if (($event['status'] ?? '') === 'cancelled') return false;
+  if (empty($event['date'])) return false;
+  $now = $now ?? time();
+  $start = strtotime((string) $event['date']);
+  if ($start === false) return false;
+  $end = !empty($event['end_date']) ? strtotime((string) $event['end_date']) : false;
+  if ($end === false) $end = $start + 3600;
+  return $now >= $start && $now <= $end;
+}
+
+function event_link_email_body(array $event, string $name, string $kind): string {
+  $when = '';
+  try {
+    $d = new DateTime((string) ($event['date'] ?? 'now'));
+    $when = $d->format('l, j F Y \a\t H:i');
+    if (!empty($event['end_date'])) {
+      $e = new DateTime((string) $event['end_date']);
+      $when .= ' – ' . $e->format('H:i');
+    }
+  } catch (Exception $ex) { $when = (string) ($event['date'] ?? ''); }
+  $where = !empty($event['location']) ? ' (' . $event['location'] . ')' : '';
+  $lines = [
+    'Dear ' . ($name !== '' ? $name : 'guest') . ',',
+    '',
+  ];
+  if ($kind === 'before_6h') {
+    $lines[] = 'Reminder: "' . $event['title'] . '" starts soon (' . $when . ')' . $where . '.';
+    $lines[] = '';
+    $lines[] = 'Join the video room here during the event:';
+  } else {
+    $lines[] = 'You are signed up for "' . $event['title'] . '" (' . $when . ')' . $where . '.';
+    $lines[] = '';
+    $lines[] = 'Keep this email — your join link for the video room:';
+  }
+  $lines[] = $event['online_url'];
+  $lines[] = '';
+  $lines[] = 'No account needed. If the room is not open yet, the host opens it shortly before start time.';
+  return implode("\n", $lines);
+}
+
+// Record a sent guest/event mail idempotently (one row per event+email+kind).
+function record_event_reminder(int $eventId, string $email, $userId, ?string $name, string $kind): void {
+  try {
+    db()->prepare('INSERT IGNORE INTO event_reminders (event_id, email, user_id, name, kind) VALUES (?, ?, ?, ?, ?)')
+      ->execute([$eventId, strtolower(trim($email)), $userId ? (int) $userId : null, $name, $kind]);
+  } catch (Exception $e) { /* table missing — skip */ }
+}
+
 // Role inbox offices (must match the directory on contact.html).
 function office_list(): array {
   return [

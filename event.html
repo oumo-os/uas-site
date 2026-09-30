@@ -337,15 +337,28 @@
       }
 
       renderActions(d);
-      // Online room link — appended AFTER renderActions (which rebuilds the
-      // actions box and would otherwise wipe it on events with capacity set)
-      if (e.is_online && e.online_url && !past && !cancelled) {
-        document.getElementById('eActions').innerHTML +=
-          '<a class="btn btn-primary" style="width:100%;margin-top:0.75rem" href="' + esc(e.online_url) + '" target="_blank" rel="noopener">Join online</a>' +
-          '<p class="text-dim" style="font-size:0.8rem;margin-top:0.4rem">Opens the video room in a new tab. No account needed for guests.</p>';
-      } else if (e.is_online && e.online_url && !cancelled) {
-        document.getElementById('eActions').innerHTML +=
-          '<p class="text-dim" style="font-size:0.85rem;margin-top:0.75rem">This was an online event.</p>';
+      // Online room link — members only, inside the join window
+      // ([start, end or start+1h]). Guests get the link by email instead, so
+      // it is never shown to logged-out visitors. Appended AFTER renderActions
+      // (which rebuilds the actions box and would otherwise wipe it).
+      if (e.is_online && e.online_url && !cancelled) {
+        var startMs = d2.getTime();
+        var endMs = dEnd ? dEnd.getTime() : startMs + 3600000;
+        var nowMs = Date.now();
+        if (api._user && nowMs >= startMs && nowMs <= endMs) {
+          document.getElementById('eActions').innerHTML +=
+            '<a class="btn btn-primary" style="width:100%;margin-top:0.75rem" href="' + esc(e.online_url) + '" target="_blank" rel="noopener">Join online</a>' +
+            '<p class="text-dim" style="font-size:0.8rem;margin-top:0.4rem">Opens the video room in a new tab.</p>';
+        } else if (api._user && nowMs < startMs) {
+          document.getElementById('eActions').innerHTML +=
+            '<p class="text-dim" style="font-size:0.85rem;margin-top:0.75rem">The video room opens here when the event starts (' + d2.toLocaleString('en', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) + ').</p>';
+        } else if (!api._user && !past) {
+          document.getElementById('eActions').innerHTML +=
+            '<p class="text-dim" style="font-size:0.8rem;margin-top:0.75rem">Online event: members sign in to join here during the event; guests receive the join link by email on signup and before it starts.</p>';
+        } else if (past) {
+          document.getElementById('eActions').innerHTML +=
+            '<p class="text-dim" style="font-size:0.85rem;margin-top:0.75rem">This was an online event.</p>';
+        }
       }
       if (d.is_manager) renderManagerSection(d);
     }

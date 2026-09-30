@@ -2045,7 +2045,7 @@ try {
     if (!rate_limit('guest-rsvp:' . client_ip(), 'guest-rsvp', 5, 3600)) {
       json_error('Too many requests. Try again later.', 429);
     }
-    $stmt = db()->prepare('SELECT id, title, capacity, date, organizer_id FROM events WHERE id = ? AND status = "published"');
+    $stmt = db()->prepare('SELECT id, title, capacity, date, end_date, location, is_online, online_url, status, organizer_id FROM events WHERE id = ? AND status = "published"');
     $stmt->execute([$eventId]);
     $event = $stmt->fetch();
     if (!$event) json_error('Event not found', 404);
@@ -2067,6 +2067,19 @@ try {
     audit_log('event_guest_rsvp', 'event', $eventId, ['email' => $email]);
     if (!empty($event['organizer_id'])) {
       notify_user((int) $event['organizer_id'], 'event_guest_rsvp', 'Guest signup: ' . $event['title'], $name . ' (' . $email . ') signed up as a guest.', '/event/' . $eventId);
+    }
+    // Online events: email the guest their join link immediately (never shown
+    // on public pages). Failures must never break the signup itself.
+    if (!empty($event['is_online']) && !empty($event['online_url'])) {
+      try {
+        $office = event_mail_office();
+        $text = event_link_email_body($event, $name, 'signup_confirm') . "\n\n—\nUganda Astronomical Society";
+        $via = null; $msgId = null;
+        if (send_office_email($office, $email, 'Registered: ' . $event['title'] . ' [UAS]', $text, $via, $msgId)) {
+          record_sent($office, $email, 'Registered: ' . $event['title'] . ' [UAS]', $text, $msgId, 'event-guest-confirm', $eventId, 0, $via);
+          record_event_reminder($eventId, $email, null, $name, 'signup_confirm');
+        }
+      } catch (Throwable $e) { /* signup already succeeded — mail is best-effort */ }
     }
     json_response(['ok' => true], 201);
   }
@@ -3495,6 +3508,60 @@ try {
     $totals = $stmt->fetch();
     audit_log('mail_broadcast_send', 'broadcast', (int) $m[1], ['sent' => $sent, 'failed' => $failed, 'remaining' => $remaining]);
     json_response(['sent_this_round' => $sent, 'failed_this_round' => $failed, 'sent_total' => (int) $totals['sent_count'], 'fail_total' => (int) $totals['fail_count'], 'remaining' => $remaining, 'done' => $remaining === 0]);
+  }
+
+  // --- SCHEDULED JOBS (cPanel cron hits this; key-gated, idempotent) ---
+  // Setup in cPanel → Cron Jobs (every 15 minutes):
+  //   curl -s "https://astronomy.ug/api/cron?job=event-reminders&key=CRON_KEY_VALUE" >/dev/null 2>&1
+  // (replace CRON_KEY_VALUE with the CRON_KEY in api/config.php).
+  // Verify any time (no mail sent) with &dry=1.
+  elseif ($path === '/cron' && $method === 'GET') {
+    $key = $_GET['key'] ?? '';
+    if (!hash_equals((string) CRON_KEY, (string) $key)) json_error('Forbidden', 403);
+    $job = $_GET['job'] ?? '';
+    if ($job !== 'event-reminders') json_error('Unknown job', 400);
+    $dry = !empty($_GET['dry']);
+    $limit = min(max((int) ($_GET['limit'] ?? 12), 1), 40);
+    $now = time();
+    // Online, published events whose join window opens within 6h and hasn't closed.
+    $stmt = db()->prepare('SELECT id, title, date, end_date, location, is_online, online_url, status FROM events WHERE is_online = 1 AND online_url IS NOT NULL AND online_url != "" AND status = "published" AND date <= ?');
+    $stmt->execute([date('Y-m-d H:i:s', $now + 6 * 3600)]);
+    $events = $stmt->fetchAll();
+    $office = event_mail_office();
+    $out = ['dry' => $dry, 'events_checked' => count($events), 'recipients_found' => 0, 'sent' => 0, 'failed' => 0, 'failures' => []];
+    $sentTotal = 0;
+    foreach ($events as $ev) {
+      $end = !empty($ev['end_date']) ? strtotime($ev['end_date']) : (strtotime($ev['date']) + 3600);
+      if ($end === false || $end < $now) continue;
+      $recips = [];
+      $stmt = db()->prepare("SELECT u.id AS user_id, u.name, u.email FROM event_registrations er JOIN users u ON u.id = er.user_id LEFT JOIN event_reminders rem ON rem.event_id = er.event_id AND rem.email = u.email AND rem.kind = 'before_6h' WHERE er.event_id = ? AND er.status IN ('registered','attended') AND u.status = 'active' AND rem.id IS NULL ORDER BY u.name");
+      $stmt->execute([$ev['id']]);
+      foreach ($stmt->fetchAll() as $r) $recips[] = $r;
+      try {
+        $stmt = db()->prepare("SELECT NULL AS user_id, name, email FROM event_guests LEFT JOIN event_reminders rem ON rem.event_id = event_guests.event_id AND rem.email = event_guests.email AND rem.kind = 'before_6h' WHERE event_guests.event_id = ? AND event_guests.status = 'registered' AND rem.id IS NULL ORDER BY created_at");
+        $stmt->execute([$ev['id']]);
+        foreach ($stmt->fetchAll() as $r) $recips[] = $r;
+      } catch (Exception $e) { /* guests table not imported yet */ }
+      $out['recipients_found'] += count($recips);
+      foreach ($recips as $r) {
+        if ($sentTotal >= $limit) break 2;
+        if ($dry) { $sentTotal++; continue; }
+        $text = event_link_email_body($ev, $r['name'] ?? '', 'before_6h') . "\n\n—\nUganda Astronomical Society";
+        $via = null; $msgId = null;
+        $ok = send_office_email($office, $r['email'], 'Starting soon: ' . $ev['title'] . ' [UAS]', $text, $via, $msgId);
+        if ($ok) {
+          record_sent($office, $r['email'], 'Starting soon: ' . $ev['title'] . ' [UAS]', $text, $msgId, 'event-reminder', (int) $ev['id'], 0, $via);
+          record_event_reminder((int) $ev['id'], $r['email'], $r['user_id'] ?? null, $r['name'] ?? null, 'before_6h');
+          $out['sent']++;
+        } else {
+          $out['failed']++;
+          $out['failures'][] = $r['email'] . ' (' . substr((string) $via, 0, 120) . ')';
+        }
+        $sentTotal++;
+      }
+    }
+    audit_log('cron_event_reminders', 'cron', 0, ['dry' => $dry, 'sent' => $out['sent'], 'failed' => $out['failed']]);
+    json_response($out);
   }
 
   // --- SEARCH ---
