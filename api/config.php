@@ -125,10 +125,13 @@ function clean_image_url($v): ?string {
 if (!defined('JITSI_DOMAIN')) define('JITSI_DOMAIN', 'https://meet.jit.si');
 
 // URL allowlist for link/redirect fields (Jitsi rooms, online venues).
+// Missing scheme is assumed https (pasted "meet.jit.si/..." links are the
+// norm); anything else invalid becomes NULL so callers can reject it loudly.
 function clean_link_url($v): ?string {
   if (!is_string($v)) return null;
   $v = trim($v);
   if ($v === '' || strlen($v) > 500) return null;
+  if (!preg_match('#^[a-z][a-z0-9+.-]*://#i', $v)) $v = 'https://' . $v;
   if (preg_match('#^https?://[^\s<>"\']+$#i', $v)) return $v;
   return null;
 }

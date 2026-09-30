@@ -175,6 +175,7 @@ try {
     $validTypes = ['board', 'general', 'committee', 'working_group', 'other'];
     $type = $data['meeting_type'] ?? 'board';
     if (!in_array($type, $validTypes, true)) json_error('Invalid meeting type', 400);
+    if (trim($data['meeting_url'] ?? '') !== '' && clean_link_url($data['meeting_url']) === null) json_error('Video room link is not a valid URL', 400);
     db()->prepare('INSERT INTO meetings (title, meeting_type, description, scheduled_at, location, meeting_url, agenda, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
       ->execute([
         $data['title'],
@@ -253,7 +254,10 @@ try {
       if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = $data[$f]; }
     }
     if (array_key_exists('description', $data)) { $sets[] = 'description = ?'; $args[] = sanitize_rich_html($data['description']); }
-    if (array_key_exists('meeting_url', $data)) { $sets[] = 'meeting_url = ?'; $args[] = clean_link_url($data['meeting_url']); }
+    if (array_key_exists('meeting_url', $data)) {
+      if (trim((string) $data['meeting_url']) !== '' && clean_link_url($data['meeting_url']) === null) json_error('Video room link is not a valid URL', 400);
+      $sets[] = 'meeting_url = ?'; $args[] = clean_link_url($data['meeting_url']);
+    }
     if (array_key_exists('scheduled_at', $data)) { $sets[] = 'scheduled_at = ?'; $args[] = $data['scheduled_at'] ?: null; }
     if (array_key_exists('agenda', $data)) { $sets[] = 'agenda = ?'; $args[] = json_encode($data['agenda']); }
     if (!$sets) json_error('Nothing to update', 400);
@@ -1646,6 +1650,8 @@ try {
     if (empty($data['title'])) json_error('Title is required', 400);
     if (empty($data['date'])) json_error('Date is required', 400);
     $slug = makeSlug($data['slug'] ?? $data['title'], 'events');
+    if (trim($data['online_url'] ?? '') !== '' && clean_link_url($data['online_url']) === null) json_error('Online meeting link is not a valid URL', 400);
+    if (trim($data['video_url'] ?? '') !== '' && video_embed_url($data['video_url']) === null) json_error('Video URL must be a YouTube or Vimeo link', 400);
     db()->prepare('INSERT INTO events (programme_id, project_id, title, slug, description, organizer_id, date, end_date, location, is_online, online_url, capacity, image_url, video_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
       ->execute([$progId, $data['project_id'] ?? null, $data['title'], $slug, sanitize_rich_html($data['description'] ?? null), $user['id'], $data['date'], $data['end_date'] ?? null, $data['location'] ?? null, !empty($data['is_online']) ? 1 : 0, clean_link_url($data['online_url'] ?? null), $data['capacity'] ?? null, clean_image_url($data['image_url'] ?? null), video_embed_url($data['video_url'] ?? null), $user['id']]);
     $id = (int) db()->lastInsertId();
@@ -1737,8 +1743,14 @@ try {
     }
     if (array_key_exists('description', $data)) { $sets[] = 'description = ?'; $args[] = sanitize_rich_html($data['description']); }
     if (array_key_exists('is_online', $data)) { $sets[] = 'is_online = ?'; $args[] = !empty($data['is_online']) ? 1 : 0; }
-    if (array_key_exists('online_url', $data)) { $sets[] = 'online_url = ?'; $args[] = clean_link_url($data['online_url']); }
-    if (array_key_exists('video_url', $data)) { $sets[] = 'video_url = ?'; $args[] = video_embed_url($data['video_url']); }
+    if (array_key_exists('online_url', $data)) {
+      if (trim((string) $data['online_url']) !== '' && clean_link_url($data['online_url']) === null) json_error('Online meeting link is not a valid URL', 400);
+      $sets[] = 'online_url = ?'; $args[] = clean_link_url($data['online_url']);
+    }
+    if (array_key_exists('video_url', $data)) {
+      if (trim((string) $data['video_url']) !== '' && video_embed_url($data['video_url']) === null) json_error('Video URL must be a YouTube or Vimeo link', 400);
+      $sets[] = 'video_url = ?'; $args[] = video_embed_url($data['video_url']);
+    }
     if (array_key_exists('image_url', $data)) { $sets[] = 'image_url = ?'; $args[] = clean_image_url($data['image_url']); }
     // Approvers may move an event across programmes/projects. Owners and leads
     // may only ATTACH a currently-unattached event (moving stays approver-only
