@@ -218,7 +218,10 @@
 
       var d2 = new Date(e.date);
       var dEnd = e.end_date ? new Date(e.end_date) : null;
-      var past = d2 < new Date();
+      // "Has ended" = past the explicit end, else past the last minute of the
+      // event day (events without an end time run to 23:59 of their date).
+      var endMs = e.end_date ? new Date(e.end_date).getTime() : (function(){ var t = new Date(e.date); t.setHours(23, 59, 59, 999); return t.getTime(); })();
+      var past = endMs < Date.now();
       var cancelled = e.status === 'cancelled';
       var statusClass = e.status === 'published' ? 'active' : cancelled ? 'inactive' : 'pending';
 
@@ -236,6 +239,7 @@
       document.getElementById('eMeta').innerHTML =
         (e.category ? '<span class="badge badge-active">' + esc(e.category) + '</span>' : '') +
         '<span class="badge badge-' + statusClass + '">' + esc(e.status) + '</span>' +
+        (e.visibility === 'members' ? '<span class="badge badge-pending">Members only</span>' : '') +
         (e.organiser_name ? '<span><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>' + esc(e.organiser_name) + '</span>' : '') +
         (e.programme_title ? '<span><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span>' + esc(e.programme_title) + '</span>' : '');
 
@@ -366,7 +370,9 @@
     function renderActions(d) {
       var el = document.getElementById('eActions');
       var e = d.event;
-      var past = new Date(e.date) < new Date();
+      var endMs = e.end_date ? new Date(e.end_date).getTime() : (function(){ var t = new Date(e.date); t.setHours(23, 59, 59, 999); return t.getTime(); })();
+      var past = endMs < Date.now();
+      var started = new Date(e.date) < new Date(); // registration still closes when it starts
       var full = e.capacity ? d.stats.total >= e.capacity : false;
 
       if (e.capacity) {
@@ -377,7 +383,7 @@
 
       if (!api._user) {
         el.innerHTML += '<a href="/login" class="btn btn-primary" style="width:100%">Sign in to RSVP</a>';
-        if (!past && e.status !== 'cancelled' && !full) {
+        if (!started && e.status !== 'cancelled' && !full) {
           el.innerHTML += '<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">' +
             '<p style="font-size:0.88rem;font-weight:600;margin-bottom:0.5rem">No account? Sign up as a guest</p>' +
             '<input class="form-input" id="guestName" placeholder="Full name" style="width:100%;margin-bottom:0.5rem">' +
@@ -386,13 +392,13 @@
             '<input type="text" id="guestWebsite" style="display:none" tabindex="-1" autocomplete="off">' +
             '<button class="btn btn-outline" style="width:100%" id="guestBtn" onclick="guestRsvp()">Sign Up as Guest</button>' +
             '<p class="text-dim" id="guestMsg" style="font-size:0.82rem;margin-top:0.5rem"></p></div>';
-        } else if (!past && e.status !== 'cancelled') {
+        } else if (!started && e.status !== 'cancelled') {
           el.innerHTML += '<p class="text-dim" style="font-size:0.88rem;margin-top:0.75rem">This event is fully booked.</p>';
         }
         return;
       }
       if (!api.hasCap('events.rsvp')) return;
-      if (past || e.status === 'cancelled') { el.innerHTML += '<p class="text-dim" style="font-size:0.88rem">Registration closed.</p>'; return; }
+      if (started || e.status === 'cancelled') { el.innerHTML += '<p class="text-dim" style="font-size:0.88rem">Registration closed.</p>'; return; }
 
       if (d.my_rsvp && d.my_rsvp.status === 'registered') {
         el.innerHTML += '<button class="btn btn-outline" style="width:100%" onclick="cancelRsvp()">Cancel RSVP</button>' +
@@ -542,6 +548,8 @@
         '<p class="text-dim" id="eeOnlineHint" style="font-size:0.8rem;margin:0 0 0.75rem"></p>' +
         '<div id="eePassRow" style="margin-bottom:0.75rem"><label style="font-size:0.78rem;font-weight:600;color:var(--text-dim)">Room passcode (optional)</label>' +
         '<input class="form-input" id="eePass" placeholder="e.g. stargaze-42" style="width:100%" value="' + esc(e.room_pass || '') + '"></div>' +
+        '<div style="margin-bottom:0.75rem"><label style="font-size:0.78rem;font-weight:600;color:var(--text-dim)">Visibility</label>' +
+        '<select class="form-input" id="eeVis" style="width:100%"><option value="public"' + (e.visibility !== 'members' ? ' selected' : '') + '>Public — everyone can see it</option><option value="members"' + (e.visibility === 'members' ? ' selected' : '') + '>Members only — hidden from the public</option></select></div>' +
         '<div style="margin-bottom:0.75rem"><label style="font-size:0.78rem;font-weight:600;color:var(--text-dim)">Confirmation message for members (optional)</label>' +
         '<textarea class="form-input" id="eeConfirm" rows="3" style="width:100%" placeholder="e.g. Gates open at 6pm — bring binoculars if you have them.">' + esc(e.confirm_message || '') + '</textarea>' +
         '<p class="text-dim" style="font-size:0.78rem;margin-top:0.25rem">Shown to members right after they sign up, and added to confirmation emails.</p></div>' +
@@ -593,6 +601,7 @@
           capacity: capRaw === '' ? null : parseInt(capRaw, 10),
           description: document.getElementById('eeDesc').innerHTML,
           confirm_message: (document.getElementById('eeConfirm').value || '').trim() || null,
+          visibility: document.getElementById('eeVis').value,
         };
         // Only send the passcode when set or previously visible — never wipe a
         // stored pass the editor cannot see.

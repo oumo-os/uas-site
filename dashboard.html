@@ -3589,6 +3589,7 @@
           { name: 'is_online', label: 'Online event', type: 'checkbox', checkLabel: 'This event meets online (physical venue, if any, stays listed)' },
           { name: 'online_url', label: 'Online meeting link', type: 'text', placeholder: 'https://meet.jit.si/… or Meet/Zoom/Teams link', help: 'Shown as a Join button on the event page' },
           { name: 'room_pass', label: 'Room passcode (optional)', type: 'text', placeholder: 'e.g. stargaze-42', help: 'Shared only with organizers, leads and approvers' },
+          { name: 'visibility', label: 'Visibility', type: 'select', options: [{ label: 'Public — everyone can see it', value: 'public' }, { label: 'Members only — hidden from the public', value: 'members' }], help: 'Members-only events never appear in public lists, search, sitemap or share previews' },
           { name: 'confirm_message', label: 'Confirmation message for members (optional)', type: 'textarea', placeholder: 'e.g. Gates open at 6pm — bring binoculars if you have them.', help: 'Shown to members right after they sign up, and added to confirmation emails' },
           { name: 'video_url', label: 'Video URL (optional)', type: 'text', placeholder: 'YouTube or Vimeo link — trailer or recording', help: 'Embedded on the event page. Never hosted here.' },
           { name: 'capacity', label: 'Capacity', type: 'number', min: 0, placeholder: 'Leave blank for unlimited', help: 'Leave blank for open attendance' },
@@ -5290,7 +5291,7 @@
                 <div class="preview-body">${data.description || ''}</div>
               </div>
             </div>` : `
-            <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
+            <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span>${data.visibility === 'members' ? ' <span class="badge badge-pending">members only</span>' : ''}</div>
             <div class="field"><div class="field-label">Date</div>${data.date ? new Date(String(data.date).replace(' ', 'T')).toLocaleDateString('en', {weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Date TBC'}</div>
             ${data.end_date ? `<div class="field"><div class="field-label">End</div>${new Date(String(data.end_date).replace(' ', 'T')).toLocaleDateString('en', {weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>` : ''}
             <div class="field"><div class="field-label">Location</div>${data.is_online ? 'Online' + (data.location ? ' · ' + esc(data.location) : '') : esc(data.location || 'TBA')}${data.location ? ` <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.location)}" target="_blank" rel="noopener" style="color:var(--accent)">Map &rarr;</a>` : ''}</div>
@@ -5686,6 +5687,7 @@
           { name: 'is_online', label: 'Online event', type: 'checkbox', checkLabel: 'This event meets online (physical venue, if any, stays listed)', value: !!Number(e.is_online) },
           { name: 'online_url', label: 'Online meeting link', type: 'text', value: e.online_url || '', placeholder: 'https://meet.jit.si/… or Meet/Zoom/Teams link', help: 'Shown as a Join button on the event page' },
           { name: 'room_pass', label: 'Room passcode (optional)', type: 'text', value: e.room_pass || '', placeholder: 'e.g. stargaze-42', help: 'Shared only with organizers, leads and approvers' },
+          { name: 'visibility', label: 'Visibility', type: 'select', value: e.visibility || 'public', options: [{ label: 'Public — everyone can see it', value: 'public' }, { label: 'Members only — hidden from the public', value: 'members' }], help: 'Members-only events never appear in public lists, search, sitemap or share previews' },
           { name: 'confirm_message', label: 'Confirmation message for members (optional)', type: 'textarea', value: e.confirm_message || '', placeholder: 'e.g. Gates open at 6pm — bring binoculars if you have them.', help: 'Shown to members right after they sign up, and added to confirmation emails' },
           { name: 'video_url', label: 'Video URL (optional)', type: 'text', value: '', placeholder: 'YouTube or Vimeo link', help: e.video_url ? 'A video is already attached (replaced if you paste a new link).' : 'Embedded on the event page. Never hosted here.' },
           { name: 'capacity', label: 'Capacity', type: 'number', min: 0, value: e.capacity || '', help: 'Leave blank for open attendance' },

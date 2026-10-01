@@ -1665,8 +1665,10 @@ try {
     if ($roomPass !== '' && !preg_match('/^[A-Za-z0-9-]{1,32}$/', $roomPass)) json_error('Room passcode may only contain letters, numbers and hyphens (max 32)', 400);
     $confirmMsg = trim(strip_tags((string) ($data['confirm_message'] ?? '')));
     if (mb_strlen($confirmMsg) > 1000) json_error('Confirmation message must be 1000 characters or fewer', 400);
-    db()->prepare('INSERT INTO events (programme_id, project_id, title, slug, description, organizer_id, date, end_date, location, is_online, online_url, room_pass, confirm_message, capacity, image_url, video_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      ->execute([$progId, $data['project_id'] ?? null, $data['title'], $slug, sanitize_rich_html($data['description'] ?? null), $user['id'], $data['date'], $data['end_date'] ?? null, $data['location'] ?? null, !empty($data['is_online']) ? 1 : 0, clean_link_url($data['online_url'] ?? null), ($roomPass === '' ? null : $roomPass), ($confirmMsg === '' ? null : $confirmMsg), $data['capacity'] ?? null, clean_image_url($data['image_url'] ?? null), video_embed_url($data['video_url'] ?? null), $user['id']]);
+    $vis = $data['visibility'] ?? 'public';
+    if (!in_array($vis, ['public', 'members'], true)) json_error('Visibility must be public or members', 400);
+    db()->prepare('INSERT INTO events (programme_id, project_id, title, slug, description, organizer_id, date, end_date, location, is_online, online_url, room_pass, confirm_message, visibility, capacity, image_url, video_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      ->execute([$progId, $data['project_id'] ?? null, $data['title'], $slug, sanitize_rich_html($data['description'] ?? null), $user['id'], $data['date'], $data['end_date'] ?? null, $data['location'] ?? null, !empty($data['is_online']) ? 1 : 0, clean_link_url($data['online_url'] ?? null), ($roomPass === '' ? null : $roomPass), ($confirmMsg === '' ? null : $confirmMsg), $vis, $data['capacity'] ?? null, clean_image_url($data['image_url'] ?? null), video_embed_url($data['video_url'] ?? null), $user['id']]);
     $id = (int) db()->lastInsertId();
     transition('event', $id, 'submitted', $user['id']);
     audit_log('event_create', 'event', $id);
@@ -1776,6 +1778,10 @@ try {
       if (mb_strlen($msg) > 1000) json_error('Confirmation message must be 1000 characters or fewer', 400);
       $sets[] = 'confirm_message = ?'; $args[] = ($msg === '' ? null : $msg);
     }
+    if (array_key_exists('visibility', $data)) {
+      if (!in_array($data['visibility'], ['public', 'members'], true)) json_error('Visibility must be public or members', 400);
+      $sets[] = 'visibility = ?'; $args[] = $data['visibility'];
+    }
     if (array_key_exists('video_url', $data)) {
       if (trim((string) $data['video_url']) !== '' && video_embed_url($data['video_url']) === null) json_error('Video URL must be a YouTube or Vimeo link', 400);
       $sets[] = 'video_url = ?'; $args[] = video_embed_url($data['video_url']);
@@ -1863,6 +1869,18 @@ try {
     $event = $stmt->fetch();
     if (!$event) json_error('Event not found', 404);
     $eventId = (int) $event['id'];
+    // Members-only events are invisible to the public (404, same as missing).
+    // Organizers and approvers keep preview access to anything.
+    if (($event['visibility'] ?? 'public') === 'members') {
+      $mv = current_user();
+      $mok = $mv && ($mv['status'] ?? '') === 'active';
+      if (!$mok) {
+        $mok = $mv && ((int) $event['organizer_id'] === (int) $mv['id']
+          || user_has_cap($mv['id'], 'events.approve')
+          || user_has_cap($mv['id'], 'events.publish'));
+      }
+      if (!$mok) json_error('Event not found', 404);
+    }
     if (!in_array($event['status'], ['published', 'cancelled', 'completed'], true)) {
       $viewer = current_user();
       $ok = $viewer && $viewer['status'] === 'active'
@@ -1927,6 +1945,7 @@ try {
     // Related events: same programme or same category, limit 3
     $related = [];
     $relSql = 'SELECT e.id, e.title, e.date, e.location, e.status FROM events e WHERE e.id != ? AND e.status = "published"';
+    if (!$user || ($user['status'] ?? '') !== 'active') $relSql .= " AND e.visibility = 'public'";
     $relParams = [$eventId];
     if ($event['programme_id']) {
       $relSql .= ' AND e.programme_id = ?';
@@ -2111,7 +2130,7 @@ try {
     if (!rate_limit('guest-rsvp:' . client_ip(), 'guest-rsvp', 5, 3600)) {
       json_error('Too many requests. Try again later.', 429);
     }
-    $stmt = db()->prepare('SELECT id, title, capacity, date, end_date, location, is_online, online_url, confirm_message, status, organizer_id FROM events WHERE id = ? AND status = "published"');
+    $stmt = db()->prepare('SELECT id, title, capacity, date, end_date, location, is_online, online_url, confirm_message, status, organizer_id FROM events WHERE id = ? AND status = "published" AND visibility = "public"');
     $stmt->execute([$eventId]);
     $event = $stmt->fetch();
     if (!$event) json_error('Event not found', 404);
@@ -2975,7 +2994,7 @@ try {
       // Upcoming events (next 3)
       $stmt = db()->prepare("SELECT e.id, e.title, e.date, e.location, e.capacity,
         (SELECT COUNT(*) FROM event_registrations r WHERE r.event_id = e.id AND r.status = 'registered') AS rsvp_count
-        FROM events e WHERE e.date >= NOW() AND e.status IN ('approved','published') ORDER BY e.date ASC LIMIT 3");
+        FROM events e WHERE " . event_end_expr('e') . " >= NOW() AND e.status IN ('approved','published') ORDER BY e.date ASC LIMIT 3");
       $stmt->execute();
       $health['upcoming_events'] = $stmt->fetchAll();
     }
@@ -3642,7 +3661,8 @@ try {
     $stmt->execute([$like, $like, $like]);
     $articles = $stmt->fetchAll();
 
-    $stmt = db()->prepare('SELECT id, title, description, date, location, status FROM events WHERE status IN ("published", "cancelled") AND (title LIKE ? OR description LIKE ?) ORDER BY date LIMIT 10');
+    $evVis = $loggedIn ? '' : ' AND visibility = "public"';
+    $stmt = db()->prepare('SELECT id, title, description, date, location, status, visibility FROM events WHERE status IN ("published", "cancelled")' . $evVis . ' AND (title LIKE ? OR description LIKE ?) ORDER BY date LIMIT 10');
     $stmt->execute([$like, $like]);
     $events = $stmt->fetchAll();
 
@@ -3748,7 +3768,7 @@ try {
     $stats = [];
     $stats['members'] = (int) db()->query("SELECT COUNT(*) FROM members m JOIN users u ON u.id = m.user_id WHERE m.profile_visible = 1 AND m.status = 'active' AND u.status = 'active'")->fetchColumn();
     $stats['programmes'] = (int) db()->query("SELECT COUNT(*) FROM programmes p WHERE p.status = 'active'")->fetchColumn();
-    $stats['events'] = (int) db()->query("SELECT COUNT(*) FROM events e WHERE (e.status = 'published' AND e.date >= NOW()) OR e.status = 'cancelled'")->fetchColumn();
+    $stats['events'] = (int) db()->query("SELECT COUNT(*) FROM events e WHERE ((e.status = 'published' AND " . event_end_expr('e') . " >= NOW()) OR e.status = 'cancelled') AND e.visibility = 'public'")->fetchColumn();
     $stats['articles'] = (int) db()->query("SELECT COUNT(*) FROM articles a WHERE a.status = 'published'")->fetchColumn();
     json_response($stats);
   }
@@ -3807,18 +3827,22 @@ try {
     json_response($article);
   }
   elseif ($path === '/public/events' && $method === 'GET') {
-    $stmt = db()->prepare("SELECT e.id, e.title, e.slug, e.description, e.date, e.end_date, e.location, e.is_online, e.status, e.capacity, e.image_url, e.category, e.organizer_id,
+    $endExpr = event_end_expr('e');
+    $visCond = event_visibility_sql('e');
+    $stmt = db()->prepare("SELECT e.id, e.title, e.slug, e.description, e.date, e.end_date, e.location, e.is_online, e.status, e.visibility, e.capacity, e.image_url, e.category, e.organizer_id,
       (SELECT COUNT(*) FROM event_registrations r WHERE r.event_id = e.id AND r.status = 'registered') AS rsvp_count
-      FROM events e WHERE (e.status = 'published' AND e.date >= NOW()) OR e.status = 'cancelled' ORDER BY e.date ASC");
+      FROM events e WHERE ((e.status = 'published' AND $endExpr >= NOW()) OR e.status = 'cancelled') AND $visCond ORDER BY e.date ASC");
     $stmt->execute();
     $events = $stmt->fetchAll();
     foreach ($events as &$e) $e['rsvp_count'] = (int) $e['rsvp_count'] + event_guest_count((int) $e['id']);
     json_response($events);
   }
   elseif ($path === '/public/past-events' && $method === 'GET') {
-    $stmt = db()->prepare("SELECT e.id, e.title, e.slug, e.description, e.date, e.end_date, e.location, e.is_online, e.status, e.capacity, e.image_url, e.category, e.organizer_id,
+    $endExpr = event_end_expr('e');
+    $visCond = event_visibility_sql('e');
+    $stmt = db()->prepare("SELECT e.id, e.title, e.slug, e.description, e.date, e.end_date, e.location, e.is_online, e.status, e.visibility, e.capacity, e.image_url, e.category, e.organizer_id,
       (SELECT COUNT(*) FROM event_registrations r WHERE r.event_id = e.id AND r.status = 'registered') AS rsvp_count
-      FROM events e WHERE e.status = 'published' AND e.date < NOW() ORDER BY e.date DESC LIMIT 20");
+      FROM events e WHERE e.status = 'published' AND $endExpr < NOW() AND $visCond ORDER BY e.date DESC LIMIT 20");
     $stmt->execute();
     $events = $stmt->fetchAll();
     foreach ($events as &$e) $e['rsvp_count'] = (int) $e['rsvp_count'] + event_guest_count((int) $e['id']);
@@ -3863,7 +3887,7 @@ try {
     if ($requester) {
       $stmt = db()->prepare('SELECT id, title, slug, date, end_date, location, status FROM events WHERE programme_id = ? ORDER BY date ASC');
     } else {
-      $stmt = db()->prepare('SELECT id, title, slug, date, end_date, location, status FROM events WHERE programme_id = ? AND status IN ("published","cancelled","completed") ORDER BY date ASC');
+      $stmt = db()->prepare('SELECT id, title, slug, date, end_date, location, status, visibility FROM events WHERE programme_id = ? AND status IN ("published","cancelled","completed") AND visibility = "public" ORDER BY date ASC');
     }
     $stmt->execute([$pid]);
     $programme['events'] = $stmt->fetchAll();
@@ -3937,8 +3961,10 @@ try {
           || ($proj['programme_id'] && is_programme_lead($viewer['id'], (int)$proj['programme_id'])));
       if (!$ok) json_error('Project not found', 404);
     }
-    // attach events count for detail
-    $s = db()->prepare('SELECT id, title, slug, date, location, status FROM events WHERE project_id = ? ORDER BY date');
+    // attach events for detail (members-only hidden from the public)
+    $pjviewer = (isset($viewer) && $viewer) ? $viewer : current_user();
+    $pjVis = ($pjviewer && ($pjviewer['status'] ?? '') === 'active') ? '' : ' AND visibility = "public"';
+    $s = db()->prepare('SELECT id, title, slug, date, location, status, visibility FROM events WHERE project_id = ?' . $pjVis . ' ORDER BY date');
     $s->execute([$proj['id']]);
     $proj['events'] = $s->fetchAll();
     json_response($proj);

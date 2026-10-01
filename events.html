@@ -250,7 +250,7 @@
       // Stats
       const now = new Date();
       document.getElementById('statTotal').textContent = allEvents.length;
-      document.getElementById('statUpcoming').textContent = allEvents.filter(e => new Date(e.date) >= now && e.status === 'published').length;
+      document.getElementById('statUpcoming').textContent = allEvents.filter(e => eventEndMs(e) >= now.getTime() && e.status === 'published').length;
       document.getElementById('statAttending').textContent = Object.keys(myRsvps).length;
 
       // Filter chips
@@ -383,6 +383,15 @@
       }
     }
 
+    // "Has ended" = past the explicit end, else past the last minute of the
+    // event day (events without an end time run to 23:59 of their date).
+    function eventEndMs(e) {
+      if (e.end_date) return new Date(e.end_date).getTime();
+      const d = new Date(e.date);
+      d.setHours(23, 59, 59, 999);
+      return d.getTime();
+    }
+
     function renderSpotlight() {
       const el = document.getElementById('spotlight');
       const now = new Date();
@@ -426,10 +435,11 @@
       const div = document.getElementById('eventsList');
       const pag = document.getElementById('eventsPagination');
       const now = new Date();
+      const nowMs = now.getTime();
       const events = allEvents.filter(e => {
         if (e.id === spotlightId && currentFilter === 'all') return false;
-        if (currentFilter === 'upcoming') return new Date(e.date) >= now && e.status === 'published';
-        if (currentFilter === 'past') return new Date(e.date) < now || e.status === 'cancelled' || e.status === 'completed';
+        if (currentFilter === 'upcoming') return eventEndMs(e) >= nowMs && e.status === 'published';
+        if (currentFilter === 'past') return eventEndMs(e) < nowMs || e.status === 'cancelled' || e.status === 'completed';
         return true;
       });
 
@@ -449,7 +459,8 @@
         const d = new Date(e.date);
         const full = e.capacity ? e.rsvp_count >= e.capacity : false;
         const cancelled = e.status === 'cancelled';
-        const past = new Date(e.date) < now;
+        const past = eventEndMs(e) < now.getTime();
+        const started = d < now; // registration still closes when it starts
         const pct = e.capacity ? Math.min(100, (e.rsvp_count || 0) / e.capacity * 100) : 0;
 
         return `
@@ -465,6 +476,7 @@
                 ${cancelled ? '<span class="badge badge-inactive" style="font-size:0.7rem">cancelled</span>' : ''}
                 ${past && !cancelled ? '<span class="badge badge-dim" style="font-size:0.7rem">past</span>' : ''}
                 ${e.is_online ? '<span class="badge badge-active" style="font-size:0.7rem">online</span>' : ''}
+                ${e.visibility === 'members' ? '<span class="badge badge-pending" style="font-size:0.7rem">members only</span>' : ''}
               </h3>
               <p>${esc(stripHtml(e.description || '').slice(0, 200))}</p>
               <div class="event-meta">
@@ -474,7 +486,7 @@
               </div>
               ${e.capacity ? `<div class="capacity-bar"><div class="fill" style="width:${pct}%"></div></div>` : ''}
               <div class="event-actions" onclick="event.stopPropagation()">
-                ${renderRsvpButton(e, full, cancelled, past)}
+                ${renderRsvpButton(e, full, cancelled, started)}
                 ${canManage(e) && !cancelled && !past ? '<button class="btn btn-outline btn-sm" onclick="toggleAttendees(' + e.id + ', this)">Attendees (' + (e.rsvp_count || 0) + ')</button>' : ''}
                 <a class="btn btn-outline btn-sm" href="/events/${e.slug || e.id}">Details</a>
               </div>

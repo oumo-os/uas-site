@@ -95,16 +95,17 @@ try {
   if ($type === 'event') {
     $row = null;
     if ($slug !== '') {
-      $s = $db->prepare('SELECT id, title, slug, description, image_url, status FROM events WHERE slug = ? LIMIT 1');
+      $s = $db->prepare('SELECT id, title, slug, description, image_url, status, visibility FROM events WHERE slug = ? LIMIT 1');
       $s->execute([$slug]);
       $row = $s->fetch();
     }
     if (!$row && ($id || ctype_digit($slug))) {
-      $s = $db->prepare('SELECT id, title, slug, description, image_url, status FROM events WHERE id = ? LIMIT 1');
+      $s = $db->prepare('SELECT id, title, slug, description, image_url, status, visibility FROM events WHERE id = ? LIMIT 1');
       $s->execute([$id ?: (int) $slug]);
       $row = $s->fetch();
     }
-    if ($row && in_array($row['status'], ['published', 'cancelled', 'completed'], true)) {
+    // Share crawlers are guests: no previews for members-only events.
+    if ($row && in_array($row['status'], ['published', 'cancelled', 'completed'], true) && ($row['visibility'] ?? 'public') === 'public') {
       serve_with_meta(__DIR__ . '/event.html', [
         'title' => $row['title'] . ' — Uganda Astronomical Society',
         'description' => share_text($row['description']) ?: 'Event — Uganda Astronomical Society.',

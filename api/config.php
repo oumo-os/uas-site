@@ -312,6 +312,20 @@ function ensure_event_room(int $eventId): ?array {
   return ['url' => $url, 'pass' => $pass];
 }
 
+// Effective end of an event for "has it ended" classification: the explicit
+// end_date, else the last minute of the event's start day (23:59:59).
+function event_end_expr(string $alias = 'e'): string {
+  return "COALESCE($alias.end_date, TIMESTAMP(DATE($alias.date), '23:59:59'))";
+}
+
+// Guest-visible event filter: members-only events are hidden from logged-out
+// (or inactive) visitors. Any active member sees everything.
+function event_visibility_sql(string $alias = 'e'): string {
+  $u = current_user();
+  if ($u && ($u['status'] ?? '') === 'active') return '1 = 1';
+  return "$alias.visibility = 'public'";
+}
+
 // Append a display-name hint to a Jitsi join URL so members/guests arrive
 // with their name prefilled (harmless if a client ignores the fragment).
 function jitsi_join_url(string $url, string $name): string {

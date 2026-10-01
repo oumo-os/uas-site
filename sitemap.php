@@ -28,7 +28,7 @@ foreach ($static as [$p, $pr, $freq]) {
 
 try {
   $pdo = db();
-  $stmt = $pdo->query('SELECT id, slug, updated_at FROM events WHERE status = "published" ORDER BY date DESC');
+  $stmt = $pdo->query('SELECT id, slug, updated_at FROM events WHERE status = "published" AND visibility = "public" ORDER BY date DESC');
   foreach ($stmt->fetchAll() as $r) {
     $slug = $r['slug'] ?: $r['id'];
     $urls[] = ['loc' => $base . '/events/' . $slug, 'lastmod' => substr($r['updated_at'] ?? $today, 0, 10), 'priority' => '0.7', 'freq' => 'weekly'];
