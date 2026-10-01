@@ -119,6 +119,8 @@
       .hero h1 { font-size:2rem; }
       .hero p { font-size:1rem; }
       .home-gallery { grid-template-columns:1fr !important; }
+      .home-gallery img { transition:transform 0.3s; }
+      .home-gallery > div:hover img { transform:scale(1.04); }
       .stat-row { grid-template-columns:repeat(2,1fr); gap:1rem; }
       .stat-card { padding:1.25rem 0.75rem; }
       .stat-card .stat-value { font-size:1.8rem; }
@@ -229,6 +231,15 @@
         <div style="border-radius:var(--radius-lg);overflow:hidden">
           <img src="img/home-events.jpg" alt="Moon observation" style="width:100%;height:220px;object-fit:cover;display:block" loading="lazy">
         </div>
+        <div style="border-radius:var(--radius-lg);overflow:hidden">
+          <img src="img/cosmus-telescope-child.jpg" alt="A UAS member guiding a child through a telescope at night" style="width:100%;height:220px;object-fit:cover;display:block" loading="lazy">
+        </div>
+        <div style="border-radius:var(--radius-lg);overflow:hidden">
+          <img src="img/outreach-school-telescope.jpg" alt="UAS outreach: school students gathered around a telescope" style="width:100%;height:220px;object-fit:cover;display:block" loading="lazy">
+        </div>
+        <div style="border-radius:var(--radius-lg);overflow:hidden">
+          <img src="img/telescope-night-city.jpg" alt="Adjusting a telescope under the night sky with city lights beyond" style="width:100%;height:220px;object-fit:cover;display:block" loading="lazy">
+        </div>
       </div>
     </div>
   </section>
@@ -292,7 +303,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260923-6"></script>
+  <script src="js/api.js?v=20260923-7"></script>
   <script>
     async function load() {
       try {

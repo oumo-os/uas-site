@@ -55,7 +55,7 @@ function icon(name, cls) {
 const api = {
   // Client build tag — dashboard compares this against its own tag and
   // prompts a refresh on mismatch (stale cached JS is otherwise silent).
-  BUILD: '20260923-6',
+  BUILD: '20260923-7',
   _token: null,
   _user: null,
   _capabilities: [],

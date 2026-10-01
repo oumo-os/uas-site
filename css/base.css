@@ -6,6 +6,7 @@
   --bg-card: #ffffff;
   --bg-card-hover: #fafbfc;
   --bg-input: #ffffff;
+  --bg-subtle: #f0efe9;
   --border: #e2ded4;
   --border-focus: #8896a8;
   --text: #1a2332;
@@ -34,6 +35,7 @@
   --bg-card: #ffffff;
   --bg-card-hover: #fafbfc;
   --bg-input: #ffffff;
+  --bg-subtle: #f0efe9;
   --border: #e2ded4;
   --border-focus: #8896a8;
   --text: #1a2332;
@@ -58,6 +60,7 @@
   --bg-card: #1e293b;
   --bg-card-hover: #253247;
   --bg-input: #1e293b;
+  --bg-subtle: #253247;
   --border: #334155;
   --border-focus: #64748b;
   --text: #e2e8f0;
@@ -80,7 +83,7 @@
 /* ============ Base ============ */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 15px; scroll-behavior: smooth; }
+html { font-size: 16px; scroll-behavior: smooth; }
 
 body {
   font-family: var(--font);
@@ -115,7 +118,7 @@ a:hover { color: var(--accent-light); }
   padding: 1.5rem;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
-.card:hover { border-color: var(--border-focus); box-shadow: var(--shadow-md); }
+.card:hover { border-color: var(--border-focus); box-shadow: var(--shadow-md); transform: translateY(-2px); }
 .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
 .card-title { font-size: 1.1rem; font-weight: 600; }
 .card-subtitle { font-size: 0.85rem; color: var(--text-dim); }
@@ -153,6 +156,19 @@ a:hover { color: var(--accent-light); }
 .badge-administrative { background: rgba(184,134,11,0.12); color: var(--gold); }
 .badge-working_group { background: rgba(124,58,237,0.12); color: #7c3aed; }
 .badge-dissolved { background: #e5e7eb; color: #6b7280; }
+.badge-pending { background: var(--gold-bg); color: var(--gold); }
+.badge-dim { background: var(--bg-subtle); color: var(--text-dim); }
+[data-theme="dark"] .badge-draft,
+[data-theme="dark"] .badge-inactive,
+[data-theme="dark"] .badge-dissolved { background: #334155; color: #94a3b8; }
+[data-theme="dark"] .badge-submitted { background: rgba(59,130,246,0.15); color: #93c5fd; }
+[data-theme="dark"] .badge-approved,
+[data-theme="dark"] .badge-published,
+[data-theme="dark"] .badge-passed,
+[data-theme="dark"] .badge-active { background: rgba(74,222,128,0.12); color: #4ade80; }
+[data-theme="dark"] .badge-voting { background: rgba(251,191,36,0.12); color: #fbbf24; }
+[data-theme="dark"] .badge-failed,
+[data-theme="dark"] .badge-overdue { background: rgba(248,113,113,0.12); color: #f87171; }
 
 /* ============ Buttons ============ */
 
@@ -247,7 +263,7 @@ tr:hover td { background: var(--accent-glow); }
   padding: 0.65rem 0;
   flex-shrink: 0;
 }
-.nav-logo { height: 30px; width: auto; border-radius: 50%; filter: invert(1); }
+.nav-logo { height: 30px; width: auto; border-radius: 50%; }
 .nav-links {
   display: flex;
   gap: 0;

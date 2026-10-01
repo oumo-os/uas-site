@@ -79,7 +79,8 @@
       border-radius:var(--radius-lg); margin-bottom:1rem; transition:all 0.3s; cursor:pointer;
     }
     .event-card:hover { border-color:var(--border-focus); box-shadow:var(--shadow-md); }
-    .event-card img { width:180px; height:120px; object-fit:cover; border-radius:var(--radius); flex-shrink:0; background:var(--bg-subtle); }
+    .event-card img { width:180px; height:120px; object-fit:cover; border-radius:var(--radius); flex-shrink:0; background:var(--bg-subtle); transition:transform 0.3s; }
+    .event-card:hover img { transform:scale(1.03); }
     .event-date-box {
       min-width:64px; text-align:center; padding:0.75rem 0.5rem; background:var(--accent-glow);
       border-radius:var(--radius); flex-shrink:0; align-self:flex-start;
@@ -223,7 +224,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260923-6"></script>
+  <script src="js/api.js?v=20260923-7"></script>
   <script>
     const eventImgs = ['/img/event-nightwatch.jpg','/img/event-workshop.jpg','/img/event-lecture.jpg'];
     let myRsvps = {};
