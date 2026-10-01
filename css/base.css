@@ -263,7 +263,12 @@ tr:hover td { background: var(--accent-glow); }
   padding: 0.65rem 0;
   flex-shrink: 0;
 }
-.nav-logo { height: 30px; width: auto; border-radius: 50%; }
+.nav-logo { height: 30px; width: auto; border-radius: 50%; filter: invert(1); }
+/* Emblem is a white-on-transparent logo: invert it on the light nav, leave it as-is on dark */
+[data-theme="dark"] .nav-logo { filter: none; }
+/* Same treatment for the login card emblem (light card in light mode) */
+.auth-header img { filter: invert(1); }
+[data-theme="dark"] .auth-header img { filter: none; }
 .nav-links {
   display: flex;
   gap: 0;
