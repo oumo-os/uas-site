@@ -123,6 +123,11 @@ function clean_image_url($v): ?string {
 
 // ---- Video meetings & embeds (nothing is hosted here) ----
 if (!defined('JITSI_DOMAIN')) define('JITSI_DOMAIN', 'https://meet.jit.si');
+// Jitsi room auto-creation + on-demand generation. Off while Jitsi usage is
+// relaxed (pending an org account): manual Meet/Zoom/Teams/Jitsi links keep
+// working everywhere; only *new* Jitsi room creation pauses. Flip to true
+// to re-enable.
+if (!defined('JITSI_AUTO_CREATE')) define('JITSI_AUTO_CREATE', false);
 
 // URL allowlist for link/redirect fields (Jitsi rooms, online venues).
 // Missing scheme is assumed https (pasted "meet.jit.si/..." links are the
@@ -272,6 +277,13 @@ function event_link_email_body(array $event, string $name, string $kind): string
   $lines[] = $join;
   $lines[] = '';
   $lines[] = 'No account needed. If the room is not open yet, the host opens it shortly before start time.';
+  // Organizer-drafted confirmation note (migration 056): travels in signup
+  // confirmations and reminders for members and guests alike.
+  if (!empty($event['confirm_message'])) {
+    $lines[] = '';
+    $lines[] = 'A note from the organizers:';
+    $lines[] = trim((string) $event['confirm_message']);
+  }
   return implode("\n", $lines);
 }
 
@@ -287,6 +299,7 @@ function room_rand(int $len = 6): string {
 // a Google/GitHub login, sets the passcode as the room password in Jitsi,
 // and admits everyone else from the lobby; guests join free.
 function ensure_event_room(int $eventId): ?array {
+  if (!JITSI_AUTO_CREATE) return null;
   $s = db()->prepare('SELECT id, is_online, online_url FROM events WHERE id = ?');
   $s->execute([$eventId]);
   $ev = $s->fetch();

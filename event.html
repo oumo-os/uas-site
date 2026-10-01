@@ -167,7 +167,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260923-5"></script>
+  <script src="js/api.js?v=20260923-6"></script>
   <script>
     var eventImgs = {'lecture':ua('/img/event-lecture.jpg'),'workshop':ua('/img/event-workshop.jpg'),'observing':ua('/img/event-nightwatch.jpg'),'conference':ua('/img/event-lecture.jpg'),'outreach':ua('/img/event-workshop.jpg')};
     var eventId = null;
@@ -260,7 +260,7 @@
       document.getElementById('eDetails').innerHTML =
         '<div class="info-box"><div class="label"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span> Date</div><div class="value">' + d2.toLocaleDateString('en',{weekday:'long',year:'numeric',month:'long',day:'numeric'}) + '</div></div>' +
         '<div class="info-box"><div class="label"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span> Time</div><div class="value">' + d2.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}) + (dEnd ? ' — ' + dEnd.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}) : '') + (duration ? ' <span class="sub">(' + duration + ')</span>' : '') + '</div></div>' +
-        '<div class="info-box"><div class="label"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> Location</div><div class="value">' + (e.is_online ? 'Online' + (e.location ? ' · ' + esc(e.location) : '') : (e.location ? esc(e.location) : 'To be confirmed')) + '</div>' + ((!e.is_online && e.location) ? '<a class="map-link" href="https://maps.google.com/?q=' + encodeURIComponent(e.location) + '" target="_blank" rel="noopener">View on map <span aria-hidden="true">&rarr;</span></a>' : '') + '</div>' +
+        '<div class="info-box"><div class="label"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> Location</div><div class="value">' + (e.is_online ? 'Online' + (e.location ? ' · ' + esc(e.location) : '') : (e.location ? esc(e.location) : 'To be confirmed')) + '</div>' + (e.location ? '<a class="map-link" href="https://maps.google.com/?q=' + encodeURIComponent(e.location) + '" target="_blank" rel="noopener">View on map <span aria-hidden="true">&rarr;</span></a>' : '') + '</div>' +
         '<div class="info-box"><div class="label"><span class="icon-inline icon-sm"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Capacity</div><div class="value">' + (e.capacity ? d.stats.total + ' / ' + e.capacity : d.stats.total + ' registered') + '</div>' + (e.capacity ? '<div class="sub">' + Math.min(100, Math.round(d.stats.total / e.capacity * 100)) + '% filled</div>' : '') + '</div>';
 
       // Rich HTML description
@@ -396,7 +396,8 @@
 
       if (d.my_rsvp && d.my_rsvp.status === 'registered') {
         el.innerHTML += '<button class="btn btn-outline" style="width:100%" onclick="cancelRsvp()">Cancel RSVP</button>' +
-          '<p class="text-success" style="font-size:0.88rem;margin-top:0.75rem">You are registered!</p>';
+          '<p class="text-success" style="font-size:0.88rem;margin-top:0.75rem">You are registered!</p>' +
+          (e.confirm_message ? '<div style="margin-top:0.75rem;padding:0.75rem;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:0.85rem"><div style="font-weight:600;margin-bottom:0.25rem;font-size:0.76rem;color:var(--text-dim)">NOTE FROM THE ORGANIZERS</div><div style="white-space:pre-wrap">' + esc(e.confirm_message) + '</div></div>' : '');
       } else if (full) {
         if (d.my_waitlist) {
           el.innerHTML += '<button class="btn btn-outline" style="width:100%" onclick="leaveWaitlist()">Leave Waitlist</button>' +
@@ -535,14 +536,34 @@
         '<div style="flex:0 0 110px"><label style="font-size:0.78rem;font-weight:600;color:var(--text-dim)">Capacity</label>' +
         '<input class="form-input" id="eeCap" type="number" min="0" style="width:100%" value="' + (e.capacity || '') + '"></div></div>' +
         '<div style="margin-bottom:0.75rem"><label style="font-size:0.85rem;display:flex;gap:0.4rem;align-items:center;cursor:pointer">' +
-        '<input type="checkbox" id="eeOnline"' + (e.is_online ? ' checked' : '') + '> This event meets online</label></div>' +
-        '<div style="margin-bottom:0.75rem"><label style="font-size:0.78rem;font-weight:600;color:var(--text-dim)">Online meeting link</label>' +
-        '<input class="form-input" id="eeOnlineUrl" placeholder="https://meet.jit.si/…" style="width:100%" value="' + esc(e.online_url || '') + '"></div>' +
+        '<input type="checkbox" id="eeOnline"' + (e.is_online ? ' checked' : '') + '> This event meets online (physical venue, if any, stays listed)</label></div>' +
+        '<div id="eeOnlineRow" style="margin-bottom:0.25rem"><label style="font-size:0.78rem;font-weight:600;color:var(--text-dim)">Online meeting link</label>' +
+        '<input class="form-input" id="eeOnlineUrl" placeholder="https://meet.jit.si/… or Meet/Zoom/Teams link" style="width:100%" value="' + esc(e.online_url || '') + '"></div>' +
+        '<p class="text-dim" id="eeOnlineHint" style="font-size:0.8rem;margin:0 0 0.75rem"></p>' +
+        '<div id="eePassRow" style="margin-bottom:0.75rem"><label style="font-size:0.78rem;font-weight:600;color:var(--text-dim)">Room passcode (optional)</label>' +
+        '<input class="form-input" id="eePass" placeholder="e.g. stargaze-42" style="width:100%" value="' + esc(e.room_pass || '') + '"></div>' +
+        '<div style="margin-bottom:0.75rem"><label style="font-size:0.78rem;font-weight:600;color:var(--text-dim)">Confirmation message for members (optional)</label>' +
+        '<textarea class="form-input" id="eeConfirm" rows="3" style="width:100%" placeholder="e.g. Gates open at 6pm — bring binoculars if you have them.">' + esc(e.confirm_message || '') + '</textarea>' +
+        '<p class="text-dim" style="font-size:0.78rem;margin-top:0.25rem">Shown to members right after they sign up, and added to confirmation emails.</p></div>' +
         '<div style="margin-bottom:0.75rem"><label style="font-size:0.78rem;font-weight:600;color:var(--text-dim)">Description *</label>' +
         '<div id="eeDesc" contenteditable="true" style="min-height:140px;max-height:300px;overflow-y:auto;padding:0.6rem;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:0.9rem;line-height:1.6">' + (e.description || '') + '</div></div>' +
         '<p class="text-dim" id="eeMsg" style="font-size:0.82rem"></p>' +
         '<button class="btn btn-primary" id="eeSave" style="width:100%" onclick="saveEventEditor()">Save changes</button></div>';
       document.body.appendChild(ov);
+      // Online ticked → reveal the link + passcode fields (hidden for venue-only events).
+      var eeOnlineBox = document.getElementById('eeOnline');
+      var eeToggleOnline = function() {
+        var on = eeOnlineBox.checked;
+        document.getElementById('eeOnlineRow').style.display = on ? '' : 'none';
+        document.getElementById('eePassRow').style.display = on ? '' : 'none';
+        var hint = document.getElementById('eeOnlineHint');
+        hint.style.display = on ? '' : 'none';
+        hint.textContent = api.feature('jitsiAuto')
+          ? 'Leave the link blank to auto-create a Jitsi room on save.'
+          : 'Members see a Join button only while a link is set — paste any Meet/Zoom/Teams/Jitsi link.';
+      };
+      eeOnlineBox.addEventListener('change', eeToggleOnline);
+      eeToggleOnline();
     }
 
     function closeEventEditor() {
@@ -559,9 +580,10 @@
       if (!title || !date) { msg.textContent = 'Title and start date are required.'; return; }
       if (end && end <= date) { msg.textContent = 'End must be after the start.'; return; }
       var capRaw = document.getElementById('eeCap').value;
+      var passRaw = (document.getElementById('eePass').value || '').trim();
       btn.disabled = true; btn.textContent = 'Saving...';
       try {
-        await api.updateEvent(eventId, {
+        var body = {
           title: title,
           date: date.replace('T', ' ') + ':00',
           end_date: end ? end.replace('T', ' ') + ':00' : null,
@@ -570,7 +592,12 @@
           online_url: (document.getElementById('eeOnlineUrl').value || '').trim() || null,
           capacity: capRaw === '' ? null : parseInt(capRaw, 10),
           description: document.getElementById('eeDesc').innerHTML,
-        });
+          confirm_message: (document.getElementById('eeConfirm').value || '').trim() || null,
+        };
+        // Only send the passcode when set or previously visible — never wipe a
+        // stored pass the editor cannot see.
+        if (passRaw || (editData && editData.room_pass)) body.room_pass = passRaw || null;
+        await api.updateEvent(eventId, body);
         closeEventEditor();
         load();
       } catch (e2) {

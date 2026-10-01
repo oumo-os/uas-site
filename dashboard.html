@@ -1121,7 +1121,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260923-5"></script>
+  <script src="js/api.js?v=20260923-6"></script>
   <script>
     let health = {};
     let allPendingData = [];
@@ -1812,7 +1812,7 @@
             <div id="jitsi-wrap" style="display:none;margin-top:0.75rem"></div>
           </div>` : (canRoom ? `
           <div style="margin-bottom:1rem"><button class="btn btn-outline btn-sm" onclick="generateMeetingRoom(${m.id})">Generate Jitsi video room</button>
-          <p class="text-dim text-sm" style="margin:0.35rem 0 0">Creates a stable, unguessable room link for this meeting.</p></div>` : '');
+          <p class="text-dim text-sm" style="margin:0.35rem 0 0">Creates a stable, unguessable room link for this meeting.${api.feature('jitsiAuto') ? '' : ' <strong>Automatic room creation is currently paused — paste any meeting link instead.</strong>'}</p></div>` : '');
         openModal('Meeting: ' + m.title, `
           <div style="font-size:0.9rem;line-height:1.6">
             ${roomHtml}
@@ -3586,8 +3586,10 @@
           { name: 'date', label: 'Start Date & Time', type: 'datetime-local', required: true },
           { name: 'end_date', label: 'End Date & Time', type: 'datetime-local' },
           { name: 'location', label: 'Location', type: 'text', placeholder: 'e.g. Kampala, Uganda' },
-          { name: 'is_online', label: 'Online event', type: 'checkbox', checkLabel: 'This event meets online (hides the map link)' },
-          { name: 'online_url', label: 'Online meeting link (optional)', type: 'text', placeholder: 'https://meet.jit.si/…', help: 'Shown as a Join button on the event page' },
+          { name: 'is_online', label: 'Online event', type: 'checkbox', checkLabel: 'This event meets online (physical venue, if any, stays listed)' },
+          { name: 'online_url', label: 'Online meeting link', type: 'text', placeholder: 'https://meet.jit.si/… or Meet/Zoom/Teams link', help: 'Shown as a Join button on the event page' },
+          { name: 'room_pass', label: 'Room passcode (optional)', type: 'text', placeholder: 'e.g. stargaze-42', help: 'Shared only with organizers, leads and approvers' },
+          { name: 'confirm_message', label: 'Confirmation message for members (optional)', type: 'textarea', placeholder: 'e.g. Gates open at 6pm — bring binoculars if you have them.', help: 'Shown to members right after they sign up, and added to confirmation emails' },
           { name: 'video_url', label: 'Video URL (optional)', type: 'text', placeholder: 'YouTube or Vimeo link — trailer or recording', help: 'Embedded on the event page. Never hosted here.' },
           { name: 'capacity', label: 'Capacity', type: 'number', min: 0, placeholder: 'Leave blank for unlimited', help: 'Leave blank for open attendance' },
           { name: 'description', label: 'Description', type: 'rich-text', rows: 4, required: true },
@@ -3645,10 +3647,12 @@
           }
         }
       }
+      if (type === 'event') wireOnlinePrompt(formId);
       FormBuilder.init(formId, fields, async (data) => {
         if (type === 'article') await api.createArticle(data);
         else if (type === 'event') {
           if (data.end_date && data.date && data.end_date <= data.date) throw { error: 'End date must be after the start date' };
+          if (!data.room_pass) delete data.room_pass;
           await api.createEvent(data);
         }
         else if (type === 'programme') await api.createProgramme(data);
@@ -5289,13 +5293,14 @@
             <div class="field"><div class="field-label">Status</div><span class="badge badge-${esc(data.status)}">${esc(data.status)}</span></div>
             <div class="field"><div class="field-label">Date</div>${data.date ? new Date(String(data.date).replace(' ', 'T')).toLocaleDateString('en', {weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Date TBC'}</div>
             ${data.end_date ? `<div class="field"><div class="field-label">End</div>${new Date(String(data.end_date).replace(' ', 'T')).toLocaleDateString('en', {weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>` : ''}
-            <div class="field"><div class="field-label">Location</div>${data.is_online ? 'Online' + (data.location ? ' · ' + esc(data.location) : '') : esc(data.location || 'TBA')}</div>
+            <div class="field"><div class="field-label">Location</div>${data.is_online ? 'Online' + (data.location ? ' · ' + esc(data.location) : '') : esc(data.location || 'TBA')}${data.location ? ` <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.location)}" target="_blank" rel="noopener" style="color:var(--accent)">Map &rarr;</a>` : ''}</div>
             ${data.is_online && data.online_url ? `<div class="field"><div class="field-label">Online room</div><a href="${esc(jitsiJoinUrl(data.online_url, api._user && api._user.name))}" target="_blank" rel="noopener" style="color:var(--accent)">Join online &rarr;</a>${data.room_pass ? `<div class="text-dim text-sm" style="margin-top:0.3rem">Moderator passcode: <strong style="letter-spacing:0.1em">${esc(data.room_pass)}</strong> — set it as the room password in Jitsi and admit from the lobby.</div>` : ''}</div>` : ''}
             ${data.is_online && !data.online_url ? `<div class="field"><div class="field-label">Online room</div><p class="text-dim text-sm" style="margin:0">No meeting link set yet — members won't see a Join button. Add one via Edit.</p></div>` : ''}
             <div class="field"><div class="field-label">Organizer</div>${esc(data.organiser_name || data.organizer_name || 'Unknown')}</div>
             <div class="field"><div class="field-label">Capacity</div>${data.capacity ? data.capacity + ' attendees' : 'Unlimited'}</div>
             ${data.image_url ? `<div class="field"><div class="field-label">Cover</div><img src="${esc(publicCover(data.image_url, ''))}" alt="" style="max-width:100%;border-radius:var(--radius);border:1px solid var(--border)"></div>` : ''}
             ${data.description ? `<div class="field"><div class="field-label">Description</div><div style="max-height:200px;overflow-y:auto;padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${data.description}</div></div>` : ''}
+            ${data.confirm_message ? `<div class="field"><div class="field-label">Note for attendees</div><div style="padding:0.75rem;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">${esc(data.confirm_message)}</div></div>` : ''}
             ${data.rejection_reason && data.status === 'draft' ? `<div class="field"><div class="field-label">Needs revision</div><div style="color:var(--danger);padding:0.5rem;background:rgba(185,28,28,0.05);border-radius:var(--radius)">${esc(data.rejection_reason)}</div></div>` : ''}
             ${attendHtml}`}
             ${actions.length ? `<div class="modal-actions">${actions.join('')}</div>` : ''}
@@ -5631,6 +5636,37 @@
       } catch(e) { toast(e.error || 'Failed to load article', 'error'); }
     }
 
+    // Online ticked → reveal the link + passcode fields (hidden for venue-only events).
+    function wireOnlinePrompt(formId) {
+      const box = document.getElementById(formId + '-is_online');
+      if (!box) return;
+      const form = document.getElementById(formId);
+      let hint = document.getElementById(formId + '-online-hint');
+      if (!hint && form) {
+        hint = document.createElement('div');
+        hint.id = formId + '-online-hint';
+        hint.className = 'text-dim text-sm';
+        hint.style.cssText = 'margin:-0.25rem 0 0.75rem';
+        const linkWrap = form.querySelector('[data-field="online_url"]');
+        if (linkWrap && linkWrap.parentNode) linkWrap.parentNode.insertBefore(hint, linkWrap.nextSibling);
+      }
+      const toggle = () => {
+        const on = box.checked;
+        const linkWrap = form ? form.querySelector('[data-field="online_url"]') : null;
+        const passWrap = form ? form.querySelector('[data-field="room_pass"]') : null;
+        if (linkWrap) linkWrap.style.display = on ? '' : 'none';
+        if (passWrap) passWrap.style.display = on ? '' : 'none';
+        if (hint) {
+          hint.style.display = on ? '' : 'none';
+          hint.textContent = api.feature('jitsiAuto')
+            ? 'Leave the link blank to auto-create a Jitsi room on save.'
+            : 'Members see a Join button only while a link is set — paste any Meet/Zoom/Teams/Jitsi link.';
+        }
+      };
+      box.addEventListener('change', toggle);
+      toggle();
+    }
+
     async function editEventForm(id) {
       try {
         const [evRes, progs] = await Promise.all([
@@ -5647,17 +5683,21 @@
           { name: 'date', label: 'Start Date & Time', type: 'datetime-local', required: true, value: dt(e.date) },
           { name: 'end_date', label: 'End Date & Time', type: 'datetime-local', value: dt(e.end_date) },
           { name: 'location', label: 'Location', type: 'text', value: e.location || '' },
-          { name: 'is_online', label: 'Online event', type: 'checkbox', checkLabel: 'This event meets online (hides the map link)', value: !!Number(e.is_online) },
-          { name: 'online_url', label: 'Online meeting link (optional)', type: 'text', value: e.online_url || '', help: 'Shown as a Join button on the event page' },
+          { name: 'is_online', label: 'Online event', type: 'checkbox', checkLabel: 'This event meets online (physical venue, if any, stays listed)', value: !!Number(e.is_online) },
+          { name: 'online_url', label: 'Online meeting link', type: 'text', value: e.online_url || '', placeholder: 'https://meet.jit.si/… or Meet/Zoom/Teams link', help: 'Shown as a Join button on the event page' },
+          { name: 'room_pass', label: 'Room passcode (optional)', type: 'text', value: e.room_pass || '', placeholder: 'e.g. stargaze-42', help: 'Shared only with organizers, leads and approvers' },
+          { name: 'confirm_message', label: 'Confirmation message for members (optional)', type: 'textarea', value: e.confirm_message || '', placeholder: 'e.g. Gates open at 6pm — bring binoculars if you have them.', help: 'Shown to members right after they sign up, and added to confirmation emails' },
           { name: 'video_url', label: 'Video URL (optional)', type: 'text', value: '', placeholder: 'YouTube or Vimeo link', help: e.video_url ? 'A video is already attached (replaced if you paste a new link).' : 'Embedded on the event page. Never hosted here.' },
           { name: 'capacity', label: 'Capacity', type: 'number', min: 0, value: e.capacity || '', help: 'Leave blank for open attendance' },
           { name: 'description', label: 'Description', type: 'rich-text', required: true, value: e.description || '' },
           { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image', value: e.image_url || '' },
         ];
         openModal('Edit Event', FormBuilder.render(fields, { id: 'edit-event', submitLabel: 'Save Changes' }));
+        wireOnlinePrompt('edit-event');
         FormBuilder.init('edit-event', fields, async (data) => {
           if (data.end_date && data.date && data.end_date <= data.date) throw { error: 'End date must be after the start date' };
           if (!data.video_url) delete data.video_url; // empty = keep the attached video
+          if (!data.room_pass && !e.room_pass) delete data.room_pass; // never wipe a passcode the editor cannot see
           await api.updateEvent(id, data);
           closeModal(); toast('Event updated', 'success');
           showItemDetail('event', id);

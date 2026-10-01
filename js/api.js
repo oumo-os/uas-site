@@ -55,10 +55,11 @@ function icon(name, cls) {
 const api = {
   // Client build tag — dashboard compares this against its own tag and
   // prompts a refresh on mismatch (stale cached JS is otherwise silent).
-  BUILD: '20260923-4',
+  BUILD: '20260923-6',
   _token: null,
   _user: null,
   _capabilities: [],
+  _features: {},
 
   _setCaps(data) {
     // Dedupe: global + scoped grants of the same slug arrive as separate rows.
@@ -107,7 +108,12 @@ const api = {
     const data = await this.request('/auth/me');
     this._user = data.user;
     this._setCaps(data);
+    if (data.features) this._features = data.features;
     return data;
+  },
+
+  feature(name) {
+    return !!(this._features && this._features[name]);
   },
 
   async logout() {

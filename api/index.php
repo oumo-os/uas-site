@@ -65,7 +65,7 @@ try {
   }
   elseif ($path === '/auth/me') {
     $user = require_login();
-    json_response(['user' => public_user($user), 'capabilities' => user_capabilities($user['id']), 'roles' => user_roles($user['id'])]);
+    json_response(['user' => public_user($user), 'capabilities' => user_capabilities($user['id']), 'roles' => user_roles($user['id']), 'features' => ['jitsiAuto' => (bool) JITSI_AUTO_CREATE]]);
   }
   elseif ($path === '/auth/password' && $method === 'PUT') {
     $user = require_login();
@@ -198,6 +198,7 @@ try {
     // Generate (or regenerate) the stable Jitsi room for a meeting.
     // Creator or meetings.manage. The room name is unguessable; the host
     // opens it with a Google/GitHub login, everyone else joins as guests.
+    if (!JITSI_AUTO_CREATE) json_error('Automatic Jitsi room creation is currently paused. Paste any meeting link instead.', 403);
     $user = require_login();
     $mid = (int) $m[1];
     $stmt = db()->prepare('SELECT id, title, created_by FROM meetings WHERE id = ?');
@@ -1660,13 +1661,18 @@ try {
     $slug = makeSlug($data['slug'] ?? $data['title'], 'events');
     if (trim($data['online_url'] ?? '') !== '' && clean_link_url($data['online_url']) === null) json_error('Online meeting link is not a valid URL', 400);
     if (trim($data['video_url'] ?? '') !== '' && video_embed_url($data['video_url']) === null) json_error('Video URL must be a YouTube or Vimeo link', 400);
-    db()->prepare('INSERT INTO events (programme_id, project_id, title, slug, description, organizer_id, date, end_date, location, is_online, online_url, capacity, image_url, video_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      ->execute([$progId, $data['project_id'] ?? null, $data['title'], $slug, sanitize_rich_html($data['description'] ?? null), $user['id'], $data['date'], $data['end_date'] ?? null, $data['location'] ?? null, !empty($data['is_online']) ? 1 : 0, clean_link_url($data['online_url'] ?? null), $data['capacity'] ?? null, clean_image_url($data['image_url'] ?? null), video_embed_url($data['video_url'] ?? null), $user['id']]);
+    $roomPass = trim((string) ($data['room_pass'] ?? ''));
+    if ($roomPass !== '' && !preg_match('/^[A-Za-z0-9-]{1,32}$/', $roomPass)) json_error('Room passcode may only contain letters, numbers and hyphens (max 32)', 400);
+    $confirmMsg = trim(strip_tags((string) ($data['confirm_message'] ?? '')));
+    if (mb_strlen($confirmMsg) > 1000) json_error('Confirmation message must be 1000 characters or fewer', 400);
+    db()->prepare('INSERT INTO events (programme_id, project_id, title, slug, description, organizer_id, date, end_date, location, is_online, online_url, room_pass, confirm_message, capacity, image_url, video_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      ->execute([$progId, $data['project_id'] ?? null, $data['title'], $slug, sanitize_rich_html($data['description'] ?? null), $user['id'], $data['date'], $data['end_date'] ?? null, $data['location'] ?? null, !empty($data['is_online']) ? 1 : 0, clean_link_url($data['online_url'] ?? null), ($roomPass === '' ? null : $roomPass), ($confirmMsg === '' ? null : $confirmMsg), $data['capacity'] ?? null, clean_image_url($data['image_url'] ?? null), video_embed_url($data['video_url'] ?? null), $user['id']]);
     $id = (int) db()->lastInsertId();
     transition('event', $id, 'submitted', $user['id']);
     audit_log('event_create', 'event', $id);
     notify_capability('events.approve', 'event_submitted', 'Event awaiting approval: ' . $data['title'], 'Submitted by ' . $user['name'] . '.', '/admin?tab=events');
-    // Online without a link (Meet/Zoom/Teams or blank) gets a Jitsi room auto-created.
+    // Online without a link (Meet/Zoom/Teams or blank) gets a Jitsi room
+    // auto-created while JITSI_AUTO_CREATE is on (currently paused).
     $room = ensure_event_room($id);
     if ($room) {
       notify_user((int) $user['id'], 'event_room', 'Video room created: ' . $data['title'], 'No meeting link was given, so a Jitsi room was created: ' . $room['url'] . ' Moderator passcode: ' . $room['pass'] . '. Open it first as host, set this as the room password, and admit guests from the lobby.', '/event/' . $id);
@@ -1759,6 +1765,16 @@ try {
     if (array_key_exists('online_url', $data)) {
       if (trim((string) $data['online_url']) !== '' && clean_link_url($data['online_url']) === null) json_error('Online meeting link is not a valid URL', 400);
       $sets[] = 'online_url = ?'; $args[] = clean_link_url($data['online_url']);
+    }
+    if (array_key_exists('room_pass', $data)) {
+      $pass = trim((string) $data['room_pass']);
+      if ($pass !== '' && !preg_match('/^[A-Za-z0-9-]{1,32}$/', $pass)) json_error('Room passcode may only contain letters, numbers and hyphens (max 32)', 400);
+      $sets[] = 'room_pass = ?'; $args[] = ($pass === '' ? null : $pass);
+    }
+    if (array_key_exists('confirm_message', $data)) {
+      $msg = trim(strip_tags((string) $data['confirm_message']));
+      if (mb_strlen($msg) > 1000) json_error('Confirmation message must be 1000 characters or fewer', 400);
+      $sets[] = 'confirm_message = ?'; $args[] = ($msg === '' ? null : $msg);
     }
     if (array_key_exists('video_url', $data)) {
       if (trim((string) $data['video_url']) !== '' && video_embed_url($data['video_url']) === null) json_error('Video URL must be a YouTube or Vimeo link', 400);
@@ -1889,6 +1905,12 @@ try {
       $event['can_see_pass'] = $is_manager || $evApprover;
     }
     if (empty($event['can_see_pass'])) unset($event['room_pass']);
+    if (!$user || $user['status'] !== 'active') {
+      // Join links go out by email and member-only windows — never to guests.
+      // The organizer's confirmation note is post-signup guidance, likewise.
+      unset($event['online_url']);
+      unset($event['confirm_message']);
+    }
     if ($is_manager) {
       $stmt = db()->prepare('SELECT er.*, u.name, u.email FROM event_registrations er JOIN users u ON u.id = er.user_id WHERE er.event_id = ? ORDER BY er.registered_at');
       $stmt->execute([$eventId]);
@@ -2005,7 +2027,7 @@ try {
     $user = require_cap('events.rsvp');
     $eventId = (int) $m[1];
 
-    $stmt = db()->prepare('SELECT id, capacity, date FROM events WHERE id = ?');
+    $stmt = db()->prepare('SELECT id, title, capacity, date, end_date, location, is_online, online_url, confirm_message FROM events WHERE id = ?');
     $stmt->execute([$eventId]);
     $event = $stmt->fetch();
     if (!$event) json_error('Event not found', 404);
@@ -2021,16 +2043,28 @@ try {
       }
       db()->prepare("UPDATE event_registrations SET status = 'registered', registered_at = NOW() WHERE id = ?")->execute([$existing['id']]);
       audit_log('event_rsvp', 'event', $eventId, ['user_id' => $user['id']]);
-      json_response(['ok' => true], 201);
+    } else {
+      if ($event['capacity'] && event_headcount($eventId) >= (int) $event['capacity']) {
+        json_error('Event is full', 400);
+      }
+      db()->prepare('INSERT INTO event_registrations (event_id, user_id, status) VALUES (?, ?, ?)')
+        ->execute([$eventId, $user['id'], 'registered']);
+      audit_log('event_rsvp', 'event', $eventId, ['user_id' => $user['id']]);
     }
-
-    if ($event['capacity'] && event_headcount($eventId) >= (int) $event['capacity']) {
-      json_error('Event is full', 400);
+    // Online events: members get the same signup confirmation guests get —
+    // join link plus the organizer's confirmation note. Best-effort: failures
+    // must never break the signup itself.
+    if (!empty($event['is_online']) && !empty($event['online_url']) && !empty($user['email'])) {
+      try {
+        $office = event_mail_office();
+        $text = event_link_email_body($event, (string) ($user['name'] ?? ''), 'signup_confirm') . "\n\n—\nUganda Astronomical Society";
+        $via = null; $msgId = null;
+        if (send_office_email($office, $user['email'], 'Registered: ' . $event['title'] . ' [UAS]', $text, $via, $msgId)) {
+          record_sent($office, $user['email'], 'Registered: ' . $event['title'] . ' [UAS]', $text, $msgId, 'event-member-confirm', $eventId, (int) $user['id'], $via);
+          record_event_reminder($eventId, $user['email'], (int) $user['id'], (string) ($user['name'] ?? ''), 'signup_confirm');
+        }
+      } catch (Throwable $e) { /* signup already succeeded — mail is best-effort */ }
     }
-
-    db()->prepare('INSERT INTO event_registrations (event_id, user_id, status) VALUES (?, ?, ?)')
-      ->execute([$eventId, $user['id'], 'registered']);
-    audit_log('event_rsvp', 'event', $eventId, ['user_id' => $user['id']]);
     json_response(['ok' => true], 201);
   }
   elseif (preg_match('#^/events/(\d+)/rsvp$#', $path, $m) && $method === 'DELETE') {
@@ -2077,7 +2111,7 @@ try {
     if (!rate_limit('guest-rsvp:' . client_ip(), 'guest-rsvp', 5, 3600)) {
       json_error('Too many requests. Try again later.', 429);
     }
-    $stmt = db()->prepare('SELECT id, title, capacity, date, end_date, location, is_online, online_url, status, organizer_id FROM events WHERE id = ? AND status = "published"');
+    $stmt = db()->prepare('SELECT id, title, capacity, date, end_date, location, is_online, online_url, confirm_message, status, organizer_id FROM events WHERE id = ? AND status = "published"');
     $stmt->execute([$eventId]);
     $event = $stmt->fetch();
     if (!$event) json_error('Event not found', 404);
@@ -3556,7 +3590,7 @@ try {
     $limit = min(max((int) ($_GET['limit'] ?? 12), 1), 40);
     $now = time();
     // Online, published events whose join window opens within 6h and hasn't closed.
-    $stmt = db()->prepare('SELECT id, title, date, end_date, location, is_online, online_url, status FROM events WHERE is_online = 1 AND online_url IS NOT NULL AND online_url != "" AND status = "published" AND date <= ?');
+    $stmt = db()->prepare('SELECT id, title, date, end_date, location, is_online, online_url, confirm_message, status FROM events WHERE is_online = 1 AND online_url IS NOT NULL AND online_url != "" AND status = "published" AND date <= ?');
     $stmt->execute([date('Y-m-d H:i:s', $now + 6 * 3600)]);
     $events = $stmt->fetchAll();
     $office = event_mail_office();

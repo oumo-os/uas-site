@@ -188,8 +188,8 @@
             <li><strong>Moderators:</strong> every auto-created room has a <strong>passcode</strong> visible only to the organizer, programme lead and approvers (meeting details / event Manage card). Whoever arrives first signs in as moderator, sets that passcode as the room password inside Jitsi, and admits everyone else from the lobby — so the organizer and the programme lead are interchangeable hosts.</li>
             <li><strong>Names filled in:</strong> members joining from the site or their reminder emails arrive with their display name prefilled; guests join with the name they signed up with.</li>
             <li><strong>Scheduling:</strong> organizers can generate the room link in the meeting details, or paste their own Jitsi link when scheduling.</li>
-            <li><strong>Virtual events:</strong> events marked <strong>Online</strong> show a Join button instead of a map link — but only to <strong>logged-in members</strong>, and only <strong>while the event runs</strong> (from its start time until its end, or one hour after start). Before that you'll see when the room opens.</li>
-            <li><strong>Meeting links:</strong> paste any link — Jitsi, Google Meet, Zoom or Teams all work. Leave it blank on an online event and a <strong>Jitsi room is created automatically</strong>, with the link sent to the organizer. Untick Online to opt out.</li>
+            <li><strong>Virtual events:</strong> events marked <strong>Online</strong> show a Join button alongside the venue and map link — but only to <strong>logged-in members</strong>, and only <strong>while the event runs</strong> (from its start time until its end, or one hour after start). Before that you'll see when the room opens.</li>
+            <li><strong>Meeting links:</strong> paste any link — Jitsi, Google Meet, Zoom or Teams all work. Leaving it blank on an online event <strong>auto-creates a Jitsi room</strong> with the link sent to the organizer (this auto-creation is currently paused pending an organization Jitsi account — paste a link for now). Hybrid events can list both a venue and a link. Untick Online to opt out.</li>
             <li><strong>Guests (no account):</strong> sign up with name + email and the join link is <strong>emailed to you twice</strong> — immediately on signup, and again about 6 hours before start. It never appears on public pages.</li>
             <li><strong>Videos:</strong> nothing is hosted here — paste a <strong>YouTube or Vimeo</strong> link (event video field, or the video button in the editor) and it embeds. Any other iframe or script is stripped on save for everyone's safety.</li>
           </ul>
@@ -220,7 +220,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260923-5"></script>
+  <script src="js/api.js?v=20260923-6"></script>
   <script>
     function showSec(name, on) {
       document.querySelectorAll('[data-sec="' + name + '"]').forEach(function(el){ el.style.display = on ? '' : 'none'; });
