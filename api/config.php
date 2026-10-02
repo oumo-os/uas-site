@@ -169,18 +169,30 @@ function video_embed_url($url): ?string {
 function sanitize_rich_html($html): ?string {
   if ($html === null) return null;
   if (!is_string($html)) return '';
-  $html = preg_replace('#<(script|style|object|embed|form|input|button|link|meta)[^>]*>.*?</\\1>#is', '', $html);
-  $html = preg_replace('#<(script|style|object|embed|form|input|button|link|meta)[^>]*/?>#i', '', $html);
-  // Event-handler attributes (onclick=, onerror=, …) on any tag.
-  $html = preg_replace('#\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)#i', '', $html);
+  // Never let a PCRE failure destroy content: every step keeps the previous
+  // value on error (a broken pattern once wiped every rich-text save).
+  $rep = function (string $pat, string $subj, string $to = ''): string {
+    $r = preg_replace($pat, $to, $subj);
+    return $r === null ? $subj : $r;
+  };
+  $html = $rep('#<(script|style|object|embed|form|input|button|link|meta)[^>]*>.*?</\\1>#is', $html);
+  $html = $rep('#<(script|style|object|embed|form|input|button|link|meta)[^>]*/?>#i', $html);
+  // Event-handler attributes (onclick=, onerror=, ...) on any tag.
+  $html = $rep('#\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)#i', $html);
   // javascript:/data:/vbscript: URLs anywhere.
-  $html = preg_replace('#\b(href|src|action|xlink:href)\s*=\s*("|\')(javascript|data|vbscript):.*?\2#is', '$1=$2#$2', $html);
+  $html = $rep('#\b(href|src|action|xlink:href)\s*=\s*("|\')(javascript|data|vbscript):.*?\2#is', $html, '$1=$2#$2');
   // Drop images left src-less (e.g. pasted data-URIs neutralized above) —
-  // a broken-image icon is worse than no image.
-  $html = preg_replace('#<img\b[^>]*\bsrc\s*=\s*("|\')(#|\s*)\1[^>]*>#i', '', $html);
-  $html = preg_replace('#<img\b(?![^>]*\bsrc\s*=)[^>]*>#i', '', $html);
+  // a broken-image icon is worse than no image. NOTE: ~ delimiters, because
+  // these patterns match a literal # which would end #-delimited patterns.
+  $html = $rep('~<img\b[^>]*\bsrc\s*=\s*""[^>]*>~i', $html);
+  $html = $rep("~<img\b[^>]*\bsrc\s*=\s*''[^>]*>~i", $html);
+  $html = $rep('~<img\b[^>]*\bsrc\s*=\s*"#"[^>]*>~i', $html);
+  $html = $rep("~<img\b[^>]*\bsrc\s*=\s*'#'[^>]*>~i", $html);
+  $html = $rep('~<img\b[^>]*\bsrc\s*=\s*"\s*"[^>]*>~i', $html);
+  $html = $rep("~<img\b[^>]*\bsrc\s*=\s*'\s*'[^>]*>~i", $html);
+  $html = $rep('#<img\b(?![^>]*\bsrc\s*=)[^>]*>#i', $html);
   // Iframes: keep only the media allowlist, drop the rest entirely.
-  $html = preg_replace_callback('#<iframe\b[^>]*>#i', function ($m) {
+  $r = preg_replace_callback('#<iframe\b[^>]*>#i', function ($m) {
     $tag = $m[0];
     if (!preg_match('#\bsrc\s*=\s*("|\')([^"\']+)#i', $tag, $s)) return '';
     $src = $s[2];
@@ -194,10 +206,11 @@ function sanitize_rich_html($html): ?string {
     if ($id !== null) $safe .= ' id="' . htmlspecialchars($id, ENT_QUOTES, 'UTF-8') . '"';
     return $safe . ' style="width:100%;height:360px;border:0;border-radius:8px" allow="camera; microphone; fullscreen; display-capture; autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>';
   }, $html);
+  if ($r !== null) $html = $r;
   // Remove stray closing iframe tags left behind by stripped opens.
-  $html = preg_replace('#</iframe>#i', '', $html);
+  $html = $rep('#</iframe>#i', $html);
   // NOTE: closing tags of kept iframes were removed above; re-close them.
-  $html = preg_replace('#(<iframe\b[^>]*style="[^"]*"[^>]*>)#i', '$1</iframe>', $html);
+  $html = $rep('#(<iframe\b[^>]*style="[^"]*"[^>]*>)#i', $html, '$1</iframe>');
   return $html;
 }
 
