@@ -184,7 +184,7 @@
     </div>
   </footer>
 
-  <script src="js/api.js?v=20260923-8"></script>
+  <script src="js/api.js?v=20260923-9"></script>
   <script>
     async function load() {
       try { await api.me(); } catch(e) {}
@@ -246,10 +246,10 @@
         });
       })();
 
-      // Hero keeps a short excerpt; the full text lives in About below.
-      var descLen = stripHtml(p.description || '').replace(/\s+/g, ' ').trim().length;
-      document.getElementById('pDesc').innerHTML = excerpt(p.description, 280);
-      if (p.description && descLen > 280) {
+      // The hero never carries the essay: the full description always lives
+      // in About below (one rule, no thresholds, no surprises).
+      document.getElementById('pDesc').innerHTML = '';
+      if (p.description && stripHtml(p.description).replace(/\s+/g, ' ').trim() !== '') {
         document.getElementById('pAboutSection').style.display = 'block';
         document.getElementById('pAbout').innerHTML = bodyHtml(p.description);
       }

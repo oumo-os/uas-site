@@ -55,7 +55,7 @@ function icon(name, cls) {
 const api = {
   // Client build tag — dashboard compares this against its own tag and
   // prompts a refresh on mismatch (stale cached JS is otherwise silent).
-  BUILD: '20260923-8',
+  BUILD: '20260923-9',
   _token: null,
   _user: null,
   _capabilities: [],
@@ -634,6 +634,30 @@ const RichTextEditor = {
         if (imgBtn) { imgBtn.disabled = false; imgBtn.title = 'Insert image'; }
         editor.focus();
       }
+    });
+    // Pasted images (e.g. from Word/Docs screenshots) arrive as files or
+    // data-URIs that the server sanitizer would kill — upload them instead
+    // so illustrated essays survive saving.
+    editor.addEventListener('paste', (ev) => {
+      const files = Array.from((ev.clipboardData && ev.clipboardData.files) || [])
+        .filter(f => f.type && f.type.startsWith('image/'));
+      if (!files.length) return; // text/HTML pastes go through untouched
+      ev.preventDefault();
+      const sel = window.getSelection();
+      const range = (sel && sel.rangeCount) ? sel.getRangeAt(0).cloneRange() : null;
+      (async () => {
+        for (const file of files) {
+          try {
+            const up = await api.uploadFile(file);
+            editor.focus();
+            if (range && sel) { sel.removeAllRanges(); sel.addRange(range); }
+            document.execCommand('insertImage', false, up.url);
+          } catch (err) {
+            alert((err && err.error) || 'Image upload failed');
+          }
+        }
+        editor.focus();
+      })();
     });
     toolbar.addEventListener('click', e => {
       const btn = e.target.closest('.rte-btn');
