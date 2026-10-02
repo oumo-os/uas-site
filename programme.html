@@ -129,12 +129,8 @@
             <div id="pVideo"></div>
           </div>
           <div class="card-section" id="pTeamSection" style="display:none">
-            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Team Members</h3>
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Leadership</h3>
             <div id="pTeam"></div>
-          </div>
-          <div class="card-section" id="pApplySection">
-            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg></span> Get Involved</h3>
-            <div id="pApply"></div>
           </div>
           <div class="card-section" id="pTimelineSection" style="display:none">
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><path d="M5 7h14"/><path d="M5 12h14"/><path d="M5 17h14"/></svg></span> Timeline</h3>
@@ -145,6 +141,10 @@
           <div class="card-section">
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span> Quick Facts</h3>
             <div id="pFacts"></div>
+          </div>
+          <div class="card-section" id="pActionsCard">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span> Quick Actions</h3>
+            <div id="pActions"></div>
           </div>
           <div class="card-section" id="pProjectsSection" style="display:none">
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span> Projects <span id="pProjCount" class="text-dim" style="font-size:0.8rem;font-weight:400"></span></h3>
@@ -213,7 +213,7 @@
       if (btn) { btn.disabled = true; btn.textContent = 'Applying...'; }
       try {
         await api.request('/programmes/' + window._progId + '/apply', { method: 'POST', body: { message: (message || '').trim() || null } });
-        document.getElementById('pApply').innerHTML = '<p class="text-dim" style="font-size:0.9rem">Application sent — a coordinator will review it and you will be notified here.</p>';
+        document.getElementById('pActions').innerHTML = '<p class="text-dim" style="font-size:0.85rem;margin:0">Application sent — a coordinator will review it and you will be notified here.</p>';
       } catch (e) {
         alert(e.error || 'Application failed');
         if (btn) { btn.disabled = false; btn.textContent = 'Apply to join this programme'; }
@@ -316,50 +316,42 @@
           '<iframe src="' + esc(p.video_url) + '" style="width:100%;height:360px;border:0;border-radius:8px" allow="fullscreen; autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy" title="Programme video"></iframe>';
       }
 
-      // Team members
-      if (p.members && p.members.length) {
-        document.getElementById('pTeamSection').style.display = 'block';
-        document.getElementById('pTeam').innerHTML = p.members.map(function(m) {
-          var initials = (m.user_name || '?').split(' ').map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
-          return '<div class="team-card">' +
-            '<div class="avatar">' + initials + '</div>' +
-            '<div class="team-info">' +
-            '<div class="team-name">' + esc(m.user_name) + '</div>' +
-            '<div class="team-role">' + esc(m.role_in_programme || 'Member') + '</div>' +
-            '</div></div>';
-        }).join('');
-      }
-
-      // Leadership (appointed leads — visible even when the team list is empty)
-      if (p.leads && p.leads.length) {
-        document.getElementById('pTeamSection').style.display = 'block';
-        document.getElementById('pTeam').innerHTML += '<h4 style="font-size:0.9rem;margin:1rem 0 0.5rem">Leadership</h4>' + p.leads.map(function(l) {
-          var initials = (l.user_name || '?').split(' ').map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
-          return '<div class="team-card">' +
-            '<div class="avatar">' + initials + '</div>' +
-            '<div class="team-info">' +
-            '<div class="team-name">' + esc(l.user_name) + '</div>' +
-            '<div class="team-role">' + esc(l.role_title || 'Programme Lead') + '</div>' +
-            '</div></div>';
-        }).join('');
-      }
-
-      // Join / apply CTA
+      // Leadership stays on the programme page; the full member roll lives
+      // on project pages — here just the lead holders plus a headcount.
       (function () {
-        var box = document.getElementById('pApply');
+        var leads = p.leads || [];
+        var memCount = (p.members && p.members.length) || 0;
+        if (leads.length) {
+          document.getElementById('pTeamSection').style.display = 'block';
+          document.getElementById('pTeam').innerHTML = leads.map(function(l) {
+            var initials = (l.user_name || '?').split(' ').map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
+            return '<div class="team-card">' +
+              '<div class="avatar">' + initials + '</div>' +
+              '<div class="team-info">' +
+              '<div class="team-name">' + esc(l.user_name) + '</div>' +
+              '<div class="team-role">' + esc(l.role_title || 'Programme Lead') + '</div>' +
+              '</div></div>';
+          }).join('') + (memCount ? '<p class="text-dim" style="font-size:0.85rem;margin-top:0.75rem">Plus ' + memCount + ' team member' + (memCount === 1 ? '' : 's') + ' — full teams are listed on each project page.</p>' : '');
+        }
+        // Quick actions (sidebar): team snapshot + join CTA.
+        var box = document.getElementById('pActions');
         if (!box) return;
         var me = null;
         try { me = api._user || null; } catch (e) {}
         var members = p.members || [];
         var isMember = me && members.some(function (m) { return m.user_id === me.id; });
+        var leadLine = leads.length ? '<div style="font-size:0.85rem;margin-bottom:0.4rem"><span class="text-dim">Lead:</span> <strong>' + esc(leads[0].user_name) + '</strong></div>' : '';
+        var teamLine = '<div style="font-size:0.85rem;margin-bottom:0.75rem"><span class="text-dim">Team:</span> ' + memCount + (memCount === 1 ? ' member' : ' members') + '</div>';
+        var cta;
         if (isMember) {
-          box.innerHTML = '<p class="text-dim" style="font-size:0.9rem">You are a member of this programme team.</p>';
+          cta = '<p class="text-dim" style="font-size:0.85rem;margin:0">You are a member of this programme team.</p>';
         } else if (!me) {
-          box.innerHTML = '<a href="/login" class="btn btn-outline">Login to apply to join this programme</a>';
+          cta = '<a href="/login" class="btn btn-outline btn-sm" style="width:100%">Login to apply to join</a>';
         } else {
-          box.innerHTML = '<button class="btn btn-primary" id="applyBtn" onclick="applyToProgramme()">Apply to join this programme</button>' +
-            '<p class="text-dim" style="font-size:0.82rem;margin-top:0.4rem">A programme coordinator will review your application.</p>';
+          cta = '<button class="btn btn-primary btn-sm" style="width:100%" id="applyBtn" onclick="applyToProgramme()">Apply to join this programme</button>' +
+            '<p class="text-dim" style="font-size:0.78rem;margin:0.4rem 0 0">A coordinator will review your application.</p>';
         }
+        box.innerHTML = leadLine + teamLine + cta;
       })();
 
       // Projects: compact rows (title + one-liner + key meta) with
