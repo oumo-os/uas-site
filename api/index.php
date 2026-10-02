@@ -4000,7 +4000,7 @@ try {
   elseif (preg_match('#^/public/projects/([^/]+)$#', $path, $m) && $method === 'GET') {
     $key = $m[1];
     $bySlug = !ctype_digit($key);
-    $stmt = db()->prepare($bySlug ? 'SELECT p.*, pr.title AS programme_title FROM projects p LEFT JOIN programmes pr ON pr.id = p.programme_id WHERE p.slug = ?' : 'SELECT p.*, pr.title AS programme_title FROM projects p LEFT JOIN programmes pr ON pr.id = p.programme_id WHERE p.id = ?');
+    $stmt = db()->prepare($bySlug ? 'SELECT p.*, pr.title AS programme_title, pr.slug AS programme_slug FROM projects p LEFT JOIN programmes pr ON pr.id = p.programme_id WHERE p.slug = ?' : 'SELECT p.*, pr.title AS programme_title, pr.slug AS programme_slug FROM projects p LEFT JOIN programmes pr ON pr.id = p.programme_id WHERE p.id = ?');
     $stmt->execute([$bySlug ? $key : (int)$key]);
     $proj = $stmt->fetch();
     if (!$proj) json_error('Project not found', 404);

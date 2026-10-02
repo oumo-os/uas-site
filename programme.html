@@ -38,6 +38,10 @@
 
     .project-card { padding:1.25rem; border:1px solid var(--border); border-radius:var(--radius-lg); margin-bottom:0.75rem; transition:all 0.2s; }
     .project-card:hover { border-color:var(--border-focus); box-shadow:var(--shadow); }
+    .project-card.project-compact { padding:0.8rem 1rem; margin-bottom:0.5rem; }
+    .project-card.project-compact h4 { font-size:0.92rem; margin-bottom:0; }
+    .proj-excerpt { font-size:0.83rem; color:var(--text-dim); line-height:1.45; margin:0.25rem 0 0.35rem; display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; }
+    .project-card.project-compact .project-meta { font-size:0.75rem; }
     .project-card h4 { font-size:0.95rem; margin-bottom:0.3rem; }
     .project-card p { font-size:0.85rem; color:var(--text-dim); line-height:1.5; margin-bottom:0.5rem; }
     .project-meta { display:flex; gap:0.75rem; font-size:0.8rem; color:var(--text-dim); flex-wrap:wrap; align-items:center; }
@@ -334,30 +338,11 @@
         }
       })();
 
-      // Projects
-      var projDiv = document.getElementById('pProjects');
-      if (!p.projects.length) {
-        projDiv.innerHTML = '<p class="text-dim" style="font-size:0.9rem">No projects yet.</p>';
-      } else {
-        projDiv.innerHTML = p.projects.map(function(pr) {
-          var pct = pr.budget && Number(pr.budget) > 0 ? Math.min(100, (Number(pr.spent || 0) / Number(pr.budget) * 100)) : 0;
-          var color = pct > 80 ? 'var(--danger)' : pct > 50 ? 'var(--warning)' : 'var(--success)';
-          var prUrl = ua('/' + (pr.slug || pr.id));
-          return '<div class="project-card" onclick="location.href=\'' + prUrl + '\'" style="cursor:pointer" role="link" tabindex="0" onkeydown="if(event.key===\'Enter\'){location.href=\'' + prUrl + '\'}">' +
-            '<div style="display:flex;justify-content:space-between;align-items:start">' +
-            '<h4>' + esc(pr.title) + '</h4>' +
-            '<span class="badge badge-' + (pr.status === 'active' ? 'active' : pr.status === 'completed' ? 'dim' : 'pending') + '">' + esc(pr.status) + '</span></div>' +
-            '<p>' + esc(pr.description || '') + '</p>' +
-            '<div class="project-meta">' +
-            (pr.deadline ? '<span>Due ' + esc(pr.deadline) + '</span>' : '') +
-            (pr.budget && Number(pr.budget) > 0 ? '<span>Budget: UGX ' + Number(pr.budget).toLocaleString() + '</span>' : '') +
-            (pr.spent && Number(pr.spent) > 0 ? '<span>Spent: UGX ' + Number(pr.spent).toLocaleString() + '</span>' : '') +
-            '</div>' +
-            (pr.budget && Number(pr.budget) > 0 ? '<div class="budget-bar"><div class="budget-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' : '') +
-            '<div style="margin-top:0.5rem;font-size:0.82rem;color:var(--accent);font-weight:600">Open project &rarr;</div>' +
-            '</div>';
-        }).join('');
-      }
+      // Projects: compact rows (title + one-liner + key meta) with
+      // progressive disclosure — full detail lives on the project page.
+      window._projList = p.projects || [];
+      window._projExpanded = false;
+      renderProjList();
 
       // Timeline (desktop only; lists remain primary on phones)
       if (window.matchMedia('(min-width: 900px)').matches && ((p.projects && p.projects.length) || (p.events && p.events.length))) {
@@ -444,6 +429,49 @@
         '<a class="share-btn" href="https://wa.me/?text=' + shareText + '%20' + pageUrl + '" target="_blank">WhatsApp</a>' +
         '<a class="share-btn" href="https://www.linkedin.com/sharing/share-offsite/?url=' + pageUrl + '" target="_blank">LinkedIn</a>' +
         '<button class="share-btn" onclick="navigator.clipboard.writeText(window.location.href).then(function(){this.textContent=\'Copied!\'}.bind(this));setTimeout(function(){this.textContent=\'Copy URL\'}.bind(this),2000)" type="button">Copy URL</button>';
+    }
+
+    var PROJ_SHOW = 6;
+
+    function projExcerpt(pr) {
+      var t = stripHtml(pr.description || '').replace(/\s+/g, ' ').trim();
+      if (t.length <= 140) return esc(t);
+      var cut = t.slice(0, 140);
+      var sp = cut.lastIndexOf(' ');
+      return esc(sp > 80 ? cut.slice(0, sp) : cut) + '…';
+    }
+
+    function projCard(pr) {
+      var prUrl = ua('/' + (pr.slug || pr.id));
+      var meta = [];
+      if (pr.deadline) meta.push('Due ' + esc(pr.deadline));
+      if (pr.budget && Number(pr.budget) > 0) meta.push('UGX ' + Number(pr.budget).toLocaleString());
+      return '<div class="project-card project-compact" onclick="location.href=\'' + prUrl + '\'" style="cursor:pointer" role="link" tabindex="0" onkeydown="if(event.key===\'Enter\'){location.href=\'' + prUrl + '\'}">' +
+        '<div style="display:flex;justify-content:space-between;align-items:start;gap:0.5rem">' +
+        '<h4>' + esc(pr.title) + '</h4>' +
+        '<span class="badge badge-' + (pr.status === 'active' ? 'active' : pr.status === 'completed' ? 'dim' : 'pending') + '">' + esc(pr.status) + '</span></div>' +
+        (pr.description ? '<p class="proj-excerpt">' + projExcerpt(pr) + '</p>' : '') +
+        (meta.length ? '<div class="project-meta"><span>' + meta.join('</span><span>') + '</span></div>' : '') +
+        '</div>';
+    }
+
+    function toggleProjList() {
+      window._projExpanded = !window._projExpanded;
+      renderProjList();
+    }
+
+    function renderProjList() {
+      var list = window._projList || [];
+      var projDiv = document.getElementById('pProjects');
+      if (!projDiv) return;
+      if (!list.length) {
+        projDiv.innerHTML = '<p class="text-dim" style="font-size:0.9rem">No projects yet.</p>';
+        return;
+      }
+      var visible = window._projExpanded ? list : list.slice(0, PROJ_SHOW);
+      projDiv.innerHTML = visible.map(projCard).join('') +
+        (list.length > PROJ_SHOW ? '<button class="btn btn-outline btn-sm" style="margin-top:0.25rem" onclick="toggleProjList()">' +
+          (window._projExpanded ? 'Show fewer' : 'Show all ' + list.length + ' projects') + '</button>' : '');
     }
 
     function fmtDate(d) { if (!d) return ''; var dt = new Date(d); return dt.toLocaleDateString('en',{year:'numeric',month:'short',day:'numeric'}); }

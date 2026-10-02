@@ -24,6 +24,13 @@
     .event-row .ev-date .month { font-size:0.65rem; color:var(--text-dim); text-transform:uppercase; }
     .event-row .ev-info h4 { font-size:0.9rem; margin-bottom:0.15rem; }
     .event-row .ev-info p { font-size:0.8rem; color:var(--text-dim); }
+    .obj-list { list-style:none; padding:0; margin:0; }
+    .obj-list li { padding:0.6rem 0.85rem; margin-bottom:0.5rem; border-left:3px solid var(--accent); background:var(--accent-glow); border-radius:0 var(--radius) var(--radius) 0; font-size:0.9rem; line-height:1.5; }
+    .obj-list.ol { counter-reset:obj; }
+    .obj-list.ol li { counter-increment:obj; position:relative; padding-left:2.6rem; }
+    .obj-list.ol li::before { content:counter(obj); position:absolute; left:0.85rem; top:0.6rem; font-weight:700; color:var(--accent); font-size:0.85rem; }
+    .hero-link { color:#fff; font-weight:600; }
+    .hero-link:hover { color:#fff; text-decoration:underline; }
   </style>
 </head>
 <body>
@@ -59,9 +66,13 @@
       <div class="stat-row" id="pStats"></div>
       <div class="content-grid">
         <div class="content-main">
+          <div class="card-section" id="pAboutSection" style="display:none">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span> About this project</h3>
+            <div class="description-body" id="pAbout"></div>
+          </div>
           <div class="card-section">
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg></span> Objectives</h3>
-            <ul class="obj-list" id="pObjectives"></ul>
+            <div id="pObjectives"></div>
           </div>
           <div class="card-section" id="pTeamSection" style="display:none">
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Team</h3>
@@ -113,9 +124,36 @@
       render(p);
     }
 
+    function excerpt(text, n) {
+      var t = stripHtml(text || '').replace(/\s+/g, ' ').trim();
+      if (t.length <= n) return esc(t);
+      var cut = t.slice(0, n);
+      var sp = cut.lastIndexOf(' ');
+      return esc(sp > n * 0.6 ? cut.slice(0, sp) : cut) + '…';
+    }
+
+    function bodyHtml(t) {
+      if (!t) return '';
+      if (/<[a-z][^>]*>/i.test(t)) return t;
+      return t.split(/\r?\n\s*\r?\n/).map(function(para) {
+        return '<p>' + esc(para).replace(/\r?\n/g, '<br>') + '</p>';
+      }).join('');
+    }
+
+    function toggleObj(btn, total) {
+      var hidden = document.querySelectorAll('#pObjectives [data-obj-extra]');
+      var open = btn.getAttribute('data-open') === '1';
+      for (var i = 0; i < hidden.length; i++) hidden[i].style.display = open ? 'none' : '';
+      btn.setAttribute('data-open', open ? '0' : '1');
+      btn.textContent = open ? 'Show all ' + total + ' objectives' : 'Show fewer';
+    }
+
     function render(p) {
       document.title = p.title + ' — Uganda Astronomical Society';
-      document.getElementById('pBreadcrumb').textContent = p.title;
+      var progUrl = p.programme_slug ? ua('/' + p.programme_slug) : (p.programme_id ? ua('/programme/' + p.programme_id) : null);
+      var progLink = (p.programme_title && progUrl) ? '<a class="hero-link" href="' + progUrl + '">' + esc(p.programme_title) + '</a>' : (p.programme_title ? esc(p.programme_title) : '');
+      var progLinkPlain = (p.programme_title && progUrl) ? '<a href="' + progUrl + '">' + esc(p.programme_title) + '</a>' : (p.programme_title ? esc(p.programme_title) : '');
+      document.getElementById('pBreadcrumb').innerHTML = (progLink ? progLink + ' &rsaquo; ' : '') + esc(p.title);
       document.getElementById('pTitle').textContent = p.title;
       if (p.image_url) {
         document.getElementById('pHeroBg').style.backgroundImage = 'url(' + esc(p.image_url) + ')';
@@ -129,20 +167,37 @@
           schema: { '@context': 'https://schema.org', '@type': 'CreativeWork', name: p.title, description: desc, image: absImg(p.image_url), url: canon, author: { '@type': 'Organization', name: 'Uganda Astronomical Society', url: 'https://astronomy.ug/' } }
         });
       })();
-      document.getElementById('pDesc').innerHTML = p.description ? p.description : '';
+      // Hero keeps a short excerpt; the full text lives in About below.
+      var descLen = stripHtml(p.description || '').replace(/\s+/g, ' ').trim().length;
+      document.getElementById('pDesc').innerHTML = excerpt(p.description, 280);
+      if (p.description && descLen > 280) {
+        document.getElementById('pAboutSection').style.display = 'block';
+        document.getElementById('pAbout').innerHTML = bodyHtml(p.description);
+      }
       var statusClass = p.status === 'published' ? 'active' : (p.status === 'approved' || p.status === 'submitted') ? 'pending' : 'dim';
       document.getElementById('pHeroMeta').innerHTML =
         '<span class="badge badge-' + statusClass + '">' + esc(p.status) + '</span>' +
-        (p.programme_title ? '<span style="color:rgba(255,255,255,0.8)">Programme: ' + esc(p.programme_title) + '</span>' : '') +
+        (progLink ? '<span style="color:rgba(255,255,255,0.8)">Programme: ' + progLink + '</span>' : '') +
         (p.deadline ? '<span style="color:rgba(255,255,255,0.8)">Due ' + esc(p.deadline) + '</span>' : '');
       document.getElementById('pStats').innerHTML =
-        (p.programme_title ? '<div class="stat-chip"><div><div class="label">Programme</div><div class="value">' + esc(p.programme_title) + '</div></div></div>' : '') +
+        (progLinkPlain ? '<div class="stat-chip"><div><div class="label">Programme</div><div class="value">' + progLinkPlain + '</div></div></div>' : '') +
         (p.budget && Number(p.budget) > 0 ? '<div class="stat-chip"><div><div class="label">Budget</div><div class="value">UGX ' + Number(p.budget).toLocaleString() + '</div></div></div>' : '') +
         (p.deadline ? '<div class="stat-chip"><div><div class="label">Deadline</div><div class="value">' + esc(p.deadline) + '</div></div></div>' : '');
+      // Objectives: strip embedded "1. 2. 3." numbering (CSS numbers ordered
+      // lists instead), and collapse long lists behind a toggle.
       var objs = document.getElementById('pObjectives');
-      objs.innerHTML = p.objectives
-        ? p.objectives.split(/\r?\n/).filter(Boolean).map(function(o){ return '<li>' + esc(o.trim()) + '</li>'; }).join('')
-        : '<p class="text-dim" style="font-size:0.9rem">No objectives listed.</p>';
+      var lines = p.objectives ? p.objectives.split(/\r?\n/).map(function(o){ return o.trim(); }).filter(Boolean) : [];
+      if (!lines.length) {
+        objs.innerHTML = '<p class="text-dim" style="font-size:0.9rem">No objectives listed.</p>';
+      } else {
+        var numbered = lines.every(function(o){ return /^\d+\.\s/.test(o); });
+        var SHOW = 5;
+        objs.innerHTML = '<ol class="obj-list' + (numbered ? ' ol' : '') + '">' + lines.map(function(o, i) {
+          var clean = esc(o.replace(/^\d+\.\s*/, ''));
+          return '<li' + (i >= SHOW ? ' data-obj-extra="1" style="display:none"' : '') + '>' + clean + '</li>';
+        }).join('') + '</ol>' +
+        (lines.length > SHOW ? '<button class="btn btn-outline btn-sm" style="margin-top:0.5rem" data-open="0" onclick="toggleObj(this,' + lines.length + ')">Show all ' + lines.length + ' objectives</button>' : '');
+      }
       if (p.participants && p.participants.length) {
         document.getElementById('pTeamSection').style.display = 'block';
         document.getElementById('pTeam').innerHTML = p.participants.map(function(m) {
@@ -168,7 +223,7 @@
       document.getElementById('pFacts').innerHTML =
         '<div style="font-size:0.88rem;line-height:2">' +
         '<div><span class="text-dim">Status:</span> <strong>' + esc(p.status) + '</strong></div>' +
-        (p.programme_title ? '<div><span class="text-dim">Programme:</span> ' + esc(p.programme_title) + '</div>' : '') +
+        (progLinkPlain ? '<div><span class="text-dim">Programme:</span> ' + progLinkPlain + '</div>' : '') +
         (p.deadline ? '<div><span class="text-dim">Deadline:</span> ' + esc(p.deadline) + '</div>' : '') +
         '</div>';
       var pageUrl = encodeURIComponent(window.location.href);
