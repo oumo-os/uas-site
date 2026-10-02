@@ -1397,8 +1397,8 @@ try {
     $data = input_json();
     if (empty($data['title'])) json_error('Title is required', 400);
     $slug = makeSlug($data['slug'] ?? $data['title'], 'programmes');
-    db()->prepare('INSERT INTO programmes (title, slug, description, objectives, image_url, video_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      ->execute([$data['title'], $slug, sanitize_rich_html($data['description'] ?? null), $data['objectives'] ?? null, clean_image_url($data['image_url'] ?? null), video_embed_url($data['video_url'] ?? null), $user['id']]);
+    db()->prepare('INSERT INTO programmes (title, slug, description, objectives, outputs, image_url, video_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      ->execute([$data['title'], $slug, sanitize_rich_html($data['description'] ?? null), $data['objectives'] ?? null, sanitize_rich_html($data['outputs'] ?? null), clean_image_url($data['image_url'] ?? null), video_embed_url($data['video_url'] ?? null), $user['id']]);
     $id = (int) db()->lastInsertId();
     audit_log('programme_create', 'programme', $id);
     notify_capability('programmes.approve', 'programme_submitted', 'Programme awaiting activation: ' . $data['title'], 'Proposed by ' . $user['name'] . '. Review and activate it from Pending.', '/dashboard');

@@ -600,6 +600,11 @@
       var end = document.getElementById('eeEnd').value || null;
       if (!title || !date) { msg.textContent = 'Title and start date are required.'; return; }
       if (end && end <= date) { msg.textContent = 'End must be after the start.'; return; }
+      var newDescHtml = document.getElementById('eeDesc').innerHTML;
+      var stripTags = function(h){ return (h || '').replace(/<[^>]*>/g, '').trim(); };
+      if (editData && stripTags(editData.description) && !stripTags(newDescHtml)) {
+        if (!confirm('Description is empty — saving will erase the existing text. Continue?')) return;
+      }
       var capRaw = document.getElementById('eeCap').value;
       var passRaw = (document.getElementById('eePass').value || '').trim();
       btn.disabled = true; btn.textContent = 'Saving...';

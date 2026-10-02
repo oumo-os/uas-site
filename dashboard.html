@@ -3618,8 +3618,9 @@
         title = 'Propose Programme';
         fields = [
           { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Programme title' },
-          { name: 'description', label: 'Description', type: 'rich-text', rows: 4, required: true },
-          { name: 'objectives', label: 'Objectives', type: 'textarea', rows: 3, placeholder: 'Key objectives and goals' },
+          { name: 'description', label: 'Description', type: 'rich-text', rows: 4, required: true, help: 'Full illustrated essay welcome — this lives in About on the programme page, never in the hero' },
+          { name: 'objectives', label: 'Objectives', type: 'rich-text', placeholder: 'One per line, or formatted freely — lists collapse automatically on the page' },
+          { name: 'outputs', label: 'Expected Outputs', type: 'rich-text', placeholder: 'What this programme will produce' },
           { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image' },
           { name: 'video_url', label: 'Video URL (optional)', type: 'text', placeholder: 'YouTube or Vimeo link', help: 'Embedded on the programme page. Never hosted here.' },
         ];
@@ -3633,8 +3634,8 @@
         fields = [
           { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Project title' },
           { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts, value: opts.programme_id || '' },
-          { name: 'description', label: 'Description', type: 'textarea', rows: 4, required: true },
-          { name: 'objectives', label: 'Objectives', type: 'textarea', rows: 3 },
+          { name: 'description', label: 'Description', type: 'rich-text', rows: 4, required: true },
+          { name: 'objectives', label: 'Objectives', type: 'rich-text', placeholder: 'One per line, or formatted freely — lists collapse automatically on the page' },
           { name: 'start_date', label: 'Start Date', type: 'date' },
           { name: 'deadline', label: 'Deadline', type: 'date' },
           { name: 'video_url', label: 'Video URL (optional)', type: 'text', placeholder: 'YouTube or Vimeo link', help: 'Embedded on the project page. Never hosted here.' },
@@ -5664,6 +5665,7 @@
         openModal('Edit Article', FormBuilder.render(fields, { id: 'edit-article', submitLabel: 'Save Changes' }));
         FormBuilder.init('edit-article', fields, async (data) => {
           if (!data.video_url) delete data.video_url;
+          if (!confirmWipe('Body', data.body, a.body)) return;
           await api.updateArticle(id, data);
           closeModal(); toast('Article updated', 'success');
           showItemDetail('article', id);
@@ -5702,6 +5704,15 @@
       toggle();
     }
 
+    // Never silently erase rich text: if a rich field that held content
+    // submits empty, make the editor confirm the wipe explicitly.
+    function confirmWipe(label, newHtml, oldHtml) {
+      if (stripHtml(oldHtml || '').trim() && !stripHtml(newHtml || '').trim()) {
+        return confirm(label + ' is empty — saving will erase the existing text. Continue?');
+      }
+      return true;
+    }
+
     async function editEventForm(id) {
       try {
         const [evRes, progs, projs] = await Promise.all([
@@ -5735,6 +5746,7 @@
         openModal('Edit Event', FormBuilder.render(fields, { id: 'edit-event', submitLabel: 'Save Changes' }));
         wireOnlinePrompt('edit-event');
         FormBuilder.init('edit-event', fields, async (data) => {
+          if (!confirmWipe('Description', data.description, e.description)) return;
           if (data.end_date && data.date && data.end_date <= data.date) throw { error: 'End date must be after the start date' };
           if (!data.video_url) delete data.video_url; // empty = keep the attached video
           if (!data.room_pass && !e.room_pass) delete data.room_pass; // never wipe a passcode the editor cannot see
@@ -5756,8 +5768,8 @@
         const fields = [
           { name: 'title', label: 'Title', type: 'text', required: true, value: p.title || '' },
           { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts, value: p.programme_id || '' },
-          { name: 'description', label: 'Description', type: 'textarea', rows: 4, required: true, value: stripHtml(p.description || '') },
-          { name: 'objectives', label: 'Objectives', type: 'textarea', rows: 3, value: stripHtml(p.objectives || '') },
+          { name: 'description', label: 'Description', type: 'rich-text', required: true, value: p.description || '' },
+          { name: 'objectives', label: 'Objectives', type: 'rich-text', value: p.objectives || '', help: 'One per line, or formatted freely — lists collapse automatically on the page' },
           { name: 'start_date', label: 'Start Date', type: 'date', value: p.start_date || '' },
           { name: 'deadline', label: 'Deadline', type: 'date', value: p.deadline || '' },
           { name: 'video_url', label: 'Video URL (optional)', type: 'text', value: '', placeholder: 'YouTube or Vimeo link', help: p.video_url ? 'A video is already attached (replaced if you paste a new link).' : 'Embedded on the project page. Never hosted here.' },
@@ -5765,7 +5777,9 @@
         ];
         openModal('Edit Project', FormBuilder.render(fields, { id: 'edit-project', submitLabel: 'Save Changes' }));
         FormBuilder.init('edit-project', fields, async (data) => {
-          if (!data.video_url) delete data.video_url;
+          if (!data.video_url) delete data.video_url; // empty = keep the attached video
+          if (!confirmWipe('Description', data.description, p.description)) return;
+          if (!confirmWipe('Objectives', data.objectives, p.objectives)) return;
           await api.updateProject(id, data);
           closeModal(); toast('Project updated', 'success');
           showItemDetail('project', id);
@@ -5809,15 +5823,18 @@
         const p = await api.getProgramme(id);
         const fields = [
           { name: 'title', label: 'Title', type: 'text', required: true, value: p.title || '' },
-          { name: 'description', label: 'Description', type: 'rich-text', required: true, value: p.description || '' },
-          { name: 'objectives', label: 'Objectives', type: 'textarea', rows: 3, value: stripHtml(p.objectives || '') },
-          { name: 'outputs', label: 'Expected Outputs', type: 'textarea', rows: 3, value: stripHtml(p.outputs || '') },
+          { name: 'description', label: 'Description', type: 'rich-text', required: true, value: p.description || '', help: 'Full illustrated essay welcome — this lives in About on the programme page, never in the hero' },
+          { name: 'objectives', label: 'Objectives', type: 'rich-text', value: p.objectives || '', help: 'One per line, or formatted freely — lists collapse automatically on the page' },
+          { name: 'outputs', label: 'Expected Outputs', type: 'rich-text', value: p.outputs || '' },
           { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image', value: p.image_url || '' },
           { name: 'video_url', label: 'Video URL (optional)', type: 'text', value: '', placeholder: 'YouTube or Vimeo link', help: p.video_url ? 'A video is already attached (replaced if you paste a new link).' : 'Embedded on the programme page. Never hosted here.' },
         ];
         openModal('Edit Programme', FormBuilder.render(fields, { id: 'edit-programme', submitLabel: 'Save Changes' }));
         FormBuilder.init('edit-programme', fields, async (data) => {
           if (!data.video_url) delete data.video_url;
+          if (!confirmWipe('Description', data.description, p.description)) return;
+          if (!confirmWipe('Objectives', data.objectives, p.objectives)) return;
+          if (!confirmWipe('Expected Outputs', data.outputs, p.outputs)) return;
           await api.updateProgramme(id, data);
           closeModal(); toast('Programme updated', 'success');
           loadMyProgrammes();

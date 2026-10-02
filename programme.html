@@ -289,7 +289,9 @@
       // lists instead), and collapse long lists behind a toggle.
       var objs = document.getElementById('pObjectives');
       var objLines = p.objectives ? p.objectives.split(/\r?\n/).map(function(o){ return o.trim(); }).filter(Boolean) : [];
-      if (!objLines.length) {
+      if (p.objectives && /<[a-z][^>]*>/i.test(p.objectives)) {
+        objs.innerHTML = '<div class="description-body">' + p.objectives + '</div>';
+      } else if (!objLines.length) {
         objs.innerHTML = '<p class="text-dim" style="font-size:0.9rem">No objectives listed.</p>';
       } else {
         var objNumbered = objLines.every(function(o){ return /^\d+\.\s/.test(o); });
