@@ -3576,13 +3576,19 @@
       } else if (type === 'event') {
         title = 'Create Event';
         let progOpts = [{ label: '— None —', value: '' }];
+        let projOpts = [{ label: '— None —', value: '' }];
         try {
           const progs = await api.getProgrammes();
           progs.forEach(p => progOpts.push({ label: p.title, value: p.id }));
         } catch(e) {}
+        try {
+          const projs = await api.getProjects();
+          (projs || []).forEach(p => projOpts.push({ label: p.title + (p.programme_title ? ' — ' + p.programme_title : ''), value: p.id }));
+        } catch(e) {}
         fields = [
           { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Event title' },
           { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts, value: opts.programme_id || '' },
+          { name: 'project_id', label: 'Project (optional)', type: 'select', options: projOpts, value: opts.project_id || '', help: 'Attach to a project — the event appears on the project page' },
           { name: 'date', label: 'Start Date & Time', type: 'datetime-local', required: true },
           { name: 'end_date', label: 'End Date & Time', type: 'datetime-local' },
           { name: 'location', label: 'Location', type: 'text', placeholder: 'e.g. Kampala, Uganda' },
@@ -3620,6 +3626,7 @@
           { name: 'start_date', label: 'Start Date', type: 'date' },
           { name: 'deadline', label: 'Deadline', type: 'date' },
           { name: 'video_url', label: 'Video URL (optional)', type: 'text', placeholder: 'YouTube or Vimeo link', help: 'Embedded on the project page. Never hosted here.' },
+          { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image' },
         ];
       }
 
@@ -3654,6 +3661,7 @@
         else if (type === 'event') {
           if (data.end_date && data.date && data.end_date <= data.date) throw { error: 'End date must be after the start date' };
           if (!data.room_pass) delete data.room_pass;
+          if (!data.project_id) delete data.project_id;
           await api.createEvent(data);
         }
         else if (type === 'programme') await api.createProgramme(data);
@@ -5670,17 +5678,21 @@
 
     async function editEventForm(id) {
       try {
-        const [evRes, progs] = await Promise.all([
+        const [evRes, progs, projs] = await Promise.all([
           api.request('/events/' + id),
           api.getProgrammes().catch(() => []),
+          api.getProjects().catch(() => []),
         ]);
         const e = (evRes && evRes.event) || evRes;
         const dt = v => v ? String(v).replace(' ', 'T').slice(0, 16) : '';
         const progOpts = [{ label: '— None —', value: '' }];
         (progs || []).forEach(p => progOpts.push({ label: p.title, value: p.id }));
+        const projOpts = [{ label: '— None —', value: '' }];
+        (projs || []).forEach(p => projOpts.push({ label: p.title + (p.programme_title ? ' — ' + p.programme_title : ''), value: p.id }));
         const fields = [
           { name: 'title', label: 'Title', type: 'text', required: true, value: e.title || '' },
           { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts, value: e.programme_id || '' },
+          { name: 'project_id', label: 'Project (optional)', type: 'select', options: projOpts, value: e.project_id || '', help: 'Attach to a project — the event appears on the project page' },
           { name: 'date', label: 'Start Date & Time', type: 'datetime-local', required: true, value: dt(e.date) },
           { name: 'end_date', label: 'End Date & Time', type: 'datetime-local', value: dt(e.end_date) },
           { name: 'location', label: 'Location', type: 'text', value: e.location || '' },
@@ -5723,6 +5735,7 @@
           { name: 'start_date', label: 'Start Date', type: 'date', value: p.start_date || '' },
           { name: 'deadline', label: 'Deadline', type: 'date', value: p.deadline || '' },
           { name: 'video_url', label: 'Video URL (optional)', type: 'text', value: '', placeholder: 'YouTube or Vimeo link', help: p.video_url ? 'A video is already attached (replaced if you paste a new link).' : 'Embedded on the project page. Never hosted here.' },
+          { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image', value: p.image_url || '' },
         ];
         openModal('Edit Project', FormBuilder.render(fields, { id: 'edit-project', submitLabel: 'Save Changes' }));
         FormBuilder.init('edit-project', fields, async (data) => {

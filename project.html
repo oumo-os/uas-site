@@ -31,6 +31,12 @@
     .obj-list.ol li::before { content:counter(obj); position:absolute; left:0.85rem; top:0.6rem; font-weight:700; color:var(--accent); font-size:0.85rem; }
     .hero-link { color:#fff; font-weight:600; }
     .hero-link:hover { color:#fff; text-decoration:underline; }
+    .ms-item { display:flex; gap:0.6rem; align-items:flex-start; padding:0.45rem 0; border-bottom:1px solid var(--border); font-size:0.88rem; }
+    .ms-item:last-child { border-bottom:none; }
+    .ms-tick { width:1.15rem; height:1.15rem; border-radius:50%; border:2px solid var(--border-focus); flex-shrink:0; margin-top:0.15rem; display:inline-flex; align-items:center; justify-content:center; font-size:0.7rem; color:#fff; }
+    .ms-tick.done { background:var(--success); border-color:var(--success); }
+    .ms-bar { height:6px; background:var(--border); border-radius:3px; overflow:hidden; margin-top:0.4rem; }
+    .ms-fill { height:100%; border-radius:3px; background:var(--success); transition:width 0.3s; }
   </style>
 </head>
 <body>
@@ -74,8 +80,13 @@
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg></span> Objectives</h3>
             <div id="pObjectives"></div>
           </div>
+          <div class="card-section" id="pMsSection" style="display:none">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></span> Milestones <span id="pMsCount" class="text-dim" style="font-size:0.8rem;font-weight:400"></span></h3>
+            <div id="pMsBar"></div>
+            <div id="pMilestones" style="margin-top:0.5rem"></div>
+          </div>
           <div class="card-section" id="pTeamSection" style="display:none">
-            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Team</h3>
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Team <span id="pTeamCount" class="text-dim" style="font-size:0.8rem;font-weight:400"></span></h3>
             <div id="pTeam"></div>
           </div>
           <div class="card-section" id="pVideoSection" style="display:none">
@@ -198,8 +209,24 @@
         }).join('') + '</ol>' +
         (lines.length > SHOW ? '<button class="btn btn-outline btn-sm" style="margin-top:0.5rem" data-open="0" onclick="toggleObj(this,' + lines.length + ')">Show all ' + lines.length + ' objectives</button>' : '');
       }
+      // Milestones (progress feeds the Gantt timeline in the dashboard).
+      var ms = [];
+      try { ms = Array.isArray(p.milestones) ? p.milestones : JSON.parse(p.milestones || '[]'); if (!Array.isArray(ms)) ms = []; } catch (e) { ms = []; }
+      var msDone = ms.filter(function(m){ return m.done; }).length;
+      if (ms.length) {
+        document.getElementById('pMsSection').style.display = 'block';
+        document.getElementById('pMsCount').textContent = msDone + '/' + ms.length + ' done';
+        var msPct = Math.round(msDone / ms.length * 100);
+        document.getElementById('pMsBar').innerHTML = '<div class="ms-bar"><div class="ms-fill" style="width:' + msPct + '%"></div></div>';
+        document.getElementById('pMilestones').innerHTML = ms.map(function(m) {
+          return '<div class="ms-item"><span class="ms-tick' + (m.done ? ' done' : '') + '">' + (m.done ? '✓' : '') + '</span>' +
+            '<div style="flex:1;min-width:0"><div' + (m.done ? ' style="text-decoration:line-through;color:var(--text-dim)"' : '') + '>' + esc(m.title) + '</div>' +
+            (m.due_date ? '<div class="text-dim" style="font-size:0.78rem">Due ' + esc(m.due_date) + '</div>' : '') + '</div></div>';
+        }).join('');
+      }
       if (p.participants && p.participants.length) {
         document.getElementById('pTeamSection').style.display = 'block';
+        document.getElementById('pTeamCount').textContent = p.participants.length + (p.participants.length === 1 ? ' member' : ' members');
         document.getElementById('pTeam').innerHTML = p.participants.map(function(m) {
           var initials = (m.user_name || '?').split(' ').map(function(w){ return w[0]; }).join('').slice(0, 2).toUpperCase();
           return '<div class="event-row"><div class="ev-date"><div class="day" style="font-size:0.9rem">' + esc(initials) + '</div></div>' +
@@ -220,11 +247,17 @@
             '<div class="ev-info"><h4>' + esc(ev.title) + '</h4><p>' + esc(ev.location || 'TBD') + ' &middot; ' + esc(ev.status) + '</p></div></div>';
         }).join('');
       }
+      var teamN = (p.participants && p.participants.length) || 0;
+      var evN = (p.events && p.events.length) || 0;
       document.getElementById('pFacts').innerHTML =
         '<div style="font-size:0.88rem;line-height:2">' +
         '<div><span class="text-dim">Status:</span> <strong>' + esc(p.status) + '</strong></div>' +
         (progLinkPlain ? '<div><span class="text-dim">Programme:</span> ' + progLinkPlain + '</div>' : '') +
+        (p.start_date ? '<div><span class="text-dim">Started:</span> ' + esc(p.start_date) + '</div>' : '') +
         (p.deadline ? '<div><span class="text-dim">Deadline:</span> ' + esc(p.deadline) + '</div>' : '') +
+        '<div><span class="text-dim">Team:</span> ' + teamN + (teamN === 1 ? ' member' : ' members') + '</div>' +
+        '<div><span class="text-dim">Events:</span> ' + evN + '</div>' +
+        (ms.length ? '<div><span class="text-dim">Milestones:</span> ' + msDone + '/' + ms.length + ' done</div>' : '') +
         '</div>';
       var pageUrl = encodeURIComponent(window.location.href);
       var shareText = encodeURIComponent(p.title + ' — Uganda Astronomical Society');

@@ -1497,8 +1497,8 @@ try {
     $slug = makeSlug($data['slug'] ?? $data['title'], 'projects');
     if (!empty($data['start_date']) && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['start_date'])) json_error('Invalid start date', 400);
     if (!empty($data['deadline']) && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['deadline'])) json_error('Invalid deadline', 400);
-    db()->prepare('INSERT INTO projects (programme_id, title, slug, description, objectives, deadline, start_date, video_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      ->execute([$progId, $data['title'], $slug, sanitize_rich_html($data['description'] ?? null), $data['objectives'] ?? null, $data['deadline'] ?: null, $data['start_date'] ?? null, video_embed_url($data['video_url'] ?? null), $user['id']]);
+    db()->prepare('INSERT INTO projects (programme_id, title, slug, description, objectives, deadline, start_date, video_url, image_url, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      ->execute([$progId, $data['title'], $slug, sanitize_rich_html($data['description'] ?? null), $data['objectives'] ?? null, $data['deadline'] ?: null, $data['start_date'] ?? null, video_embed_url($data['video_url'] ?? null), clean_image_url($data['image_url'] ?? null), $user['id']]);
     $id = (int) db()->lastInsertId();
     transition('project', $id, 'submitted', $user['id']);
     audit_log('project_create', 'project', $id);
@@ -1599,6 +1599,7 @@ try {
     if (array_key_exists('milestones', $data)) { $sets[] = 'milestones = ?'; $args[] = json_encode(clean_milestones($data['milestones'])); }
     if (array_key_exists('description', $data)) { $sets[] = 'description = ?'; $args[] = sanitize_rich_html($data['description']); }
     if (array_key_exists('video_url', $data)) { $sets[] = 'video_url = ?'; $args[] = video_embed_url($data['video_url']); }
+    if (array_key_exists('image_url', $data)) { $sets[] = 'image_url = ?'; $args[] = clean_image_url($data['image_url']); }
     if (array_key_exists('slug', $data) && $data['slug'] !== null && $data['slug'] !== '') { $sets[] = 'slug = ?'; $args[] = makeSlug($data['slug'], 'projects', $pid); }
     if (!$sets) json_error('Nothing to update', 400);
     $args[] = $pid;
@@ -4020,6 +4021,10 @@ try {
     $s = db()->prepare('SELECT id, title, slug, date, location, status, visibility FROM events WHERE project_id = ?' . $pjVis . ' ORDER BY date');
     $s->execute([$proj['id']]);
     $proj['events'] = $s->fetchAll();
+    // Team: active participants with names + roles (never emails publicly).
+    $tp = db()->prepare('SELECT u.name AS user_name, pp.role FROM project_participants pp JOIN users u ON u.id = pp.user_id WHERE pp.project_id = ? AND pp.status = "active" ORDER BY u.name');
+    $tp->execute([$proj['id']]);
+    $proj['participants'] = $tp->fetchAll();
     json_response($proj);
   }
   elseif ($path === '/public/documents' && $method === 'GET') {

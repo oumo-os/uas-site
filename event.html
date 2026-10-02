@@ -517,11 +517,21 @@
     }
 
     var editData = null;
-    function openEventEditor() {
+    async function openEventEditor() {
       var e = (window._evDetail && window._evDetail.event) || null;
       if (!e) return;
       editData = e;
       var dt = function(v){ return v ? String(v).replace(' ', 'T').slice(0, 16) : ''; };
+      var projOpts = '<option value="">— None —</option>';
+      var projLoaded = false;
+      try {
+        var projs = await api.getProjects();
+        projLoaded = true;
+        projOpts += (projs || []).map(function(p) {
+          return '<option value="' + p.id + '"' + (Number(e.project_id) === Number(p.id) ? ' selected' : '') + '>' + esc(p.title) + (p.programme_title ? ' — ' + esc(p.programme_title) : '') + '</option>';
+        }).join('');
+      } catch (err) { /* project list unavailable — selector stays inert */ }
+      window._eeProjLoaded = projLoaded;
       var ov = document.createElement('div');
       ov.id = 'evEditOverlay';
       ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:1rem';
@@ -536,6 +546,9 @@
         '<input class="form-input" id="eeDate" type="datetime-local" style="width:100%" value="' + dt(e.date) + '"></div>' +
         '<div style="flex:1"><label style="font-size:0.78rem;font-weight:600;color:var(--text-dim)">End</label>' +
         '<input class="form-input" id="eeEnd" type="datetime-local" style="width:100%" value="' + dt(e.end_date) + '"></div></div>' +
+        '<div style="display:flex;gap:0.5rem;margin-bottom:0.75rem">' +
+        '<div style="flex:1"><label style="font-size:0.78rem;font-weight:600;color:var(--text-dim)">Project (optional)</label>' +
+        '<select class="form-input" id="eeProj" style="width:100%">' + projOpts + '</select></div></div>' +
         '<div style="display:flex;gap:0.5rem;margin-bottom:0.75rem">' +
         '<div style="flex:1"><label style="font-size:0.78rem;font-weight:600;color:var(--text-dim)">Location</label>' +
         '<input class="form-input" id="eeLoc" style="width:100%" value="' + esc(e.location || '') + '"></div>' +
@@ -598,6 +611,7 @@
           location: (document.getElementById('eeLoc').value || '').trim() || null,
           is_online: document.getElementById('eeOnline').checked,
           online_url: (document.getElementById('eeOnlineUrl').value || '').trim() || null,
+          project_id: document.getElementById('eeProj').value || null,
           capacity: capRaw === '' ? null : parseInt(capRaw, 10),
           description: document.getElementById('eeDesc').innerHTML,
           confirm_message: (document.getElementById('eeConfirm').value || '').trim() || null,
@@ -606,6 +620,9 @@
         // Only send the passcode when set or previously visible — never wipe a
         // stored pass the editor cannot see.
         if (passRaw || (editData && editData.room_pass)) body.room_pass = passRaw || null;
+        // Only send the project link when the project list actually loaded —
+        // never detach on a failed fetch.
+        if (!window._eeProjLoaded) delete body.project_id;
         await api.updateEvent(eventId, body);
         closeEventEditor();
         load();
