@@ -175,6 +175,10 @@ function sanitize_rich_html($html): ?string {
   $html = preg_replace('#\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)#i', '', $html);
   // javascript:/data:/vbscript: URLs anywhere.
   $html = preg_replace('#\b(href|src|action|xlink:href)\s*=\s*("|\')(javascript|data|vbscript):.*?\2#is', '$1=$2#$2', $html);
+  // Drop images left src-less (e.g. pasted data-URIs neutralized above) —
+  // a broken-image icon is worse than no image.
+  $html = preg_replace('#<img\b[^>]*\bsrc\s*=\s*("|\')(#|\s*)\1[^>]*>#i', '', $html);
+  $html = preg_replace('#<img\b(?![^>]*\bsrc\s*=)[^>]*>#i', '', $html);
   // Iframes: keep only the media allowlist, drop the rest entirely.
   $html = preg_replace_callback('#<iframe\b[^>]*>#i', function ($m) {
     $tag = $m[0];

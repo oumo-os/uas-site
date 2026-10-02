@@ -725,7 +725,7 @@ tr:hover td { background: var(--accent-glow); }
 .description-body { font-size: 1.02rem; line-height: 1.85; color: var(--text); }
 .description-body p { margin-bottom: 1.1rem; }
 .description-body h2, .description-body h3 { color: var(--text); margin: 1.5rem 0 0.75rem; }
-.description-body img { max-width: 100%; border-radius: var(--radius-lg); margin: 1rem 0; }
+.description-body img { max-width: 100%; height: auto; border-radius: var(--radius-lg); margin: 1rem 0; }
 .description-body blockquote { border-left: 3px solid var(--accent); margin: 1rem 0; padding: 0.5rem 1rem; background: var(--bg-card); border-radius: 0 var(--radius) var(--radius) 0; }
 .description-body a { color: var(--accent); }
 .description-body ul, .description-body ol { margin: 0.5rem 0; padding-left: 1.5rem; }
