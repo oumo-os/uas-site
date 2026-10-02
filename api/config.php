@@ -232,6 +232,72 @@ function event_mail_office(): string {
   return 'info';
 }
 
+// Sending office for membership account mail: membership desk, else info.
+function membership_mail_office(): string {
+  try {
+    $s = db()->prepare("SELECT office FROM office_mailboxes WHERE office IN ('membership','info') AND enabled = 1 ORDER BY FIELD(office, 'membership', 'info') LIMIT 1");
+    $s->execute();
+    $office = $s->fetchColumn();
+    if ($office) return $office;
+  } catch (Exception $e) { /* fall through */ }
+  return 'info';
+}
+
+// Membership account-status emails (approval, rejection, suspension...).
+// Returns [subject, body] in plain text WITHOUT the signature — callers
+// append "\n\n—\nUganda Astronomical Society" like other system mail.
+// $context: 'approved' (new member), 'reactivated', 'rejected',
+// 'suspended', 'deactivated'. $extras: membership_number, member_class.
+function account_status_email(string $name, string $context, array $extras = []): array {
+  $first = trim($name) !== '' ? $name : 'member';
+  $login = SITE_URL . '/login';
+  $number = trim((string) ($extras['membership_number'] ?? ''));
+  $class = trim((string) ($extras['member_class'] ?? ''));
+  switch ($context) {
+    case 'approved':
+      $subject = 'Membership approved [UAS]';
+      $body = "Dear $first,\n\n"
+        . "Your Uganda Astronomical Society membership application has been approved — welcome!\n";
+      if ($number !== '') $body .= "\nYour membership number: $number";
+      if ($class !== '') $body .= "\nMember class: $class";
+      $body .= "\n\nYou can now sign in at $login and:\n"
+        . "- RSVP to events and join waitlists\n"
+        . "- Submit articles and propose events\n"
+        . "- Upload documents and view the member directory\n\n"
+        . "If you applied for a member class with annual dues, your dues record will appear under Dashboard → Dues.";
+      break;
+    case 'reactivated':
+      $subject = 'Account reactivated [UAS]';
+      $body = "Dear $first,\n\n"
+        . "Your UAS account is active again. Sign in at $login — everything is where you left it.\n\n"
+        . "If you did not expect this change, please contact us straight away.";
+      break;
+    case 'rejected':
+      $subject = 'Membership application update [UAS]';
+      $body = "Dear $first,\n\n"
+        . "Thank you for your interest in the Uganda Astronomical Society. "
+        . "After review, your membership application was not approved at this time.\n\n"
+        . "You are still welcome at our public events, and you may reapply later. "
+        . "If you have questions, reply to this email or contact us at $login.";
+      break;
+    case 'suspended':
+      $subject = 'Account suspended [UAS]';
+      $body = "Dear $first,\n\n"
+        . "Your UAS account has been suspended, so signing in and member features are currently unavailable.\n\n"
+        . "If you believe this is a mistake, or would like to discuss it, please reply to this email — "
+        . "include your name and membership number" . ($number !== '' ? " ($number)" : '') . ".";
+      break;
+    case 'deactivated':
+    default:
+      $subject = 'Account deactivated [UAS]';
+      $body = "Dear $first,\n\n"
+        . "Your UAS account has been deactivated, so signing in and member features are currently unavailable.\n\n"
+        . "If you believe this is a mistake, please reply to this email and we will look into it.";
+      break;
+  }
+  return [$subject, $body];
+}
+
 // Join window: [start, end or start+1h]. Guests/members join only inside it;
 // the host opens the room early from the dashboard (ungated member area).
 function event_join_open(array $event, ?int $now = null): bool {

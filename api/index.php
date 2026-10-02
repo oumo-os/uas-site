@@ -612,16 +612,42 @@ try {
       set_member_class((int)$data['user_id'], $classTitle, $user['id']);
     }
 
+    // Confirmation email alongside the in-app notification. Best-effort:
+    // failures must never break the status change itself.
+    $emailed = false;
+    if (in_array($newStatus, ['active', 'rejected'], true)) {
+      try {
+        $stmt = db()->prepare('SELECT u.name, u.email, m.membership_number FROM users u LEFT JOIN members m ON m.user_id = u.id WHERE u.id = ?');
+        $stmt->execute([(int) $data['user_id']]);
+        $target = $stmt->fetch() ?: [];
+        $toEmail = trim((string) ($target['email'] ?? ''));
+        if ($toEmail !== '' && filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
+          [$subject, $body] = account_status_email(
+            (string) ($target['name'] ?? ''),
+            $newStatus === 'active' ? 'approved' : 'rejected',
+            ['membership_number' => $target['membership_number'] ?? null, 'member_class' => $classTitle ?? null]
+          );
+          $office = membership_mail_office();
+          $text = $body . "\n\n—\nUganda Astronomical Society";
+          $via = null; $msgId = null;
+          if (send_office_email($office, $toEmail, $subject, $text, $via, $msgId)) {
+            $emailed = true;
+            record_sent($office, $toEmail, $subject, $text, $msgId, 'member-status', (int) $data['user_id'], (int) $data['user_id'], $via);
+          }
+        }
+      } catch (Throwable $e) { /* status change already succeeded — mail is best-effort */ }
+    }
     audit_log('member_' . ($newStatus === 'active' ? 'approve' : 'reject'), 'member', $data['user_id'], [
       'approved_by' => $user['id'],
-      'status' => $newStatus
+      'status' => $newStatus,
+      'emailed' => $emailed
     ]);
     if ($newStatus === 'active') {
       notify_user((int) $data['user_id'], 'membership_approved', 'Membership approved', 'Your membership application has been approved. Welcome to the society!', '/dashboard');
     } elseif ($newStatus === 'rejected') {
       notify_user((int) $data['user_id'], 'membership_rejected', 'Membership not approved', 'Your membership application was not approved. Please contact us for more information.', '/contact');
     }
-    json_response(['ok' => true]);
+    json_response(['ok' => true, 'emailed' => $emailed]);
   }
   elseif ($path === '/members/grouped' && $method === 'GET') {
     $isPublic = isset($_GET['public']) && $_GET['public'] === '1';
@@ -709,9 +735,10 @@ try {
     $user = require_cap('members.manage');
     $userId = (int) $m[1];
     $data = input_json();
-    $stmt = db()->prepare('SELECT id FROM members WHERE user_id = ?');
+    $stmt = db()->prepare('SELECT m.status, m.membership_number, u.name, u.email FROM members m JOIN users u ON u.id = m.user_id WHERE m.user_id = ?');
     $stmt->execute([$userId]);
-    if (!$stmt->fetch()) json_error('Member not found', 404);
+    $prev = $stmt->fetch();
+    if (!$prev) json_error('Member not found', 404);
     $fields = [];
     $params = [];
     if (isset($data['class']) && in_array($data['class'], ['Regular Member','Student Member','Honorary Member','Institutional Member','Affiliate Member','Corporate Member'])) {
@@ -741,8 +768,34 @@ try {
       $params[] = $userId;
       db()->prepare('UPDATE members SET ' . implode(', ', $fields) . ' WHERE user_id = ?')->execute($params);
     }
-    audit_log('member_update', 'member', $userId, ['by' => $user['id'], 'fields' => array_keys($data)]);
-    json_response(['ok' => true]);
+    // Confirmation email when the account status actually changed.
+    // Best-effort: failures must never break the update itself.
+    $emailed = false;
+    $statusChanged = isset($data['status']) && in_array($data['status'], ['active', 'inactive', 'suspended'], true) && $data['status'] !== ($prev['status'] ?? null);
+    if ($statusChanged) {
+      try {
+        // If the email was just changed in the same request, use the new one.
+        $toEmail = trim((string) (isset($email) ? $email : ($prev['email'] ?? '')));
+        if ($toEmail !== '' && filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
+          $ctx = $data['status'] === 'active' ? 'reactivated' : ($data['status'] === 'suspended' ? 'suspended' : 'deactivated');
+          [$subject, $body] = account_status_email(
+            (string) ($prev['name'] ?? ''),
+            $ctx,
+            ['membership_number' => $prev['membership_number'] ?? null]
+          );
+          $office = membership_mail_office();
+          $text = $body . "\n\n—\nUganda Astronomical Society";
+          $via = null; $msgId = null;
+          if (send_office_email($office, $toEmail, $subject, $text, $via, $msgId)) {
+            $emailed = true;
+            record_sent($office, $toEmail, $subject, $text, $msgId, 'member-status', $userId, $userId, $via);
+          }
+          notify_user($userId, 'account_status', $subject, $body, '/dashboard');
+        }
+      } catch (Throwable $e) { /* update already succeeded — mail is best-effort */ }
+    }
+    audit_log('member_update', 'member', $userId, ['by' => $user['id'], 'fields' => array_keys($data), 'emailed' => $emailed]);
+    json_response(['ok' => true, 'emailed' => $emailed]);
   }
   elseif (preg_match('#^/members/(\d+)/reset-password$#', $path, $m) && $method === 'POST') {
     $user = require_cap('members.manage');

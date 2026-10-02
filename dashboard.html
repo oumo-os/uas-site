@@ -2031,8 +2031,8 @@
       const who = m ? `${m.name} (${(m.class || 'member').replace(' Member', '')})` : 'this applicant';
       if (!confirm(`Approve ${who} as an active member?`)) return;
       try {
-        await api.request('/members', { method: 'POST', body: { user_id: userId, status: 'active' } });
-        toast('Member approved', 'success');
+        const r = await api.request('/members', { method: 'POST', body: { user_id: userId, status: 'active' } });
+        toast(r && r.emailed === false ? 'Member approved (confirmation email failed — check mail setup)' : 'Member approved — confirmation email sent', 'success');
         const members = await api.request('/members');
         renderMembersPanel(members);
       } catch (e) { toast(e.error || 'Failed', 'error'); }
@@ -2041,8 +2041,8 @@
     async function rejectMember(userId) {
       if (!confirm('Reject this membership application?')) return;
       try {
-        await api.request('/members', { method: 'POST', body: { user_id: userId, status: 'rejected' } });
-        toast('Member rejected', 'success');
+        const r = await api.request('/members', { method: 'POST', body: { user_id: userId, status: 'rejected' } });
+        toast(r && r.emailed === false ? 'Application rejected (notice email failed — check mail setup)' : 'Application rejected — applicant notified by email', 'success');
         const members = await api.request('/members');
         renderMembersPanel(members);
       } catch (e) { toast(e.error || 'Failed', 'error'); }
