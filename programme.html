@@ -342,7 +342,8 @@
         projDiv.innerHTML = p.projects.map(function(pr) {
           var pct = pr.budget && Number(pr.budget) > 0 ? Math.min(100, (Number(pr.spent || 0) / Number(pr.budget) * 100)) : 0;
           var color = pct > 80 ? 'var(--danger)' : pct > 50 ? 'var(--warning)' : 'var(--success)';
-          return '<div class="project-card">' +
+          var prUrl = ua('/' + (pr.slug || pr.id));
+          return '<div class="project-card" onclick="location.href=\'' + prUrl + '\'" style="cursor:pointer" role="link" tabindex="0" onkeydown="if(event.key===\'Enter\'){location.href=\'' + prUrl + '\'}">' +
             '<div style="display:flex;justify-content:space-between;align-items:start">' +
             '<h4>' + esc(pr.title) + '</h4>' +
             '<span class="badge badge-' + (pr.status === 'active' ? 'active' : pr.status === 'completed' ? 'dim' : 'pending') + '">' + esc(pr.status) + '</span></div>' +
@@ -353,6 +354,7 @@
             (pr.spent && Number(pr.spent) > 0 ? '<span>Spent: UGX ' + Number(pr.spent).toLocaleString() + '</span>' : '') +
             '</div>' +
             (pr.budget && Number(pr.budget) > 0 ? '<div class="budget-bar"><div class="budget-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' : '') +
+            '<div style="margin-top:0.5rem;font-size:0.82rem;color:var(--accent);font-weight:600">Open project &rarr;</div>' +
             '</div>';
         }).join('');
       }
