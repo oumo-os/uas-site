@@ -704,6 +704,9 @@ tr:hover td { background: var(--accent-glow); }
   border-radius: var(--radius-lg);
   margin-bottom: 1.5rem;
 }
+.card-section {
+  scroll-margin-top: 90px;
+}
 .card-section h3 {
   font-size: 1rem;
   font-weight: 700;

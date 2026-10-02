@@ -2252,8 +2252,10 @@ try {
       $decoded = json_decode($tags, true);
       $tags = is_array($decoded) ? $decoded : array_map('trim', explode(',', $tags));
     }
-    db()->prepare('INSERT INTO articles (author_id, title, body, category, tags, image_url, video_url, approver_role_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      ->execute([$user['id'], $data['title'], sanitize_rich_html($data['body'] ?? null), $data['category'] ?? 'article', json_encode(array_values(array_filter($tags))), clean_image_url($data['image_url'] ?? null), video_embed_url($data['video_url'] ?? null), $data['approver_role_id'] ?? null]);
+    $linkProj = article_link_id($data['project_id'] ?? null, 'projects');
+    $linkEv = article_link_id($data['event_id'] ?? null, 'events');
+    db()->prepare('INSERT INTO articles (author_id, title, body, category, tags, image_url, video_url, approver_role_id, project_id, event_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      ->execute([$user['id'], $data['title'], sanitize_rich_html($data['body'] ?? null), $data['category'] ?? 'article', json_encode(array_values(array_filter($tags))), clean_image_url($data['image_url'] ?? null), video_embed_url($data['video_url'] ?? null), $data['approver_role_id'] ?? null, $linkProj, $linkEv]);
     $id = (int) db()->lastInsertId();
     transition('article', $id, 'submitted', $user['id']);
     audit_log('article_create', 'article', $id);
@@ -2372,6 +2374,8 @@ try {
       $sets[] = 'tags = ?'; $args[] = json_encode(array_values(array_filter((array) $tags)));
     }
     if (array_key_exists('image_url', $data)) { $sets[] = 'image_url = ?'; $args[] = clean_image_url($data['image_url']); }
+    if (array_key_exists('project_id', $data)) { $sets[] = 'project_id = ?'; $args[] = article_link_id($data['project_id'], 'projects'); }
+    if (array_key_exists('event_id', $data)) { $sets[] = 'event_id = ?'; $args[] = article_link_id($data['event_id'], 'events'); }
     if (!$sets) json_error('Nothing to update', 400);
     $args[] = $aid;
     db()->prepare('UPDATE articles SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($args);
@@ -3867,10 +3871,14 @@ try {
     json_response($stmt->fetchAll());
   }
   elseif (preg_match('#^/public/articles/(\d+)$#', $path, $m) && $method === 'GET') {
-    $stmt = db()->prepare('SELECT a.id, a.title, a.body, a.category, a.tags, a.image_url, a.video_url, a.published_at, a.created_at, a.author_id, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.id = ? AND a.status = "published"');
+    $stmt = db()->prepare('SELECT a.id, a.title, a.body, a.category, a.tags, a.image_url, a.video_url, a.published_at, a.created_at, a.author_id, a.project_id, a.event_id, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.id = ? AND a.status = "published"');
     $stmt->execute([(int) $m[1]]);
     $article = $stmt->fetch();
     if (!$article) json_error('Article not found', 404);
+    // Linked project/event cards (published + public only — never leaks).
+    $links = article_links($article['project_id'] ?? null, $article['event_id'] ?? null);
+    $article['project'] = $links['project'];
+    $article['event'] = $links['event'];
 
     $stmt = db()->prepare('SELECT id, title, category, tags, image_url, published_at, author_id FROM articles WHERE id != ? AND status = "published" AND (category = ? OR tags LIKE ?) ORDER BY published_at DESC LIMIT 3');
     $cat = $article['category'];
@@ -4025,6 +4033,10 @@ try {
     $tp = db()->prepare('SELECT u.name AS user_name, pp.role FROM project_participants pp JOIN users u ON u.id = pp.user_id WHERE pp.project_id = ? AND pp.status = "active" ORDER BY u.name');
     $tp->execute([$proj['id']]);
     $proj['participants'] = $tp->fetchAll();
+    // Related reading: published articles attached to this project.
+    $ar = db()->prepare('SELECT id, title, category, published_at FROM articles WHERE project_id = ? AND status = "published" ORDER BY published_at DESC');
+    $ar->execute([$proj['id']]);
+    $proj['articles'] = $ar->fetchAll();
     json_response($proj);
   }
   elseif ($path === '/public/documents' && $method === 'GET') {

@@ -58,6 +58,16 @@
           <label class="form-label">Body</label>
           <div class="rte-wrap" id="artBody-wrap"><div class="rte-toolbar" id="artBody-toolbar"></div><div class="rte-editor" id="artBody" contenteditable="true"></div></div>
         </div>
+        <div class="grid-2 gap-3">
+          <div class="form-group">
+            <label class="form-label">Related project (optional)</label>
+            <select class="form-select" id="artProject"><option value="">— None —</option></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Related event (optional)</label>
+            <select class="form-select" id="artEvent"><option value="">— None —</option></select>
+          </div>
+        </div>
         <div class="form-group">
           <label class="form-label">Cover Image (optional)</label>
           <div class="cover-picker" id="artCover-wrap">
@@ -91,6 +101,16 @@
       updateNavUser();
       RichTextEditor.init('artBody-toolbar', 'artBody');
       bindCoverPicker();
+      try {
+        const ps = await api.getProjects();
+        document.getElementById('artProject').innerHTML = '<option value="">— None —</option>' +
+          (ps || []).map(p => `<option value="${p.id}">${esc(p.title)}</option>`).join('');
+      } catch(e) {}
+      try {
+        const es = await api.getEvents();
+        document.getElementById('artEvent').innerHTML = '<option value="">— None —</option>' +
+          (es || []).filter(e => e.status === 'published').map(e => `<option value="${e.id}">${esc(e.title)}</option>`).join('');
+      } catch(e) {}
     }
 
     function bindCoverPicker() {
@@ -137,6 +157,8 @@
           body,
           tags: document.getElementById('artTags').value.split(',').map(s => s.trim()).filter(Boolean),
           image_url: imageUrl,
+          project_id: document.getElementById('artProject').value || null,
+          event_id: document.getElementById('artEvent').value || null,
         });
         document.getElementById('status').textContent = 'Submitted for review. You can track it on your dashboard.';
         document.getElementById('artTitle').value = '';

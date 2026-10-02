@@ -3561,6 +3561,16 @@
 
       if (type === 'article') {
         title = 'Submit Article';
+        let artProjOpts = [{ label: '— None —', value: '' }];
+        let artEvOpts = [{ label: '— None —', value: '' }];
+        try {
+          const ps = await api.getProjects();
+          (ps || []).forEach(p => artProjOpts.push({ label: p.title, value: p.id }));
+        } catch(e) {}
+        try {
+          const es = await api.getEvents();
+          (es || []).filter(e => e.status === 'published').forEach(e => artEvOpts.push({ label: e.title, value: e.id }));
+        } catch(e) {}
         fields = [
           { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Article title' },
           { name: 'category', label: 'Category', type: 'select', required: true, placeholder: '— Choose type —', options: [
@@ -3570,6 +3580,8 @@
             { label: 'Announcement', value: 'announcement' },
           ]},
           { name: 'body', label: 'Body', type: 'rich-text', required: true },
+          { name: 'project_id', label: 'Related project (optional)', type: 'select', options: artProjOpts, value: '', help: 'Shown as a linked card on the article page' },
+          { name: 'event_id', label: 'Related event (optional)', type: 'select', options: artEvOpts, value: '', help: 'Shown as a linked card on the article page' },
           { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image' },
           { name: 'video_url', label: 'Video URL (optional)', type: 'text', placeholder: 'YouTube or Vimeo link', help: 'Embedded on the article page. Never hosted here.' },
         ];
@@ -3657,7 +3669,11 @@
       }
       if (type === 'event') wireOnlinePrompt(formId);
       FormBuilder.init(formId, fields, async (data) => {
-        if (type === 'article') await api.createArticle(data);
+        if (type === 'article') {
+          if (!data.project_id) delete data.project_id;
+          if (!data.event_id) delete data.event_id;
+          await api.createArticle(data);
+        }
         else if (type === 'event') {
           if (data.end_date && data.date && data.end_date <= data.date) throw { error: 'End date must be after the start date' };
           if (!data.room_pass) delete data.room_pass;
@@ -5622,7 +5638,15 @@
     // ── Edit forms (prefilled create forms → PUT; backend enforces permissions) ──
     async function editArticleForm(id) {
       try {
-        const a = await api.request('/articles/' + id);
+        const [a, artProjs, artEvs] = await Promise.all([
+          api.request('/articles/' + id),
+          api.getProjects().catch(() => []),
+          api.getEvents().catch(() => []),
+        ]);
+        const artProjOpts = [{ label: '— None —', value: '' }];
+        (artProjs || []).forEach(p => artProjOpts.push({ label: p.title, value: p.id }));
+        const artEvOpts = [{ label: '— None —', value: '' }];
+        (artEvs || []).filter(e => e.status === 'published').forEach(e => artEvOpts.push({ label: e.title, value: e.id }));
         const fields = [
           { name: 'title', label: 'Title', type: 'text', required: true, value: a.title || '' },
           { name: 'category', label: 'Category', type: 'select', required: true, value: a.category || 'article', options: [
@@ -5632,6 +5656,8 @@
             { label: 'Announcement', value: 'announcement' },
           ]},
           { name: 'body', label: 'Body', type: 'rich-text', required: true, value: a.body || '' },
+          { name: 'project_id', label: 'Related project (optional)', type: 'select', options: artProjOpts, value: a.project_id || '', help: 'Shown as a linked card on the article page' },
+          { name: 'event_id', label: 'Related event (optional)', type: 'select', options: artEvOpts, value: a.event_id || '', help: 'Shown as a linked card on the article page' },
           { name: 'image_url', label: 'Cover Image (optional)', type: 'cover-image', value: a.image_url || '' },
           { name: 'video_url', label: 'Video URL (optional)', type: 'text', value: '', placeholder: 'YouTube or Vimeo link', help: a.video_url ? 'A video is already attached (replaced if you paste a new link).' : 'Embedded on the article page. Never hosted here.' },
         ];

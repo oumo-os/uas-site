@@ -409,6 +409,41 @@ function record_event_reminder(int $eventId, string $email, $userId, ?string $na
   } catch (Exception $e) { /* table missing — skip */ }
 }
 
+// Resolve an article's linked project/event ids to public-safe payloads.
+// Returns ['project' => ?array{id,title,slug}, 'event' => ?array{id,title,slug,date,location}].
+// Only published projects and public, published events are ever exposed;
+// anything else (or nothing) resolves to null — fail closed, never leak.
+function article_links($projectId, $eventId): array {
+  $out = ['project' => null, 'event' => null];
+  try {
+    $pid = (int) ($projectId ?? 0);
+    if ($pid > 0) {
+      $s = db()->prepare('SELECT id, title, slug FROM projects WHERE id = ? AND status = "published"');
+      $s->execute([$pid]);
+      if ($r = $s->fetch()) $out['project'] = $r;
+    }
+    $eid = (int) ($eventId ?? 0);
+    if ($eid > 0) {
+      $s = db()->prepare('SELECT id, title, slug, date, location FROM events WHERE id = ? AND status = "published" AND visibility = "public"');
+      $s->execute([$eid]);
+      if ($r = $s->fetch()) $out['event'] = $r;
+    }
+  } catch (Exception $e) { /* fail closed — no links */ }
+  return $out;
+}
+
+// Validate a submitted article link id: null/'' allowed, otherwise the row
+// must exist (400/404, never a bare FK blowup).
+function article_link_id($v, string $table): ?int {
+  if ($v === null || $v === '') return null;
+  $id = (int) $v;
+  if ($id <= 0) json_error('Invalid link', 400);
+  $chk = db()->prepare("SELECT id FROM $table WHERE id = ?");
+  $chk->execute([$id]);
+  if (!$chk->fetch()) json_error('Linked ' . rtrim($table, 's') . ' not found', 404);
+  return $id;
+}
+
 // Role inbox offices (must match the directory on contact.html).
 function office_list(): array {
   return [

@@ -97,6 +97,10 @@
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span> Events</h3>
             <div id="pEvents"></div>
           </div>
+          <div class="card-section" id="pArticlesSection" style="display:none">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span> Related reading</h3>
+            <div id="pArticles"></div>
+          </div>
         </div>
         <div class="sidebar">
           <div class="card-section">
@@ -249,15 +253,25 @@
       }
       var teamN = (p.participants && p.participants.length) || 0;
       var evN = (p.events && p.events.length) || 0;
+      if (p.articles && p.articles.length) {
+        document.getElementById('pArticlesSection').style.display = 'block';
+        document.getElementById('pArticles').innerHTML = p.articles.map(function(a) {
+          return '<a href="/article/' + a.id + '" class="related-card">' +
+            '<h4>' + esc(a.title) + '</h4>' +
+            '<p>' + esc((a.category || '').replace(/_/g, ' ')) + (a.published_at ? ' &middot; ' + new Date(a.published_at).toLocaleDateString('en', {month:'short', day:'numeric', year:'numeric'}) : '') + '</p></a>';
+        }).join('');
+      }
+      var artN = (p.articles && p.articles.length) || 0;
       document.getElementById('pFacts').innerHTML =
         '<div style="font-size:0.88rem;line-height:2">' +
         '<div><span class="text-dim">Status:</span> <strong>' + esc(p.status) + '</strong></div>' +
         (progLinkPlain ? '<div><span class="text-dim">Programme:</span> ' + progLinkPlain + '</div>' : '') +
         (p.start_date ? '<div><span class="text-dim">Started:</span> ' + esc(p.start_date) + '</div>' : '') +
         (p.deadline ? '<div><span class="text-dim">Deadline:</span> ' + esc(p.deadline) + '</div>' : '') +
-        '<div><span class="text-dim">Team:</span> ' + teamN + (teamN === 1 ? ' member' : ' members') + '</div>' +
-        '<div><span class="text-dim">Events:</span> ' + evN + '</div>' +
-        (ms.length ? '<div><span class="text-dim">Milestones:</span> ' + msDone + '/' + ms.length + ' done</div>' : '') +
+        '<div><span class="text-dim">Team:</span> ' + (teamN ? '<a href="#pTeamSection">' + teamN + (teamN === 1 ? ' member' : ' members') + '</a>' : '0 members') + '</div>' +
+        '<div><span class="text-dim">Events:</span> ' + (evN ? '<a href="#pEventsSection">' + evN + '</a>' : '0') + '</div>' +
+        (ms.length ? '<div><span class="text-dim">Milestones:</span> <a href="#pMsSection">' + msDone + '/' + ms.length + ' done</a></div>' : '') +
+        (artN ? '<div><span class="text-dim">Articles:</span> <a href="#pArticlesSection">' + artN + '</a></div>' : '') +
         '</div>';
       var pageUrl = encodeURIComponent(window.location.href);
       var shareText = encodeURIComponent(p.title + ' — Uganda Astronomical Society');

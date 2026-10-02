@@ -30,6 +30,9 @@
     .timeline-bar .date { font-size:0.8rem; color:var(--text-dim); white-space:nowrap; }
 
     .obj-list { list-style:none; padding:0; margin:0; }
+    .obj-list.ol { counter-reset:obj; }
+    .obj-list.ol li { counter-increment:obj; position:relative; padding-left:2.6rem; }
+    .obj-list.ol li::before { content:counter(obj); position:absolute; left:0.85rem; top:0.6rem; font-weight:700; color:var(--accent); font-size:0.85rem; }
     .obj-list li {
       padding:0.6rem 0.85rem; margin-bottom:0.5rem; border-left:3px solid var(--accent);
       background:var(--accent-glow); border-radius:0 var(--radius) var(--radius) 0;
@@ -109,9 +112,13 @@
       <div class="content-grid">
         <div class="content-main">
           <div id="pTimeline"></div>
+          <div class="card-section" id="pAboutSection" style="display:none">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span> About this programme</h3>
+            <div class="description-body" id="pAbout"></div>
+          </div>
           <div class="card-section">
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg></span> Objectives</h3>
-            <ul class="obj-list" id="pObjectives"></ul>
+            <div id="pObjectives"></div>
           </div>
           <div class="card-section" id="pOutputsSection" style="display:none">
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span> Expected Outputs</h3>
@@ -239,8 +246,13 @@
         });
       })();
 
-      // Rich description
-      document.getElementById('pDesc').innerHTML = p.description ? p.description : '';
+      // Hero keeps a short excerpt; the full text lives in About below.
+      var descLen = stripHtml(p.description || '').replace(/\s+/g, ' ').trim().length;
+      document.getElementById('pDesc').innerHTML = excerpt(p.description, 280);
+      if (p.description && descLen > 280) {
+        document.getElementById('pAboutSection').style.display = 'block';
+        document.getElementById('pAbout').innerHTML = bodyHtml(p.description);
+      }
 
       var statusClass = p.status === 'active' ? 'active' : p.status === 'completed' ? 'dim' : 'pending';
       document.getElementById('pHeroMeta').innerHTML =
@@ -273,11 +285,21 @@
           '</div></div>';
       }
 
-      // Objectives
+      // Objectives: strip embedded "1. 2. 3." numbering (CSS numbers ordered
+      // lists instead), and collapse long lists behind a toggle.
       var objs = document.getElementById('pObjectives');
-      objs.innerHTML = p.objectives
-        ? p.objectives.split(/\r?\n/).filter(Boolean).map(function(o){ return '<li>' + esc(o.trim()) + '</li>'; }).join('')
-        : '<p class="text-dim" style="font-size:0.9rem">No objectives listed.</p>';
+      var objLines = p.objectives ? p.objectives.split(/\r?\n/).map(function(o){ return o.trim(); }).filter(Boolean) : [];
+      if (!objLines.length) {
+        objs.innerHTML = '<p class="text-dim" style="font-size:0.9rem">No objectives listed.</p>';
+      } else {
+        var objNumbered = objLines.every(function(o){ return /^\d+\.\s/.test(o); });
+        var OBJ_SHOW = 5;
+        objs.innerHTML = '<ol class="obj-list' + (objNumbered ? ' ol' : '') + '">' + objLines.map(function(o, i) {
+          var clean = esc(o.replace(/^\d+\.\s*/, ''));
+          return '<li' + (i >= OBJ_SHOW ? ' data-obj-extra="1" style="display:none"' : '') + '>' + clean + '</li>';
+        }).join('') + '</ol>' +
+        (objLines.length > OBJ_SHOW ? '<button class="btn btn-outline btn-sm" style="margin-top:0.5rem" data-open="0" onclick="toggleProgObj(this,' + objLines.length + ')">Show all ' + objLines.length + ' objectives</button>' : '');
+      }
 
       // Outputs
       if (p.outputs) {
@@ -472,6 +494,30 @@
       projDiv.innerHTML = visible.map(projCard).join('') +
         (list.length > PROJ_SHOW ? '<button class="btn btn-outline btn-sm" style="margin-top:0.25rem" onclick="toggleProjList()">' +
           (window._projExpanded ? 'Show fewer' : 'Show all ' + list.length + ' projects') + '</button>' : '');
+    }
+
+    function excerpt(text, n) {
+      var t = stripHtml(text || '').replace(/\s+/g, ' ').trim();
+      if (t.length <= n) return esc(t);
+      var cut = t.slice(0, n);
+      var sp = cut.lastIndexOf(' ');
+      return esc(sp > n * 0.6 ? cut.slice(0, sp) : cut) + '…';
+    }
+
+    function bodyHtml(t) {
+      if (!t) return '';
+      if (/<[a-z][^>]*>/i.test(t)) return t;
+      return t.split(/\r?\n\s*\r?\n/).map(function(para) {
+        return '<p>' + esc(para).replace(/\r?\n/g, '<br>') + '</p>';
+      }).join('');
+    }
+
+    function toggleProgObj(btn, total) {
+      var hidden = document.querySelectorAll('#pObjectives [data-obj-extra]');
+      var open = btn.getAttribute('data-open') === '1';
+      for (var i = 0; i < hidden.length; i++) hidden[i].style.display = open ? 'none' : '';
+      btn.setAttribute('data-open', open ? '0' : '1');
+      btn.textContent = open ? 'Show all ' + total + ' objectives' : 'Show fewer';
     }
 
     function fmtDate(d) { if (!d) return ''; var dt = new Date(d); return dt.toLocaleDateString('en',{year:'numeric',month:'short',day:'numeric'}); }

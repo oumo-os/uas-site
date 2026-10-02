@@ -104,6 +104,10 @@
             <h3>About the Author</h3>
             <div id="aAuthor"></div>
           </div>
+          <div class="card-section" id="aLinksCard" style="display:none">
+            <h3>Linked</h3>
+            <div id="aLinks"></div>
+          </div>
           <div class="card-section" id="aRelatedCard" style="display:none">
             <h3>Related Articles</h3>
             <div id="aRelated"></div>
@@ -209,6 +213,20 @@
         '<div style="font-size:0.8rem;color:var(--text-dim)">UAS Author</div></div></div>' +
         '<div style="margin-top:0.75rem;font-size:0.82rem;color:var(--text-dim)">Published ' + new Date(a.published_at).toLocaleDateString('en',{year:'numeric',month:'long',day:'numeric'}) + '</div>';
 
+      // Linked project / event (attached at composition; public targets only).
+      var linkHtml = '';
+      if (a.project && a.project.id) {
+        linkHtml += '<a href="/' + (a.project.slug || a.project.id) + '" class="related-card">' +
+          '<h4>' + esc(a.project.title) + '</h4><p>Project &rarr;</p></a>';
+      }
+      if (a.event && a.event.id) {
+        linkHtml += '<a href="/events/' + (a.event.slug || a.event.id) + '" class="related-card">' +
+          '<h4>' + esc(a.event.title) + '</h4><p>Event' + (a.event.date ? ' &middot; ' + new Date(a.event.date).toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'}) : '') + ' &rarr;</p></a>';
+      }
+      if (linkHtml) {
+        document.getElementById('aLinksCard').style.display = 'block';
+        document.getElementById('aLinks').innerHTML = linkHtml;
+      }
       if (a.related && a.related.length) {
         document.getElementById('aRelatedCard').style.display = 'block';
         document.getElementById('aRelated').innerHTML = a.related.map(function(r){
