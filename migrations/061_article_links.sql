@@ -8,8 +8,11 @@
 
 SET @has_project := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'articles' AND COLUMN_NAME = 'project_id');
 SET @sql_project := IF(@has_project = 0, 'ALTER TABLE articles ADD COLUMN project_id INT NULL AFTER approver_role_id', 'SELECT 1');
-PREPARE stmt_project FROM @sql_project; EXECUTE stmt_project; DEALLOCATE PREPARE stmt_project;
-
+PREPARE stmt_project FROM @sql_project;
+EXECUTE stmt_project;
+DEALLOCATE PREPARE stmt_project;
 SET @has_event := (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'articles' AND COLUMN_NAME = 'event_id');
 SET @sql_event := IF(@has_event = 0, 'ALTER TABLE articles ADD COLUMN event_id INT NULL AFTER project_id', 'SELECT 1');
-PREPARE stmt_event FROM @sql_event; EXECUTE stmt_event; DEALLOCATE PREPARE stmt_event;
+PREPARE stmt_event FROM @sql_event;
+EXECUTE stmt_event;
+DEALLOCATE PREPARE stmt_event;
