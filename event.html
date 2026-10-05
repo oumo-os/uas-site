@@ -372,7 +372,8 @@
       var e = d.event;
       var endMs = e.end_date ? new Date(e.end_date).getTime() : (function(){ var t = new Date(e.date); t.setHours(23, 59, 59, 999); return t.getTime(); })();
       var past = endMs < Date.now();
-      var started = new Date(e.date) < new Date(); // registration still closes when it starts
+      // Registration stays open until the event ends (mirrors the server
+      // cutoff), so multi-day events accept signups while running.
       var full = e.capacity ? d.stats.total >= e.capacity : false;
 
       if (e.capacity) {
@@ -383,7 +384,7 @@
 
       if (!api._user) {
         el.innerHTML += '<a href="/login" class="btn btn-primary" style="width:100%">Sign in to RSVP</a>';
-        if (!started && e.status !== 'cancelled' && !full) {
+        if (!past && e.status !== 'cancelled' && !full) {
           el.innerHTML += '<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">' +
             '<p style="font-size:0.88rem;font-weight:600;margin-bottom:0.5rem">No account? Sign up as a guest</p>' +
             '<input class="form-input" id="guestName" placeholder="Full name" style="width:100%;margin-bottom:0.5rem">' +
@@ -392,13 +393,13 @@
             '<input type="text" id="guestWebsite" style="display:none" tabindex="-1" autocomplete="off">' +
             '<button class="btn btn-outline" style="width:100%" id="guestBtn" onclick="guestRsvp()">Sign Up as Guest</button>' +
             '<p class="text-dim" id="guestMsg" style="font-size:0.82rem;margin-top:0.5rem"></p></div>';
-        } else if (!started && e.status !== 'cancelled') {
+        } else if (!past && e.status !== 'cancelled') {
           el.innerHTML += '<p class="text-dim" style="font-size:0.88rem;margin-top:0.75rem">This event is fully booked.</p>';
         }
         return;
       }
       if (!api.hasCap('events.rsvp')) return;
-      if (started || e.status === 'cancelled') { el.innerHTML += '<p class="text-dim" style="font-size:0.88rem">Registration closed.</p>'; return; }
+      if (past || e.status === 'cancelled') { el.innerHTML += '<p class="text-dim" style="font-size:0.88rem">Registration closed.</p>'; return; }
 
       if (d.my_rsvp && d.my_rsvp.status === 'registered') {
         el.innerHTML += '<button class="btn btn-outline" style="width:100%" onclick="cancelRsvp()">Cancel RSVP</button>' +

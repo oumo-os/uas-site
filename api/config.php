@@ -409,6 +409,22 @@ function event_visibility_sql(string $alias = 'e'): string {
   return "$alias.visibility = 'public'";
 }
 
+// Registration cutoff: signups (member RSVP, guest signup, waitlist) stay
+// open until the event ENDS — explicit end_date, else 23:59 of the start
+// day — not merely until it starts, so multi-day events accept signups
+// while running.
+function event_signup_open(array $event, ?int $now = null): bool {
+  if (empty($event['date'])) return false;
+  $now = $now ?? time();
+  if (!empty($event['end_date'])) {
+    $end = strtotime((string) $event['end_date']);
+  } else {
+    $day = strtotime((string) $event['date']);
+    $end = $day === false ? false : strtotime(date('Y-m-d', $day) . ' 23:59:59');
+  }
+  return $end !== false && $now <= $end;
+}
+
 // Append a display-name hint to a Jitsi join URL so members/guests arrive
 // with their name prefilled (harmless if a client ignores the fragment).
 function jitsi_join_url(string $url, string $name): string {

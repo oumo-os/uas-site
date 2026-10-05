@@ -2033,11 +2033,11 @@ try {
     $user = require_cap('events.rsvp');
     $eventId = (int) $m[1];
 
-    $stmt = db()->prepare('SELECT id, capacity, date FROM events WHERE id = ?');
+    $stmt = db()->prepare('SELECT id, capacity, date, end_date FROM events WHERE id = ?');
     $stmt->execute([$eventId]);
     $event = $stmt->fetch();
     if (!$event) json_error('Event not found', 404);
-    if ($event['date'] < date('Y-m-d H:i:s')) json_error('Event has already taken place', 400);
+    if (!event_signup_open($event)) json_error('This event has ended — registration is closed', 400);
     if (!$event['capacity']) json_error('This event has no capacity limit', 400);
 
     $stmt = db()->prepare("SELECT status FROM event_registrations WHERE event_id = ? AND user_id = ?");
@@ -2107,7 +2107,7 @@ try {
     $stmt->execute([$eventId]);
     $event = $stmt->fetch();
     if (!$event) json_error('Event not found', 404);
-    if ($event['date'] < date('Y-m-d H:i:s')) json_error('Event has already taken place', 400);
+    if (!event_signup_open($event)) json_error('This event has ended — registration is closed', 400);
 
     $stmt = db()->prepare('SELECT id, status FROM event_registrations WHERE event_id = ? AND user_id = ?');
     $stmt->execute([$eventId, $user['id']]);
@@ -2191,7 +2191,7 @@ try {
     $stmt->execute([$eventId]);
     $event = $stmt->fetch();
     if (!$event) json_error('Event not found', 404);
-    if ($event['date'] < date('Y-m-d H:i:s')) json_error('Event has already taken place', 400);
+    if (!event_signup_open($event)) json_error('This event has ended — registration is closed', 400);
     $stmt = db()->prepare('SELECT id, status FROM event_guests WHERE event_id = ? AND email = ?');
     $stmt->execute([$eventId, $email]);
     $existing = $stmt->fetch();

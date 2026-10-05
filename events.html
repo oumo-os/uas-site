@@ -461,7 +461,6 @@
         const full = e.capacity ? e.rsvp_count >= e.capacity : false;
         const cancelled = e.status === 'cancelled';
         const past = eventEndMs(e) < now.getTime();
-        const started = d < now; // registration still closes when it starts
         const pct = e.capacity ? Math.min(100, (e.rsvp_count || 0) / e.capacity * 100) : 0;
 
         return `
@@ -487,7 +486,7 @@
               </div>
               ${e.capacity ? `<div class="capacity-bar"><div class="fill" style="width:${pct}%"></div></div>` : ''}
               <div class="event-actions" onclick="event.stopPropagation()">
-                ${renderRsvpButton(e, full, cancelled, started)}
+                ${renderRsvpButton(e, full, cancelled, past)}
                 ${canManage(e) && !cancelled && !past ? '<button class="btn btn-outline btn-sm" onclick="toggleAttendees(' + e.id + ', this)">Attendees (' + (e.rsvp_count || 0) + ')</button>' : ''}
                 <a class="btn btn-outline btn-sm" href="/events/${e.slug || e.id}">Details</a>
               </div>
