@@ -562,7 +562,10 @@ try {
       $m['roles'] = $rolesByUser[(int)$m['user_id']] ?? [];
       $m['class'] = $classByUser[(int)$m['user_id']] ?? 'Regular Member';
     }
-    json_response($members);
+    // Headline membership total: every active member counts, whether or not
+    // they chose a public directory listing (see the privacy disclosure).
+    $totalActive = (int) db()->query("SELECT COUNT(*) FROM members m JOIN users u ON u.id = m.user_id WHERE m.status = 'active' AND u.status = 'active'")->fetchColumn();
+    json_response(['members' => $members, 'total_active' => $totalActive]);
   }
   elseif ($path === '/members' && $method === 'POST') {
     $user = require_cap('members.approve');
@@ -3824,7 +3827,7 @@ try {
   // --- PUBLIC: published articles, events, programmes (for website) ---
   elseif ($path === '/public/stats' && $method === 'GET') {
     $stats = [];
-    $stats['members'] = (int) db()->query("SELECT COUNT(*) FROM members m JOIN users u ON u.id = m.user_id WHERE m.profile_visible = 1 AND m.status = 'active' AND u.status = 'active'")->fetchColumn();
+    $stats['members'] = (int) db()->query("SELECT COUNT(*) FROM members m JOIN users u ON u.id = m.user_id WHERE m.status = 'active' AND u.status = 'active'")->fetchColumn();
     $stats['programmes'] = (int) db()->query("SELECT COUNT(*) FROM programmes p WHERE p.status = 'active'")->fetchColumn();
     $stats['events'] = (int) db()->query("SELECT COUNT(*) FROM events e WHERE ((e.status = 'published' AND " . event_end_expr('e') . " >= NOW()) OR e.status = 'cancelled') AND e.visibility = 'public'")->fetchColumn();
     $stats['articles'] = (int) db()->query("SELECT COUNT(*) FROM articles a WHERE a.status = 'published'")->fetchColumn();

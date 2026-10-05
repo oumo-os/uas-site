@@ -219,6 +219,7 @@
   <script src="js/api.js?v=20260923-10"></script>
   <script>
     let allMembers = [];
+    let totalActive = 0;
     let allWgData = [];
     let allOpenRoles = [];
     let activeSection = '';
@@ -234,7 +235,8 @@
         api.getWorkingGroupsWithMembers().catch(() => []),
         api.request('/public/open-roles').catch(() => []),
       ]);
-      allMembers = members;
+      allMembers = (members && members.members) || members || [];
+      totalActive = (members && members.total_active) || allMembers.length;
       allWgData = wgData;
       allOpenRoles = openRoles;
       renderStats();
@@ -244,7 +246,8 @@
     }
 
     function renderStats() {
-      const total = allMembers.length;
+      const total = totalActive || allMembers.length;
+      const privateCount = Math.max(0, total - allMembers.length);
       const institutions = [...new Set(allMembers.map(m => m.institution).filter(Boolean))].length;
       const locations = [...new Set(allMembers.map(m => m.location).filter(Boolean))].length;
       const recent = allMembers.filter(m => {
@@ -256,7 +259,7 @@
         <div class="stat-item"><div class="stat-val">${institutions}</div><div class="stat-lbl">Institutions</div></div>
         <div class="stat-item"><div class="stat-val">${locations}</div><div class="stat-lbl">Locations</div></div>
         <div class="stat-item"><div class="stat-val">${recent}</div><div class="stat-lbl">Recent (90d)</div></div>
-      `;
+      ` + (privateCount > 0 ? `<p class="text-dim text-sm" style="grid-column:1/-1;text-align:center;margin:0.25rem 0 0">${privateCount} more profile${privateCount === 1 ? '' : 's'} chose to remain private</p>` : '');
     }
 
     function renderFilter() {
