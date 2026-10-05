@@ -562,10 +562,7 @@ try {
       $m['roles'] = $rolesByUser[(int)$m['user_id']] ?? [];
       $m['class'] = $classByUser[(int)$m['user_id']] ?? 'Regular Member';
     }
-    // Headline membership total: every active member counts, whether or not
-    // they chose a public directory listing (see the privacy disclosure).
-    $totalActive = (int) db()->query("SELECT COUNT(*) FROM members m JOIN users u ON u.id = m.user_id WHERE m.status = 'active' AND u.status = 'active'")->fetchColumn();
-    json_response(['members' => $members, 'total_active' => $totalActive]);
+    json_response($members);
   }
   elseif ($path === '/members' && $method === 'POST') {
     $user = require_cap('members.approve');
@@ -709,7 +706,10 @@ try {
       $m['roles'] = $rolesByUser[$uid] ?? [];
       $m['class'] = $classByUser[$uid] ?? 'Regular Member';
     }
-    json_response($members);
+    // Headline membership total: every active member counts, whether or not
+    // they chose a public directory listing (see the privacy disclosure).
+    $totalActive = (int) db()->query("SELECT COUNT(*) FROM members m JOIN users u ON u.id = m.user_id WHERE m.status = 'active' AND u.status = 'active'")->fetchColumn();
+    json_response(['members' => $members, 'total_active' => $totalActive]);
   }
   elseif (preg_match('#^/members/(\d+)$#', $path, $m) && $method === 'GET') {
     $userId = (int) $m[1];
