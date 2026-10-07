@@ -1,5 +1,10 @@
 <?php
 // UAS Institutional Platform — Configuration
+// All timestamps are East Africa Time (UTC+3, no DST): PHP here, MySQL via
+// the session time_zone in db() below. User-entered datetimes, NOW(),
+// strtotime() and client-side parsing all share this base — never rely on
+// the hosting server's clock zone.
+date_default_timezone_set('Africa/Kampala');
 // Server-only secret overrides (never committed to git). Needed because
 // LiteSpeed/cPanel SetEnv cannot reliably carry values containing '#'.
 if (is_file(__DIR__ . '/prod-env.php')) require __DIR__ . '/prod-env.php';
@@ -1160,6 +1165,8 @@ function db(): PDO {
       PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
       PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
       PDO::ATTR_EMULATE_PREPARES => false,
+      // Session clock = EAT (numeric offset needs no tz tables, no privileges).
+      PDO::MYSQL_ATTR_INIT_COMMAND => "SET time_zone = '+03:00'",
     ]);
   }
   return $pdo;
