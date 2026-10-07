@@ -3669,17 +3669,22 @@
         }
       }
       if (type === 'event') wireOnlinePrompt(formId);
+      if (type === 'event' || type === 'article') cqnMountCompose(formId);
       FormBuilder.init(formId, fields, async (data) => {
         if (type === 'article') {
           if (!data.project_id) delete data.project_id;
           if (!data.event_id) delete data.event_id;
-          await api.createArticle(data);
+          cqnAssertComposable();
+          const created = await api.createArticle(data);
+          await cqnSubmitCompose('article', created && created.id);
         }
         else if (type === 'event') {
           if (data.end_date && data.date && data.end_date <= data.date) throw { error: 'End date must be after the start date' };
           if (!data.room_pass) delete data.room_pass;
           if (!data.project_id) delete data.project_id;
-          await api.createEvent(data);
+          cqnAssertComposable();
+          const created = await api.createEvent(data);
+          await cqnSubmitCompose('event', created && created.id);
         }
         else if (type === 'programme') await api.createProgramme(data);
         else if (type === 'project') await api.createProject(data);
@@ -4447,6 +4452,113 @@
             <a class="btn btn-outline btn-xs" href="${API_BASE}/questionnaires/${qid}/answers.csv">Download CSV</a></div>
           <div style="overflow-x:auto"><table><thead><tr>${head.map(h => `<th style="text-align:left;padding:0.35rem 0.5rem;font-size:0.75rem;color:var(--text-dim);border-bottom:1px solid var(--border);white-space:nowrap">${esc(String(h))}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`;
       } catch (e) { box.innerHTML = '<p class="text-dim text-sm">Could not load responses.</p>'; }
+    }
+
+    // ── Questionnaire at composition time (create event/article forms) ──
+    // The item doesn't exist yet, so the questionnaire is composed inline and
+    // saved right after the item is created (same submit, chained calls).
+    function cqnMountCompose(formId) {
+      window._cqnCompose = { title: '', description: '', fields: [{ label: '', type: 'text', required: false, options: [] }] };
+      const form = document.getElementById(formId);
+      if (!form) return;
+      const what = formId === 'create-event' ? 'event' : 'article';
+      const wrap = document.createElement('div');
+      wrap.id = formId + '-cqn';
+      wrap.innerHTML = `
+        <div style="border:1px dashed var(--border-focus);border-radius:var(--radius-lg);padding:1rem;margin:0 0 1rem">
+          <h4 style="font-size:0.9rem;margin-bottom:0.25rem">Questionnaire <span class="text-dim" style="font-weight:400">(optional)</span></h4>
+          <p class="text-dim text-sm" style="margin-bottom:0.75rem">Collect info with this ${what} — added automatically on submit.</p>
+          <div class="form-group"><label class="form-label">Questionnaire title</label><input class="form-input" id="cqn-title" style="width:100%" placeholder="e.g. Dietary needs, T-shirt size, expectations"></div>
+          <div class="form-group"><label class="form-label">Introduction (optional)</label><textarea class="form-textarea" id="cqn-desc" rows="2" style="width:100%" placeholder="A sentence shown above the questions"></textarea></div>
+          <div id="cqn-rows"></div>
+          <button type="button" class="btn btn-outline btn-sm" onclick="cqnAddRow()">+ Add question</button>
+        </div>`;
+      const actions = form.querySelector('.form-actions');
+      if (actions) actions.parentNode.insertBefore(wrap, actions);
+      else form.appendChild(wrap);
+      cqnRenderRows();
+    }
+
+    function cqnRowsHtml() {
+      return window._cqnCompose.fields.map((f, i) => `
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.6rem;margin-bottom:0.5rem" data-cqn-row="${i}">
+          <div style="display:flex;gap:0.4rem;margin-bottom:0.4rem">
+            <input class="form-input" data-cqn="label" placeholder="Question ${i + 1}" value="${esc(String(f.label || ''))}" style="flex:1">
+            <button type="button" class="btn btn-outline btn-xs" style="color:var(--danger)" onclick="cqnRemoveRow(${i})" aria-label="Remove question">&times;</button>
+          </div>
+          <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap">
+            <select class="form-select" data-cqn="type" onchange="cqnTypeChanged(this)" style="flex:1;min-width:120px">${qnTypeOptions(f.type)}</select>
+            <label style="font-size:0.82rem;display:flex;gap:0.3rem;align-items:center;white-space:nowrap"><input type="checkbox" data-cqn="required"${f.required ? ' checked' : ''}> Required</label>
+          </div>
+          <textarea class="form-textarea" data-cqn="options" rows="2" placeholder="Options, one per line (choose-one questions only)" style="width:100%;margin-top:0.4rem;${f.type === 'select' ? '' : 'display:none'}">${esc((f.options || []).join('\n'))}</textarea>
+        </div>`).join('');
+    }
+
+    function cqnStash() {
+      window._cqnCompose.fields = [...document.querySelectorAll('[data-cqn-row]')].map(row => ({
+        label: (row.querySelector('[data-cqn="label"]').value || '').trim(),
+        type: row.querySelector('[data-cqn="type"]').value,
+        required: row.querySelector('[data-cqn="required"]').checked,
+        options: (row.querySelector('[data-cqn="options"]').value || '').split('\n'),
+      }));
+      const t = document.getElementById('cqn-title');
+      if (t) window._cqnCompose.title = t.value;
+    }
+
+    function cqnRenderRows() {
+      const box = document.getElementById('cqn-rows');
+      if (box) box.innerHTML = cqnRowsHtml();
+    }
+
+    function cqnAddRow() {
+      cqnStash();
+      window._cqnCompose.fields.push({ label: '', type: 'text', required: false, options: [] });
+      cqnRenderRows();
+    }
+
+    function cqnRemoveRow(i) {
+      cqnStash();
+      window._cqnCompose.fields.splice(i, 1);
+      if (!window._cqnCompose.fields.length) window._cqnCompose.fields.push({ label: '', type: 'text', required: false, options: [] });
+      cqnRenderRows();
+    }
+
+    function cqnTypeChanged(sel) {
+      const row = sel.closest('[data-cqn-row]');
+      const ta = row ? row.querySelector('[data-cqn="options"]') : null;
+      if (ta) ta.style.display = sel.value === 'select' ? '' : 'none';
+    }
+
+    function cqnCollect() {
+      const title = (document.getElementById('cqn-title').value || '').trim();
+      const description = (document.getElementById('cqn-desc') || {}).value;
+      const fields = [...document.querySelectorAll('[data-cqn-row]')].map(row => ({
+        label: (row.querySelector('[data-cqn="label"]').value || '').trim(),
+        type: row.querySelector('[data-cqn="type"]').value,
+        required: row.querySelector('[data-cqn="required"]').checked,
+        options: (row.querySelector('[data-cqn="options"]').value || '').split('\n'),
+      }));
+      return { title, description: (description || '').trim() || null, fields };
+    }
+
+    // Block submit early (before anything is created) if questions lack a title.
+    function cqnAssertComposable() {
+      const t = document.getElementById('cqn-title');
+      if (!t) return;
+      const labeled = [...document.querySelectorAll('[data-cqn-row]')].filter(r => ((r.querySelector('[data-cqn="label"]') || {}).value || '').trim());
+      if (labeled.length && !t.value.trim()) throw { error: 'Your questionnaire has questions but no title — add one or remove them.' };
+    }
+
+    async function cqnSubmitCompose(kind, itemId) {
+      if (!itemId || !document.getElementById('cqn-title')) return;
+      const { title, description, fields } = cqnCollect();
+      if (!fields.some(f => f.label)) return; // nothing composed — skip silently
+      try {
+        await api.createQuestionnaire({ title, description, fields, ...(kind === 'event' ? { event_id: itemId } : { article_id: itemId }) });
+        toast('Questionnaire attached', 'success');
+      } catch (e) {
+        toast('Item created, but the questionnaire failed: ' + (e.error || 'save failed'), 'warning');
+      }
     }
 
     const progProjView = {};
