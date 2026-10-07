@@ -170,9 +170,20 @@
       return articleImgs[i % articleImgs.length];
     }
 
+    // Owners and approvers get a per-card Edit shortcut into the dashboard modal.
+    function canEditNews(a) {
+      return api.hasCap('articles.approve') || (api._user && a.author_id && Number(a.author_id) === Number(api._user.id));
+    }
+
     async function load() {
       try { await api.me(); } catch(e) {}
       updateNavUser();
+
+      // Compose entry point for privileged users (backend caps enforced)
+      if (api.hasCap('articles.submit')) {
+        document.getElementById('newsGrid').insertAdjacentHTML('beforebegin',
+          '<div style="display:flex;justify-content:flex-end;margin-bottom:0.75rem"><a class="btn btn-primary btn-sm" href="/dashboard?create=announcement">+ New Announcement</a></div>');
+      }
 
       const data = await api.request('/public/news').catch(() => ({ announcements: [], links: [] }));
 
@@ -190,6 +201,7 @@
                   ${a.author_name ? `<span>${esc(a.author_name)}</span>` : ''}
                   ${d ? `<span>${d.toLocaleDateString('en',{year:'numeric',month:'short',day:'numeric'})}</span>` : ''}
                 </div>
+                ${canEditNews(a) ? `<div style="margin-top:0.6rem" onclick="event.stopPropagation()"><a class="btn btn-outline btn-sm" href="/dashboard?edit=article:${a.id}">Edit</a></div>` : ''}
               </div>
             </div>`;
         }).join('');

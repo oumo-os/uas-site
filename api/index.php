@@ -1603,7 +1603,11 @@ try {
     if (array_key_exists('description', $data)) { $sets[] = 'description = ?'; $args[] = sanitize_rich_html($data['description']); }
     if (array_key_exists('video_url', $data)) { $sets[] = 'video_url = ?'; $args[] = video_embed_url($data['video_url']); }
     if (array_key_exists('image_url', $data)) { $sets[] = 'image_url = ?'; $args[] = clean_image_url($data['image_url']); }
-    if (array_key_exists('slug', $data) && $data['slug'] !== null && $data['slug'] !== '') { $sets[] = 'slug = ?'; $args[] = makeSlug($data['slug'], 'projects', $pid); }
+    if (array_key_exists('slug', $data) && $data['slug'] !== null && $data['slug'] !== '') {
+      $newSlug = makeSlug($data['slug'], 'projects', $pid);
+      if (!empty($proj['slug']) && $newSlug !== $proj['slug']) record_slug_redirect('project', $pid, $proj['slug']);
+      $sets[] = 'slug = ?'; $args[] = $newSlug;
+    }
     if (!$sets) json_error('Nothing to update', 400);
     $args[] = $pid;
     db()->prepare('UPDATE projects SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($args);
@@ -1620,6 +1624,7 @@ try {
     if (!can_manage_project($user['id'], $proj)) json_error('Insufficient permissions: cannot delete this project', 403);
     // Participants cascade; linked events/finance detach (SET NULL).
     db()->prepare('DELETE FROM projects WHERE id = ?')->execute([$pid]);
+    try { db()->prepare('DELETE FROM slug_redirects WHERE target_type = "project" AND target_id = ?')->execute([$pid]); } catch (Exception $e) { /* pre-065 table — skip */ }
     audit_log('project_delete', 'project', $pid, ['title' => $proj['title']]);
     if ($proj['created_by'] && (int) $proj['created_by'] !== (int) $user['id']) {
       notify_user((int) $proj['created_by'], 'project_deleted', 'Project deleted: ' . $proj['title'], 'Deleted by ' . $user['name'] . '.', '/dashboard');
@@ -1853,7 +1858,11 @@ try {
         if (array_key_exists($f, $data)) { $sets[] = "$f = ?"; $args[] = ($data[$f] === '' ? null : (int) $data[$f]); }
       }
     }
-    if (array_key_exists('slug', $data) && $data['slug'] !== null && $data['slug'] !== '') { $sets[] = 'slug = ?'; $args[] = makeSlug($data['slug'], 'events', $eid); }
+    if (array_key_exists('slug', $data) && $data['slug'] !== null && $data['slug'] !== '') {
+      $newSlug = makeSlug($data['slug'], 'events', $eid);
+      if (!empty($ev['slug']) && $newSlug !== $ev['slug']) record_slug_redirect('event', $eid, $ev['slug']);
+      $sets[] = 'slug = ?'; $args[] = $newSlug;
+    }
     if (!$sets) json_error('Nothing to update', 400);
     $args[] = $eid;
     db()->prepare('UPDATE events SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($args);
@@ -1880,6 +1889,7 @@ try {
     if (($isOwner || $isLead) && !$isApprover && in_array($ev['status'], ['completed', 'cancelled'], true)) json_error('Completed or cancelled events cannot be deleted', 400);
     // RSVPs, waitlist and guests cascade; finance links detach (SET NULL).
     db()->prepare('DELETE FROM events WHERE id = ?')->execute([$eid]);
+    try { db()->prepare('DELETE FROM slug_redirects WHERE target_type = "event" AND target_id = ?')->execute([$eid]); } catch (Exception $e) { /* pre-065 table — skip */ }
     audit_log('event_delete', 'event', $eid, ['title' => $ev['title']]);
     if ($ev['organizer_id'] && (int) $ev['organizer_id'] !== (int) $user['id']) {
       notify_user((int) $ev['organizer_id'], 'event_deleted', 'Event deleted: ' . $ev['title'], 'Deleted by ' . $user['name'] . '.', '/dashboard');
@@ -4091,7 +4101,7 @@ try {
     json_response($stats);
   }
   elseif ($path === '/public/news' && $method === 'GET') {
-    $stmt = db()->prepare('SELECT a.id, a.title, a.category, a.image_url, a.published_at, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.status = "published" AND a.category = "announcement" ORDER BY a.published_at DESC');
+    $stmt = db()->prepare('SELECT a.id, a.title, a.category, a.image_url, a.published_at, a.author_id, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.status = "published" AND a.category = "announcement" ORDER BY a.published_at DESC');
     $stmt->execute();
     $announcements = $stmt->fetchAll();
     $stmt = db()->prepare('SELECT id, title, description, url, category, external_organization FROM useful_links WHERE status = "active" ORDER BY category, title');
@@ -4126,7 +4136,7 @@ try {
     json_response($items);
   }
   elseif ($path === '/public/articles' && $method === 'GET') {
-    $stmt = db()->prepare('SELECT a.id, a.title, a.category, a.tags, a.image_url, a.published_at, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.status = "published" ORDER BY a.published_at DESC');
+    $stmt = db()->prepare('SELECT a.id, a.title, a.category, a.tags, a.image_url, a.published_at, a.author_id, u.name AS author_name FROM articles a JOIN users u ON u.id = a.author_id WHERE a.status = "published" ORDER BY a.published_at DESC');
     $stmt->execute();
     json_response($stmt->fetchAll());
   }
@@ -4386,7 +4396,14 @@ try {
     }
     if (array_key_exists('image_url', $data)) { $sets[] = 'image_url = ?'; $args[] = clean_image_url($data['image_url']); }
     if (array_key_exists('video_url', $data)) { $sets[] = 'video_url = ?'; $args[] = video_embed_url($data['video_url']); }
-    if (array_key_exists('slug', $data)) { $s = makeSlug($data['slug'], 'programmes', $id); $sets[] = 'slug = ?'; $args[] = $s; }
+    if (array_key_exists('slug', $data) && $data['slug'] !== null && $data['slug'] !== '') {
+      $s = makeSlug($data['slug'], 'programmes', $id);
+      $oldQ = db()->prepare('SELECT slug FROM programmes WHERE id = ?');
+      $oldQ->execute([$id]);
+      $oldSlug = $oldQ->fetchColumn();
+      if ($oldSlug && $oldSlug !== $s) record_slug_redirect('programme', $id, $oldSlug);
+      $sets[] = 'slug = ?'; $args[] = $s;
+    }
     if (array_key_exists('budget', $data)) { $sets[] = 'budget = ?'; $args[] = $data['budget'] !== null ? (float) $data['budget'] : null; }
     if (array_key_exists('spent', $data)) { $sets[] = 'spent = ?'; $args[] = $data['spent'] !== null ? (float) $data['spent'] : null; }
     if (!$sets) json_error('Nothing to update', 400);
@@ -4405,6 +4422,7 @@ try {
     $prog = $stmt->fetch();
     if (!$prog) json_error('Programme not found', 404);
     db()->prepare('DELETE FROM programmes WHERE id = ?')->execute([$id]);
+    try { db()->prepare('DELETE FROM slug_redirects WHERE target_type = "programme" AND target_id = ?')->execute([$id]); } catch (Exception $e) { /* pre-065 table — skip */ }
     audit_log('programme_delete', 'programme', $id, ['title' => $prog['title']]);
     if ($prog['created_by'] && (int) $prog['created_by'] !== (int) $user['id']) {
       notify_user((int) $prog['created_by'], 'programme_deleted', 'Programme deleted: ' . $prog['title'], 'Deleted by ' . $user['name'] . '.', '/dashboard');

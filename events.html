@@ -248,6 +248,12 @@
       myEvents.forEach(e => { if (e.status === 'published') myRsvps[e.id] = true; });
       allEvents = events.concat(pastEvents.filter(p => !events.some(e => e.id === p.id)));
 
+      // Compose entry point for privileged users (backend caps enforced)
+      if (api.hasCap('events.create')) {
+        document.getElementById('listFilters').insertAdjacentHTML('beforebegin',
+          '<div style="display:flex;justify-content:flex-end;margin-bottom:0.75rem"><a class="btn btn-primary btn-sm" href="/dashboard?create=event">+ New Event</a></div>');
+      }
+
       // Stats
       const now = new Date();
       document.getElementById('statTotal').textContent = allEvents.length;
@@ -418,10 +424,17 @@
             </div>
             <div onclick="event.stopPropagation()" style="display:flex;gap:0.5rem;flex-wrap:wrap">
               ${renderRsvpButton(feat, full, false, false)}
+              ${canEditEv(feat) ? `<a class="btn btn-outline btn-sm" href="/dashboard?edit=event:${feat.id}">Edit</a>` : ''}
               <a class="btn btn-outline btn-sm" href="/events/${feat.slug || feat.id}">Details</a>
             </div>
           </div>
         </div>`;
+    }
+
+    // Owners and approvers get a per-card Edit shortcut (detail page editor
+    // covers leads; the dashboard modal covers the rest).
+    function canEditEv(e) {
+      return api.hasCap('events.approve') || (api._user && e.organizer_id && Number(e.organizer_id) === Number(api._user.id));
     }
 
     function renderRsvpButton(e, full, cancelled, past) {
@@ -488,6 +501,7 @@
               <div class="event-actions" onclick="event.stopPropagation()">
                 ${renderRsvpButton(e, full, cancelled, past)}
                 ${canManage(e) && !cancelled && !past ? '<button class="btn btn-outline btn-sm" onclick="toggleAttendees(' + e.id + ', this)">Attendees (' + (e.rsvp_count || 0) + ')</button>' : ''}
+                ${canEditEv(e) ? `<a class="btn btn-outline btn-sm" href="/dashboard?edit=event:${e.id}" onclick="event.stopPropagation()">Edit</a>` : ''}
                 <a class="btn btn-outline btn-sm" href="/events/${e.slug || e.id}">Details</a>
               </div>
               ${canManage(e) ? `<div class="attendee-list" id="attendees-${e.id}" style="display:none;margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem" onclick="event.stopPropagation()"></div>` : ''}

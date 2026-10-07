@@ -618,6 +618,9 @@
         '<button class="btn btn-outline btn-sm" onclick="closeEventEditor()">Close</button></div>' +
         '<div style="margin-bottom:0.75rem"><label style="font-size:0.78rem;font-weight:600;color:var(--text-dim)">Title *</label>' +
         '<input class="form-input" id="eeTitle" style="width:100%" value="' + esc(e.title || '') + '"></div>' +
+        '<div style="margin-bottom:0.75rem"><label style="font-size:0.78rem;font-weight:600;color:var(--text-dim)">URL Slug</label>' +
+        '<input class="form-input" id="eeSlug" style="width:100%" value="' + esc(e.slug || '') + '" placeholder="auto-generated if left as-is" oninput="document.getElementById(\'eeSlugPreview\').textContent=this.value">' +
+        '<p class="text-dim" style="font-size:0.78rem;margin-top:0.25rem">Address: astronomy.ug/events/<span id="eeSlugPreview">' + esc(e.slug || '') + '</span> — old links keep redirecting.</p></div>' +
         '<div style="display:flex;gap:0.5rem;margin-bottom:0.75rem">' +
         '<div style="flex:1"><label style="font-size:0.78rem;font-weight:600;color:var(--text-dim)">Start *</label>' +
         '<input class="form-input" id="eeDate" type="datetime-local" style="width:100%" value="' + dt(e.date) + '"></div>' +
@@ -686,8 +689,10 @@
       var passRaw = (document.getElementById('eePass').value || '').trim();
       btn.disabled = true; btn.textContent = 'Saving...';
       try {
+        var slugRaw = (document.getElementById('eeSlug').value || '').trim();
         var body = {
           title: title,
+          slug: slugRaw || null,
           date: date.replace('T', ' ') + ':00',
           end_date: end ? end.replace('T', ' ') + ':00' : null,
           location: (document.getElementById('eeLoc').value || '').trim() || null,

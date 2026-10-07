@@ -599,6 +599,16 @@ function makeSlug(string $title, string $table, ?int $excludeId = null): string 
   return $slug;
 }
 
+// Remember an old slug -> current item mapping so renamed links keep
+// working (301 in slug.php). Failures must never break the save itself.
+function record_slug_redirect(string $type, int $id, $oldSlug): void {
+  if (!is_string($oldSlug) || trim($oldSlug) === '') return;
+  try {
+    db()->prepare('INSERT IGNORE INTO slug_redirects (from_slug, target_type, target_id) VALUES (?, ?, ?)')
+      ->execute([strtolower(trim($oldSlug)), $type, $id]);
+  } catch (Exception $e) { /* table missing — skip */ }
+}
+
 // ---- Office mailbox (IMAP) helpers ----
 // Passwords are AES-256-CBC encrypted with MAILBOX_KEY from api/prod-env.php
 // (server-only). The key never leaves the server; officers never see passwords.

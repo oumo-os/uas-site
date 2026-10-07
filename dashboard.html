@@ -3573,7 +3573,7 @@
         } catch(e) {}
         fields = [
           { name: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Article title' },
-          { name: 'category', label: 'Category', type: 'select', required: true, placeholder: '— Choose type —', options: [
+          { name: 'category', label: 'Category', type: 'select', required: true, placeholder: '— Choose type —', value: opts.category || '', options: [
             { label: 'Article', value: 'article' },
             { label: 'Observing Report', value: 'observing_report' },
             { label: 'Educational', value: 'educational' },
@@ -6005,6 +6005,7 @@
         (projs || []).forEach(p => projOpts.push({ label: p.title + (p.programme_title ? ' — ' + p.programme_title : ''), value: p.id }));
         const fields = [
           { name: 'title', label: 'Title', type: 'text', required: true, value: e.title || '' },
+          { name: 'slug', label: 'URL Slug', type: 'text', value: e.slug || '', help: 'Address: astronomy.ug/events/<slug> — old links keep redirecting after a change' },
           { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts, value: e.programme_id || '' },
           { name: 'project_id', label: 'Project (optional)', type: 'select', options: projOpts, value: e.project_id || '', help: 'Attach to a project — the event appears on the project page' },
           { name: 'date', label: 'Start Date & Time', type: 'datetime-local', required: true, value: dt(e.date) },
@@ -6044,6 +6045,7 @@
         (progs || []).forEach(g => progOpts.push({ label: g.title, value: g.id }));
         const fields = [
           { name: 'title', label: 'Title', type: 'text', required: true, value: p.title || '' },
+          { name: 'slug', label: 'URL Slug', type: 'text', value: p.slug || '', help: 'Address: astronomy.ug/<slug> — old links keep redirecting after a change' },
           { name: 'programme_id', label: 'Programme', type: 'select', options: progOpts, value: p.programme_id || '' },
           { name: 'description', label: 'Description', type: 'rich-text', required: true, value: p.description || '' },
           { name: 'objectives', label: 'Objectives', type: 'rich-text', value: p.objectives || '', help: 'One per line, or formatted freely — lists collapse automatically on the page' },
@@ -6100,6 +6102,7 @@
         const p = await api.getProgramme(id);
         const fields = [
           { name: 'title', label: 'Title', type: 'text', required: true, value: p.title || '' },
+          { name: 'slug', label: 'URL Slug', type: 'text', value: p.slug || '', help: 'Address: astronomy.ug/<slug> — old links keep redirecting after a change' },
           { name: 'description', label: 'Description', type: 'rich-text', required: true, value: p.description || '', help: 'Full illustrated essay welcome — this lives in About on the programme page, never in the hero' },
           { name: 'objectives', label: 'Objectives', type: 'rich-text', value: p.objectives || '', help: 'One per line, or formatted freely — lists collapse automatically on the page' },
           { name: 'outputs', label: 'Expected Outputs', type: 'rich-text', value: p.outputs || '' },
@@ -6133,7 +6136,31 @@
       showItemDetail('resolution', id);
     }
 
+    // Deep links from public listing pages: ?create=event|article|announcement
+    // opens the compose form; ?edit=event:<id>|article:<id> opens the item
+    // modal. Backend caps still enforced — this only navigates.
+    async function handleDeepLink() {
+      let q;
+      try { q = new URLSearchParams(location.search); } catch (e) { return; }
+      const create = q.get('create');
+      if (create === 'event' || create === 'article' || create === 'announcement') {
+        try { await api.me(); } catch (e) { return; }
+        switchTab('create');
+        if (create === 'announcement') showCreateForm('article', { category: 'announcement' });
+        else showCreateForm(create);
+        return;
+      }
+      const edit = q.get('edit');
+      const m = edit && edit.match(/^(event|article):(\d+)$/);
+      if (m) {
+        try { await api.me(); } catch (e) { return; }
+        try { await showItemDetail(m[1], parseInt(m[2], 10)); }
+        catch (e) { toast((e && e.error) || 'Item not found', 'error'); }
+      }
+    }
+
     load();
+    handleDeepLink();
   </script>
 </body>
 </html>
