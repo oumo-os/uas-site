@@ -17,6 +17,41 @@ function slug_404(): void {
   serve_template(__DIR__ . '/404.html');
 }
 
+// Renamed slugs: resolve an old slug to the CURRENT public URL (or null).
+// Public targets only — a members-only or unpublished rename stays hidden.
+// $onlyType restricts to one target kind (used inside type-pinned branches).
+function slug_history_dest($db, string $slug, ?string $onlyType = null): ?string {
+  if ($slug === '') return null;
+  try {
+    $h = $db->prepare('SELECT target_type, target_id FROM slug_redirects WHERE from_slug = ? LIMIT 1');
+    $h->execute([$slug]);
+    if (!($r = $h->fetch())) return null;
+    if ($onlyType && $r['target_type'] !== $onlyType) return null;
+    if ($r['target_type'] === 'event') {
+      $t = $db->prepare('SELECT slug, status, visibility FROM events WHERE id = ?');
+      $t->execute([(int) $r['target_id']]);
+      if ($er = $t->fetch()) {
+        if ($er['status'] === 'published' && ($er['visibility'] ?? 'public') === 'public') {
+          return SITE_URL . '/events/' . ($er['slug'] ?: $r['target_id']);
+        }
+      }
+    } elseif ($r['target_type'] === 'project') {
+      $t = $db->prepare('SELECT slug, status FROM projects WHERE id = ?');
+      $t->execute([(int) $r['target_id']]);
+      if ($pr = $t->fetch()) {
+        if ($pr['status'] === 'published') return SITE_URL . '/' . ($pr['slug'] ?: $r['target_id']);
+      }
+    } elseif ($r['target_type'] === 'programme') {
+      $t = $db->prepare('SELECT slug, status FROM programmes WHERE id = ?');
+      $t->execute([(int) $r['target_id']]);
+      if ($pg = $t->fetch()) {
+        if ($pg['status'] === 'active') return SITE_URL . '/' . ($pg['slug'] ?: $r['target_id']);
+      }
+    }
+  } catch (Exception $e) { /* pre-065 table or DB issue — no redirect */ }
+  return null;
+}
+
 $type = strtolower(trim($_GET['type'] ?? 'auto'));
 $slug = strtolower(trim($_GET['slug'] ?? ''));
 $id = (isset($_GET['id']) && ctype_digit((string) $_GET['id'])) ? (int) $_GET['id'] : 0;
@@ -70,7 +105,13 @@ try {
       }
       serve_template(__DIR__ . '/programme.html');
     }
-    if ($type === 'programme') serve_template(__DIR__ . '/programme.html');
+    if ($type === 'programme') {
+      if (!$row && ($dest = slug_history_dest($db, $slug, 'programme'))) {
+        header('Location: ' . $dest, true, 301);
+        exit;
+      }
+      serve_template(__DIR__ . '/programme.html');
+    }
   }
 
   // --- Project: /<slug> ---
@@ -113,6 +154,10 @@ try {
         'url' => SITE_URL . '/events/' . ($row['slug'] ?: $row['id']),
       ]);
     }
+    if (!$row && ($dest = slug_history_dest($db, $slug, 'event'))) {
+      header('Location: ' . $dest, true, 301);
+      exit;
+    }
     serve_template(__DIR__ . '/event.html');
   }
 
@@ -142,41 +187,11 @@ try {
   }
 }
 
-// --- Renamed slugs: 301 to the current URL, public targets only (a
-// members-only or unpublished rename stays a 404 rather than leaking it).
-if ($slug !== '' && isset($db)) {
-  try {
-    $h = $db->prepare('SELECT target_type, target_id FROM slug_redirects WHERE from_slug = ? LIMIT 1');
-    $h->execute([$slug]);
-    $dest = null;
-    if ($r = $h->fetch()) {
-      if ($r['target_type'] === 'event') {
-        $t = $db->prepare('SELECT slug, status, visibility FROM events WHERE id = ?');
-        $t->execute([(int) $r['target_id']]);
-        if ($er = $t->fetch()) {
-          if ($er['status'] === 'published' && ($er['visibility'] ?? 'public') === 'public') {
-            $dest = SITE_URL . '/events/' . ($er['slug'] ?: $r['target_id']);
-          }
-        }
-      } elseif ($r['target_type'] === 'project') {
-        $t = $db->prepare('SELECT slug, status FROM projects WHERE id = ?');
-        $t->execute([(int) $r['target_id']]);
-        if ($pr = $t->fetch()) {
-          if ($pr['status'] === 'published') $dest = SITE_URL . '/' . ($pr['slug'] ?: $r['target_id']);
-        }
-      } elseif ($r['target_type'] === 'programme') {
-        $t = $db->prepare('SELECT slug, status FROM programmes WHERE id = ?');
-        $t->execute([(int) $r['target_id']]);
-        if ($pg = $t->fetch()) {
-          if ($pg['status'] === 'active') $dest = SITE_URL . '/' . ($pg['slug'] ?: $r['target_id']);
-        }
-      }
-    }
-    if ($dest) {
-      header('Location: ' . $dest, true, 301);
-      exit;
-    }
-  } catch (Exception $e) { /* pre-065 table or DB issue — fall through to 404 */ }
+// --- Renamed slugs: 301 to the current URL (reached only when no live row
+// matched above). Public targets only — see slug_history_dest().
+if (isset($db) && ($dest = slug_history_dest($db, $slug))) {
+  header('Location: ' . $dest, true, 301);
+  exit;
 }
 
 slug_404();
