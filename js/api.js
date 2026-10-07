@@ -261,6 +261,14 @@ const api = {
   async publishArticle(id) { return this.request('/articles/' + id + '/publish', { method: 'POST' }); },
   async resubmitArticle(id) { return this.request('/articles/' + id + '/resubmit', { method: 'POST' }); },
 
+  // Questionnaires (data-collection forms on events & articles)
+  async getQuestionnaire(params) { return this.request('/questionnaires' + (params ? '?' + new URLSearchParams(params).toString() : '')); },
+  async createQuestionnaire(data) { return this.request('/questionnaires', { method: 'POST', body: data }); },
+  async updateQuestionnaire(id, data) { return this.request('/questionnaires/' + id, { method: 'PUT', body: data }); },
+  async deleteQuestionnaire(id) { return this.request('/questionnaires/' + id, { method: 'DELETE' }); },
+  async answerQuestionnaire(id, data) { return this.request('/questionnaires/' + id + '/answers', { method: 'POST', body: data }); },
+  async getQuestionnaireAnswers(id) { return this.request('/questionnaires/' + id + '/answers'); },
+
   // Documents
   async getDocuments() { return this.request('/documents'); },
   async uploadDocument(data) { return this.request('/documents', { method: 'POST', body: data }); },

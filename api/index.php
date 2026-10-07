@@ -2409,6 +2409,263 @@ try {
     json_response(['ok' => true]);
   }
 
+  // --- QUESTIONNAIRES (data-collection forms on events & articles) ---
+  elseif ($path === '/questionnaires' && $method === 'GET') {
+    $eventId = isset($_GET['event_id']) ? (int) $_GET['event_id'] : 0;
+    $articleId = isset($_GET['article_id']) ? (int) $_GET['article_id'] : 0;
+    if (!$eventId && !$articleId) json_error('event_id or article_id is required', 400);
+    $event = null; $article = null;
+    if ($eventId) {
+      $stmt = db()->prepare('SELECT * FROM events WHERE id = ?');
+      $stmt->execute([$eventId]);
+      $event = $stmt->fetch() ?: null;
+      if (!$event) json_error('Event not found', 404);
+    } else {
+      $stmt = db()->prepare('SELECT * FROM articles WHERE id = ?');
+      $stmt->execute([$articleId]);
+      $article = $stmt->fetch() ?: null;
+      if (!$article) json_error('Article not found', 404);
+    }
+    $viewer = current_user();
+    $manager = $viewer && $viewer['status'] === 'active' && can_manage_questionnaire($event, $article, (int) $viewer['id']);
+    if (!$manager && !questionnaire_visible($event, $article, $viewer)) json_error('Not found', 404);
+    $stmt = db()->prepare('SELECT id, title, description, fields, event_id, article_id FROM questionnaires WHERE ' . ($event ? 'event_id = ?' : 'article_id = ?'));
+    $stmt->execute([$event ? $eventId : $articleId]);
+    $q = $stmt->fetch();
+    if (!$q) json_error('No questionnaire here yet', 404);
+    json_response($q);
+  }
+  elseif ($path === '/questionnaires' && $method === 'POST') {
+    $user = require_login();
+    $data = input_json();
+    $eventId = !empty($data['event_id']) ? (int) $data['event_id'] : 0;
+    $articleId = !empty($data['article_id']) ? (int) $data['article_id'] : 0;
+    if (($eventId && $articleId) || (!$eventId && !$articleId)) json_error('Attach to exactly one event or article', 400);
+    $event = null; $article = null;
+    if ($eventId) {
+      $stmt = db()->prepare('SELECT * FROM events WHERE id = ?');
+      $stmt->execute([$eventId]);
+      $event = $stmt->fetch() ?: null;
+      if (!$event) json_error('Event not found', 404);
+    } else {
+      $stmt = db()->prepare('SELECT * FROM articles WHERE id = ?');
+      $stmt->execute([$articleId]);
+      $article = $stmt->fetch() ?: null;
+      if (!$article) json_error('Article not found', 404);
+    }
+    if (!can_manage_questionnaire($event, $article, (int) $user['id'])) json_error('Only the organizer/author or approvers can add a questionnaire here', 403);
+    $title = trim((string) ($data['title'] ?? ''));
+    if ($title === '') json_error('Title is required', 400);
+    $fields = clean_questionnaire_fields($data['fields'] ?? []);
+    if (!$fields) json_error('At least one question is required', 400);
+    $stmt = db()->prepare('SELECT id FROM questionnaires WHERE ' . ($event ? 'event_id = ?' : 'article_id = ?'));
+    $stmt->execute([$event ? $eventId : $articleId]);
+    if ($stmt->fetch()) json_error('This item already has a questionnaire — edit it instead', 409);
+    db()->prepare('INSERT INTO questionnaires (title, description, fields, event_id, article_id, created_by) VALUES (?, ?, ?, ?, ?, ?)')
+      ->execute([mb_substr($title, 0, 500), sanitize_rich_html($data['description'] ?? null), json_encode($fields), $eventId ?: null, $articleId ?: null, $user['id']]);
+    $qid = (int) db()->lastInsertId();
+    audit_log('questionnaire_create', 'questionnaire', $qid, ['event_id' => $eventId ?: null, 'article_id' => $articleId ?: null]);
+    json_response(['id' => $qid], 201);
+  }
+  elseif (preg_match('#^/questionnaires/(\d+)$#', $path, $m) && $method === 'PUT') {
+    $user = require_login();
+    $qid = (int) $m[1];
+    $stmt = db()->prepare('SELECT * FROM questionnaires WHERE id = ?');
+    $stmt->execute([$qid]);
+    $q = $stmt->fetch();
+    if (!$q) json_error('Questionnaire not found', 404);
+    $event = null; $article = null;
+    if (!empty($q['event_id'])) {
+      $stmt = db()->prepare('SELECT * FROM events WHERE id = ?');
+      $stmt->execute([(int) $q['event_id']]);
+      $event = $stmt->fetch() ?: null;
+    } elseif (!empty($q['article_id'])) {
+      $stmt = db()->prepare('SELECT * FROM articles WHERE id = ?');
+      $stmt->execute([(int) $q['article_id']]);
+      $article = $stmt->fetch() ?: null;
+    }
+    if (!$event && !$article) json_error('The linked item is gone', 410);
+    if (!can_manage_questionnaire($event, $article, (int) $user['id'])) json_error('Insufficient permissions', 403);
+    $data = input_json();
+    $sets = []; $args = [];
+    if (array_key_exists('title', $data)) {
+      $title = trim((string) $data['title']);
+      if ($title === '') json_error('Title is required', 400);
+      $sets[] = 'title = ?'; $args[] = mb_substr($title, 0, 500);
+    }
+    if (array_key_exists('description', $data)) { $sets[] = 'description = ?'; $args[] = sanitize_rich_html($data['description']); }
+    if (array_key_exists('fields', $data)) {
+      $fields = clean_questionnaire_fields($data['fields']);
+      if (!$fields) json_error('At least one question is required', 400);
+      $sets[] = 'fields = ?'; $args[] = json_encode($fields);
+    }
+    if (!$sets) json_error('Nothing to update', 400);
+    $args[] = $qid;
+    db()->prepare('UPDATE questionnaires SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($args);
+    audit_log('questionnaire_update', 'questionnaire', $qid);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/questionnaires/(\d+)$#', $path, $m) && $method === 'DELETE') {
+    $user = require_login();
+    $qid = (int) $m[1];
+    $stmt = db()->prepare('SELECT * FROM questionnaires WHERE id = ?');
+    $stmt->execute([$qid]);
+    $q = $stmt->fetch();
+    if (!$q) json_error('Questionnaire not found', 404);
+    $event = null; $article = null;
+    if (!empty($q['event_id'])) {
+      $stmt = db()->prepare('SELECT * FROM events WHERE id = ?');
+      $stmt->execute([(int) $q['event_id']]);
+      $event = $stmt->fetch() ?: null;
+    } elseif (!empty($q['article_id'])) {
+      $stmt = db()->prepare('SELECT * FROM articles WHERE id = ?');
+      $stmt->execute([(int) $q['article_id']]);
+      $article = $stmt->fetch() ?: null;
+    }
+    if (!can_manage_questionnaire($event, $article, (int) $user['id'])) json_error('Insufficient permissions', 403);
+    db()->prepare('DELETE FROM questionnaires WHERE id = ?')->execute([$qid]);
+    audit_log('questionnaire_delete', 'questionnaire', $qid);
+    json_response(['ok' => true]);
+  }
+  elseif (preg_match('#^/questionnaires/(\d+)/answers$#', $path, $m) && $method === 'POST') {
+    $qid = (int) $m[1];
+    $stmt = db()->prepare('SELECT * FROM questionnaires WHERE id = ?');
+    $stmt->execute([$qid]);
+    $q = $stmt->fetch();
+    if (!$q) json_error('Questionnaire not found', 404);
+    $event = null; $article = null;
+    if (!empty($q['event_id'])) {
+      $stmt = db()->prepare('SELECT * FROM events WHERE id = ?');
+      $stmt->execute([(int) $q['event_id']]);
+      $event = $stmt->fetch() ?: null;
+    } elseif (!empty($q['article_id'])) {
+      $stmt = db()->prepare('SELECT * FROM articles WHERE id = ?');
+      $stmt->execute([(int) $q['article_id']]);
+      $article = $stmt->fetch() ?: null;
+    }
+    $viewer = current_user();
+    $manager = $viewer && $viewer['status'] === 'active' && can_manage_questionnaire($event, $article, (int) $viewer['id']);
+    if (!$manager && !questionnaire_visible($event, $article, $viewer)) json_error('Not found', 404);
+    $data = input_json();
+    $answers = $data['answers'] ?? null;
+    if (!is_array($answers)) json_error('Answers are required', 400);
+    $userId = null; $name = ''; $email = '';
+    if ($viewer && ($viewer['status'] ?? '') === 'active') {
+      $userId = (int) $viewer['id'];
+      $name = (string) ($viewer['name'] ?? '');
+      $email = (string) ($viewer['email'] ?? '');
+    } else {
+      if (!rate_limit('qn-answer:' . client_ip(), 'qn-answer', 10, 3600)) {
+        json_error('Too many requests. Try again later.', 429);
+      }
+      $name = trim((string) ($data['name'] ?? ''));
+      $email = trim(mb_strtolower((string) ($data['email'] ?? '')));
+      if (mb_strlen($name) < 2) json_error('Please provide your name', 400);
+      if (!filter_var($email, FILTER_VALIDATE_EMAIL)) json_error('A valid email address is required', 400);
+    }
+    // Validate against the field spec: requiredness, select membership, numbers.
+    $fields = json_decode((string) ($q['fields'] ?? '[]'), true) ?: [];
+    $clean = [];
+    foreach ($fields as $i => $f) {
+      $v = $answers[$i] ?? $answers[(string) $i] ?? null;
+      if (is_string($v)) $v = trim($v);
+      $empty = $v === null || $v === '' || $v === false;
+      if (!empty($f['required']) && $empty) json_error('Please answer: ' . $f['label'], 400);
+      if (!$empty) {
+        if (($f['type'] ?? '') === 'number' && !is_numeric($v)) json_error($f['label'] . ' must be a number', 400);
+        if (($f['type'] ?? '') === 'select' && !in_array($v, $f['options'] ?? [], true)) json_error('Invalid choice for ' . $f['label'], 400);
+        if (($f['type'] ?? '') === 'checkbox') $v = !empty($v);
+        if (is_string($v)) $v = mb_substr($v, 0, 2000);
+      }
+      $clean[] = $v;
+    }
+    // One response per member (user_id) or per guest email: re-submits
+    // overwrite. (<=> is NULL-safe equality for the nullable columns.)
+    $stmt = db()->prepare('SELECT id FROM questionnaire_answers WHERE questionnaire_id = ? AND user_id <=> ? AND email <=> ?');
+    $stmt->execute([$qid, $userId, $email ?: null]);
+    $existingId = $stmt->fetchColumn();
+    if ($existingId) {
+      db()->prepare('UPDATE questionnaire_answers SET name = ?, email = ?, answers = ?, updated_at = NOW() WHERE id = ?')
+        ->execute([$name ?: null, $email ?: null, json_encode($clean), $existingId]);
+    } else {
+      try {
+        db()->prepare('INSERT INTO questionnaire_answers (questionnaire_id, user_id, name, email, answers) VALUES (?, ?, ?, ?, ?)')
+          ->execute([$qid, $userId, $name ?: null, $email ?: null, json_encode($clean)]);
+      } catch (PDOException $e) {
+        // Lost a race with a parallel submit — overwrite instead.
+        db()->prepare('UPDATE questionnaire_answers SET name = ?, email = ?, answers = ?, updated_at = NOW() WHERE questionnaire_id = ? AND user_id <=> ? AND email <=> ?')
+          ->execute([$name ?: null, $email ?: null, json_encode($clean), $qid, $userId, $email ?: null]);
+      }
+    }
+    audit_log('questionnaire_answer', 'questionnaire', $qid, ['user_id' => $userId, 'email' => $userId ? null : $email]);
+    json_response(['ok' => true], 201);
+  }
+  elseif (preg_match('#^/questionnaires/(\d+)/answers$#', $path, $m) && $method === 'GET') {
+    $user = require_login();
+    $qid = (int) $m[1];
+    $stmt = db()->prepare('SELECT * FROM questionnaires WHERE id = ?');
+    $stmt->execute([$qid]);
+    $q = $stmt->fetch();
+    if (!$q) json_error('Questionnaire not found', 404);
+    $event = null; $article = null;
+    if (!empty($q['event_id'])) {
+      $stmt = db()->prepare('SELECT * FROM events WHERE id = ?');
+      $stmt->execute([(int) $q['event_id']]);
+      $event = $stmt->fetch() ?: null;
+    } elseif (!empty($q['article_id'])) {
+      $stmt = db()->prepare('SELECT * FROM articles WHERE id = ?');
+      $stmt->execute([(int) $q['article_id']]);
+      $article = $stmt->fetch() ?: null;
+    }
+    if (!can_manage_questionnaire($event, $article, (int) $user['id'])) json_error('Only organizers and approvers can view responses', 403);
+    $stmt = db()->prepare('SELECT a.id, a.user_id, a.name, a.email, a.answers, a.created_at, a.updated_at, u.name AS user_name, u.email AS user_email FROM questionnaire_answers a LEFT JOIN users u ON u.id = a.user_id WHERE a.questionnaire_id = ? ORDER BY a.created_at DESC');
+    $stmt->execute([$qid]);
+    json_response($stmt->fetchAll());
+  }
+  elseif (preg_match('#^/questionnaires/(\d+)/answers\.csv$#', $path, $m) && $method === 'GET') {
+    $user = require_login();
+    $qid = (int) $m[1];
+    $stmt = db()->prepare('SELECT * FROM questionnaires WHERE id = ?');
+    $stmt->execute([$qid]);
+    $q = $stmt->fetch();
+    if (!$q) json_error('Questionnaire not found', 404);
+    $event = null; $article = null;
+    if (!empty($q['event_id'])) {
+      $stmt = db()->prepare('SELECT * FROM events WHERE id = ?');
+      $stmt->execute([(int) $q['event_id']]);
+      $event = $stmt->fetch() ?: null;
+    } elseif (!empty($q['article_id'])) {
+      $stmt = db()->prepare('SELECT * FROM articles WHERE id = ?');
+      $stmt->execute([(int) $q['article_id']]);
+      $article = $stmt->fetch() ?: null;
+    }
+    if (!can_manage_questionnaire($event, $article, (int) $user['id'])) json_error('Only organizers and approvers can export responses', 403);
+    $fields = json_decode((string) ($q['fields'] ?? '[]'), true) ?: [];
+    $stmt = db()->prepare('SELECT a.name, a.email, a.answers, a.created_at, u.name AS user_name, u.email AS user_email FROM questionnaire_answers a LEFT JOIN users u ON u.id = a.user_id WHERE a.questionnaire_id = ? ORDER BY a.created_at DESC');
+    $stmt->execute([$qid]);
+    $rows = $stmt->fetchAll();
+    $esc = fn($v) => '"' . str_replace('"', '""', (string) ($v ?? '')) . '"';
+    $fmtAns = function ($a) {
+      if ($a === true) return 'Yes';
+      if ($a === false || $a === null) return '';
+      if (is_array($a)) return implode('; ', array_map('strval', $a));
+      return (string) $a;
+    };
+    $csv = 'name,email,submitted';
+    foreach ($fields as $f) $csv .= ',' . $esc($f['label'] ?? '');
+    $csv .= "\n";
+    foreach ($rows as $r) {
+      $ans = json_decode((string) ($r['answers'] ?? '[]'), true) ?: [];
+      $line = [$r['user_name'] ?: $r['name'], $r['user_email'] ?: $r['email'], $r['created_at']];
+      foreach ($fields as $i => $f) $line[] = $fmtAns($ans[$i] ?? $ans[(string) $i] ?? null);
+      $csv .= implode(',', array_map($esc, $line)) . "\n";
+    }
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="questionnaire-' . $qid . '-answers.csv"');
+    echo $csv;
+    exit;
+  }
+
   // --- DOCUMENTS ---
   elseif ($path === '/documents' && $method === 'GET') {
     require_login();

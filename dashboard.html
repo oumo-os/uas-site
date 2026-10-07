@@ -4286,6 +4286,169 @@
       } catch (e) { toast(e.error || 'Failed', 'error'); }
     }
 
+    // ── Questionnaire builder + responses (data-collection forms on events & articles) ──
+    const QN_TYPES = [
+      { value: 'text', label: 'Short text' },
+      { value: 'textarea', label: 'Long text' },
+      { value: 'number', label: 'Number' },
+      { value: 'select', label: 'Choose one' },
+      { value: 'checkbox', label: 'Yes / No' },
+      { value: 'date', label: 'Date' },
+    ];
+
+    async function openQuestionnaireEditor(kind, itemId) {
+      const qparam = kind === 'event' ? { event_id: itemId } : { article_id: itemId };
+      let q = null;
+      try {
+        q = await api.getQuestionnaire(qparam);
+        if (q && typeof q.fields === 'string') { try { q.fields = JSON.parse(q.fields); } catch (e) { q.fields = []; } }
+      } catch (e) { q = null; }
+      window._qnDraft = {
+        id: (q && q.id) || null,
+        title: (q && q.title) || '',
+        description: (q && q.description) || '',
+        fields: (q && Array.isArray(q.fields) && q.fields.length) ? q.fields : [{ label: '', type: 'text', required: false, options: [] }],
+      };
+      renderQnBuilder(kind, itemId);
+      if (window._qnDraft.id) loadQnResponses(window._qnDraft.id);
+    }
+
+    function qnTypeOptions(sel) {
+      return QN_TYPES.map(t => `<option value="${t.value}"${t.value === sel ? ' selected' : ''}>${t.label}</option>`).join('');
+    }
+
+    function renderQnBuilder(kind, itemId) {
+      const d = window._qnDraft;
+      const rows = d.fields.map((f, i) => `
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.6rem;margin-bottom:0.5rem" data-qn-row="${i}">
+          <div style="display:flex;gap:0.4rem;margin-bottom:0.4rem">
+            <input class="form-input" data-qn="label" placeholder="Question ${i + 1}" value="${esc(String(f.label || ''))}" style="flex:1">
+            <button type="button" class="btn btn-outline btn-xs" style="color:var(--danger)" onclick="qnRemoveRow(${i}, '${kind}', ${itemId})" aria-label="Remove question">&times;</button>
+          </div>
+          <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap">
+            <select class="form-select" data-qn="type" onchange="qnTypeChanged(this)" style="flex:1;min-width:120px">${qnTypeOptions(f.type)}</select>
+            <label style="font-size:0.82rem;display:flex;gap:0.3rem;align-items:center;white-space:nowrap"><input type="checkbox" data-qn="required"${f.required ? ' checked' : ''}> Required</label>
+          </div>
+          <textarea class="form-textarea" data-qn="options" rows="2" placeholder="Options, one per line (choose-one questions only)" style="width:100%;margin-top:0.4rem;${f.type === 'select' ? '' : 'display:none'}">${esc((f.options || []).join('\n'))}</textarea>
+        </div>`).join('');
+      openModal((d.id ? 'Edit' : 'New') + ' Questionnaire', `
+        <div style="font-size:0.85rem">
+          <div class="form-group"><label class="form-label">Title *</label><input class="form-input" id="qn-title" style="width:100%" value="${esc(d.title)}"></div>
+          <div class="form-group"><label class="form-label">Introduction (optional)</label><textarea class="form-textarea" id="qn-desc" rows="2" style="width:100%">${esc(d.description || '')}</textarea></div>
+          <div id="qn-rows">${rows}</div>
+          <button type="button" class="btn btn-outline btn-sm" onclick="qnAddRow('${kind}', ${itemId})">+ Add question</button>
+          <div class="form-actions" style="display:flex;gap:0.5rem;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="qnSave('${kind}', ${itemId})">Save questionnaire</button>
+            ${d.id ? `<button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="qnDelete('${kind}', ${itemId})">Delete</button>` : ''}
+            <button class="btn btn-outline btn-sm" onclick="showItemDetail('${kind}', ${itemId})">Back</button>
+          </div>
+          <p class="text-dim text-sm" id="qn-msg" style="margin-top:0.5rem"></p>
+          <div id="qn-responses" style="margin-top:1rem"></div>
+        </div>`);
+    }
+
+    function qnCollectRows() {
+      return [...document.querySelectorAll('[data-qn-row]')].map(row => ({
+        label: (row.querySelector('[data-qn="label"]').value || '').trim(),
+        type: row.querySelector('[data-qn="type"]').value,
+        required: row.querySelector('[data-qn="required"]').checked,
+        options: (row.querySelector('[data-qn="options"]').value || '').split('\n'),
+      }));
+    }
+
+    function qnStashHeading() {
+      const t = document.getElementById('qn-title');
+      if (t) window._qnDraft.title = t.value;
+      const ds = document.getElementById('qn-desc');
+      if (ds) window._qnDraft.description = ds.value;
+    }
+
+    function qnAddRow(kind, itemId) {
+      window._qnDraft.fields = qnCollectRows();
+      window._qnDraft.fields.push({ label: '', type: 'text', required: false, options: [] });
+      qnStashHeading();
+      renderQnBuilder(kind, itemId);
+      if (window._qnDraft.id) loadQnResponses(window._qnDraft.id);
+    }
+
+    function qnRemoveRow(i, kind, itemId) {
+      window._qnDraft.fields = qnCollectRows();
+      window._qnDraft.fields.splice(i, 1);
+      if (!window._qnDraft.fields.length) window._qnDraft.fields.push({ label: '', type: 'text', required: false, options: [] });
+      qnStashHeading();
+      renderQnBuilder(kind, itemId);
+      if (window._qnDraft.id) loadQnResponses(window._qnDraft.id);
+    }
+
+    function qnTypeChanged(sel) {
+      const row = sel.closest('[data-qn-row]');
+      const ta = row ? row.querySelector('[data-qn="options"]') : null;
+      if (ta) ta.style.display = sel.value === 'select' ? '' : 'none';
+    }
+
+    async function qnSave(kind, itemId) {
+      const msg = document.getElementById('qn-msg');
+      const title = (document.getElementById('qn-title').value || '').trim();
+      const description = (document.getElementById('qn-desc').value || '').trim() || null;
+      const fields = qnCollectRows();
+      try {
+        if (window._qnDraft.id) {
+          await api.updateQuestionnaire(window._qnDraft.id, { title, description, fields });
+          toast('Questionnaire updated', 'success');
+        } else {
+          const r = await api.createQuestionnaire({ title, description, fields, ...(kind === 'event' ? { event_id: itemId } : { article_id: itemId }) });
+          window._qnDraft.id = r.id;
+          toast('Questionnaire created', 'success');
+        }
+        window._qnDraft.title = title;
+        window._qnDraft.description = description || '';
+        window._qnDraft.fields = fields;
+        renderQnBuilder(kind, itemId);
+        loadQnResponses(window._qnDraft.id);
+      } catch (e) {
+        const err = e.error || 'Save failed';
+        if (msg) msg.textContent = err; else toast(err, 'error');
+      }
+    }
+
+    async function qnDelete(kind, itemId) {
+      if (!window._qnDraft.id || !confirm('Delete this questionnaire and all its responses?')) return;
+      try {
+        await api.deleteQuestionnaire(window._qnDraft.id);
+        toast('Questionnaire deleted', 'success');
+        closeModal();
+        showItemDetail(kind, itemId);
+      } catch (e) { toast(e.error || 'Delete failed', 'error'); }
+    }
+
+    async function loadQnResponses(qid) {
+      const box = document.getElementById('qn-responses');
+      if (!box) return;
+      box.innerHTML = '<p class="text-dim text-sm">Loading responses…</p>';
+      try {
+        const rows = await api.getQuestionnaireAnswers(qid);
+        if (!rows.length) { box.innerHTML = '<p class="text-dim text-sm">No responses yet.</p>'; return; }
+        const fields = window._qnDraft.fields || [];
+        const head = ['Name', 'Email', 'Submitted'].concat(fields.map(f => f.label));
+        const body = rows.map(r => {
+          let ans = [];
+          try { ans = Array.isArray(r.answers) ? r.answers : JSON.parse(r.answers || '[]'); } catch (e) { ans = []; }
+          const cells = [r.user_name || r.name || '', r.user_email || r.email || '', r.created_at || ''];
+          fields.forEach((f, i) => {
+            let v = ans[i];
+            if (v === true) v = 'Yes';
+            else if (v === false || v == null) v = '';
+            cells.push(v);
+          });
+          return '<tr>' + cells.map(c => `<td style="padding:0.35rem 0.5rem;border-bottom:1px solid var(--border);font-size:0.8rem;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis" title="${esc(String(c))}">${esc(String(c))}</td>`).join('') + '</tr>';
+        }).join('');
+        box.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+            <strong style="font-size:0.85rem">Responses (${rows.length})</strong>
+            <a class="btn btn-outline btn-xs" href="${API_BASE}/questionnaires/${qid}/answers.csv">Download CSV</a></div>
+          <div style="overflow-x:auto"><table><thead><tr>${head.map(h => `<th style="text-align:left;padding:0.35rem 0.5rem;font-size:0.75rem;color:var(--text-dim);border-bottom:1px solid var(--border);white-space:nowrap">${esc(String(h))}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`;
+      } catch (e) { box.innerHTML = '<p class="text-dim text-sm">Could not load responses.</p>'; }
+    }
+
     const progProjView = {};
     const progCache = {};
     async function loadProgProjects(pid) {
@@ -5240,6 +5403,7 @@
           const isAuthor = api._user && (data.author_id === api._user.id || data.author_name === api._user.name);
           const canEditArticle = (typeof data.viewer_can_edit === 'boolean') ? data.viewer_can_edit : (api.hasCap('articles.approve') || (isAuthor && ['draft','submitted','rejected'].includes(data.status)));
           if (canEditArticle) actions.push(`<button class="btn btn-outline btn-sm" onclick="editArticleForm(${id})">Edit</button>`);
+          if (canEditArticle) actions.push(`<button class="btn btn-outline btn-sm" onclick="openQuestionnaireEditor('article', ${id})">Questionnaire</button>`);
           if (canEditArticle) actions.push(`<button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="modalDelete('article', ${id})">Delete</button>`);
           if (data.status === 'submitted' || data.status === 'under_review' || data.status === 'draft') {
             if (api.hasCap('articles.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('article','approve',${id})">Approve</button>`);
@@ -5283,6 +5447,7 @@
           const isOwner = api._user && (data.organizer_id === api._user.id || data.created_by === api._user.id);
           const canEditEvent = (typeof data.viewer_can_edit === 'boolean') ? data.viewer_can_edit : (api.hasCap('events.approve') || (isOwner && !['completed','cancelled'].includes(data.status)));
           if (canEditEvent) actions.push(`<button class="btn btn-outline btn-sm" onclick="editEventForm(${id})">Edit</button>`);
+          if (canEditEvent || rsvps) actions.push(`<button class="btn btn-outline btn-sm" onclick="openQuestionnaireEditor('event', ${id})">Questionnaire</button>`);
           if (canEditEvent) actions.push(`<button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="modalDelete('event', ${id})">Delete</button>`);
           if (data.status === 'submitted' || data.status === 'draft') {
             if (api.hasCap('events.approve')) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('event','approve',${id})">Approve</button>`);

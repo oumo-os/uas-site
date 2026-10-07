@@ -108,6 +108,10 @@
             <h3>Linked</h3>
             <div id="aLinks"></div>
           </div>
+          <div class="card-section" id="aQnCard" style="display:none">
+            <h3><span id="aQnTitle">Questions</span></h3>
+            <div id="aQn"></div>
+          </div>
           <div class="card-section" id="aRelatedCard" style="display:none">
             <h3>Related Articles</h3>
             <div id="aRelated"></div>
@@ -234,6 +238,82 @@
             '<h4>' + esc(r.title) + '</h4>' +
             '<p>' + esc((r.category||'').replace(/_/g,' ')) + ' &middot; ' + (r.published_at ? new Date(r.published_at).toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'}) : '') + '</p></a>';
         }).join('');
+      }
+      window._articleId = a.id;
+      renderArticleQuestionnaire(a);
+    }
+
+    // Questionnaire (data-collection form attached by the author).
+    var articleQnId = null;
+    function qnFieldHtml(f, i) {
+      var req = f.required ? ' <span style="color:var(--danger)">*</span>' : '';
+      var base = 'class="form-input" id="aqn-f' + i + '" style="width:100%;margin-bottom:0.6rem"';
+      var lab = '<label style="font-size:0.82rem;font-weight:600;display:block;margin-bottom:0.25rem">' + esc(f.label) + req + '</label>';
+      if (f.type === 'textarea') return lab + '<textarea ' + base + ' rows="3"></textarea>';
+      if (f.type === 'number') return lab + '<input type="number" ' + base + '>';
+      if (f.type === 'date') return lab + '<input type="date" ' + base + '>';
+      if (f.type === 'checkbox') return '<label style="font-size:0.85rem;display:flex;gap:0.4rem;align-items:center;margin-bottom:0.6rem;cursor:pointer"><input type="checkbox" id="aqn-f' + i + '"> ' + esc(f.label) + req + '</label>';
+      if (f.type === 'select') {
+        return lab + '<select ' + base + '><option value="">— Choose —</option>' +
+          (f.options || []).map(function(o){ return '<option value="' + esc(o) + '">' + esc(o) + '</option>'; }).join('') + '</select>';
+      }
+      return lab + '<input type="text" ' + base + '>';
+    }
+
+    async function renderArticleQuestionnaire(a) {
+      var box = document.getElementById('aQn');
+      if (!box || !a || !a.id) return;
+      var q = null;
+      try { q = await api.getQuestionnaire({ article_id: a.id }); } catch (e) { return; }
+      if (!q || !q.id) return;
+      var fields = [];
+      try { fields = Array.isArray(q.fields) ? q.fields : JSON.parse(q.fields || '[]'); } catch (e) { fields = []; }
+      if (!fields.length) return;
+      articleQnId = q.id;
+      document.getElementById('aQnTitle').textContent = q.title || 'Questions';
+      var ident = '';
+      if (!api._user) {
+        ident = '<input class="form-input" id="aqnName" placeholder="Full name" style="width:100%;margin-bottom:0.5rem">' +
+          '<input class="form-input" id="aqnEmail" type="email" placeholder="Email" style="width:100%;margin-bottom:0.5rem">';
+      } else {
+        ident = '<p class="text-dim" style="font-size:0.8rem;margin-bottom:0.6rem">Answering as ' + esc(api._user.name) + ' — you can update your answers anytime.</p>';
+      }
+      box.innerHTML =
+        (q.description ? '<p class="text-dim" style="font-size:0.85rem;margin-bottom:0.75rem">' + esc(q.description) + '</p>' : '') +
+        ident +
+        fields.map(qnFieldHtml).join('') +
+        '<button class="btn btn-primary" style="width:100%" id="aqnBtn" onclick="submitArticleQuestionnaire()">Submit answers</button>' +
+        '<p class="text-dim" id="aqnMsg" style="font-size:0.82rem;margin-top:0.5rem"></p>';
+      document.getElementById('aQnCard').style.display = 'block';
+    }
+
+    async function submitArticleQuestionnaire() {
+      var msg = document.getElementById('aqnMsg');
+      var btn = document.getElementById('aqnBtn');
+      if (!articleQnId) return;
+      var q = null;
+      try { q = await api.getQuestionnaire({ article_id: window._articleId }); } catch (e) { msg.textContent = 'Could not load the form.'; return; }
+      var fields = [];
+      try { fields = Array.isArray(q.fields) ? q.fields : JSON.parse(q.fields || '[]'); } catch (e) { fields = []; }
+      var answers = {};
+      for (var i = 0; i < fields.length; i++) {
+        var el = document.getElementById('aqn-f' + i);
+        if (!el) continue;
+        answers[i] = (fields[i].type === 'checkbox') ? !!el.checked : (el.value || '').trim();
+      }
+      var payload = { answers: answers };
+      if (!api._user) {
+        payload.name = (document.getElementById('aqnName').value || '').trim();
+        payload.email = (document.getElementById('aqnEmail').value || '').trim();
+      }
+      btn.disabled = true; btn.textContent = 'Submitting...';
+      try {
+        await api.answerQuestionnaire(articleQnId, payload);
+        msg.innerHTML = '<span class="text-success">Answers saved — thank you!</span>';
+      } catch (e) {
+        msg.textContent = e.error || 'Submission failed';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Submit answers';
       }
     }
 

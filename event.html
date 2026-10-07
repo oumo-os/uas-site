@@ -134,6 +134,10 @@
             <div id="eActions"></div>
             <div id="eMsg" style="font-size:0.88rem;margin-top:0.75rem"></div>
           </div>
+          <div class="card-section" id="eQnCard" style="display:none">
+            <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span> <span id="eQnTitle">Questions</span></h3>
+            <div id="eQn"></div>
+          </div>
           <div class="card-section" id="eOrganizerCard" style="display:none">
             <h3><span class="icon-inline"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span> Organizer</h3>
             <div id="eOrganizer"></div>
@@ -341,6 +345,7 @@
       }
 
       renderActions(d);
+      renderQuestionnaire();
       // Online room link — members only, inside the join window
       // ([start, end or start+1h]). Guests get the link by email instead, so
       // it is never shown to logged-out visitors. Appended AFTER renderActions
@@ -415,6 +420,77 @@
         }
       } else {
         el.innerHTML += '<button class="btn btn-primary" style="width:100%" onclick="rsvp()">Register Now</button>';
+      }
+    }
+
+    // Questionnaire (data-collection form attached by the organizer).
+    function qnFieldHtml(f, i) {
+      var req = f.required ? ' <span style="color:var(--danger)">*</span>' : '';
+      var base = 'class="form-input" id="qn-f' + i + '" style="width:100%;margin-bottom:0.6rem"';
+      var lab = '<label style="font-size:0.82rem;font-weight:600;display:block;margin-bottom:0.25rem">' + esc(f.label) + req + '</label>';
+      if (f.type === 'textarea') return lab + '<textarea ' + base + ' rows="3"></textarea>';
+      if (f.type === 'number') return lab + '<input type="number" ' + base + '>';
+      if (f.type === 'date') return lab + '<input type="date" ' + base + '>';
+      if (f.type === 'checkbox') return '<label style="font-size:0.85rem;display:flex;gap:0.4rem;align-items:center;margin-bottom:0.6rem;cursor:pointer"><input type="checkbox" id="qn-f' + i + '"> ' + esc(f.label) + req + '</label>';
+      if (f.type === 'select') {
+        return lab + '<select ' + base + '><option value="">— Choose —</option>' +
+          (f.options || []).map(function(o){ return '<option value="' + esc(o) + '">' + esc(o) + '</option>'; }).join('') + '</select>';
+      }
+      return lab + '<input type="text" ' + base + '>';
+    }
+
+    async function renderQuestionnaire() {
+      var box = document.getElementById('eQn');
+      if (!box) return;
+      var q = null;
+      try { q = await api.getQuestionnaire({ event_id: eventId }); } catch (e) { return; }
+      if (!q || !q.id) return;
+      var fields = [];
+      try { fields = Array.isArray(q.fields) ? q.fields : JSON.parse(q.fields || '[]'); } catch (e) { fields = []; }
+      if (!fields.length) return;
+      document.getElementById('eQnTitle').textContent = q.title || 'Questions';
+      var ident = '';
+      if (!api._user) {
+        ident = '<input class="form-input" id="qnName" placeholder="Full name" style="width:100%;margin-bottom:0.5rem" value="">' +
+          '<input class="form-input" id="qnEmail" type="email" placeholder="Email" style="width:100%;margin-bottom:0.5rem" value="">';
+      } else {
+        ident = '<p class="text-dim" style="font-size:0.8rem;margin-bottom:0.6rem">Answering as ' + esc(api._user.name) + ' — you can update your answers anytime.</p>';
+      }
+      box.innerHTML =
+        (q.description ? '<p class="text-dim" style="font-size:0.85rem;margin-bottom:0.75rem">' + esc(q.description) + '</p>' : '') +
+        ident +
+        fields.map(qnFieldHtml).join('') +
+        '<button class="btn btn-primary" style="width:100%" id="qnBtn" onclick="submitQuestionnaire(' + q.id + ')">Submit answers</button>' +
+        '<p class="text-dim" id="qnMsg" style="font-size:0.82rem;margin-top:0.5rem"></p>';
+      document.getElementById('eQnCard').style.display = 'block';
+    }
+
+    async function submitQuestionnaire(qid) {
+      var msg = document.getElementById('qnMsg');
+      var btn = document.getElementById('qnBtn');
+      var q = null;
+      try { q = await api.getQuestionnaire({ event_id: eventId }); } catch (e) { msg.textContent = 'Could not load the form.'; return; }
+      var fields = [];
+      try { fields = Array.isArray(q.fields) ? q.fields : JSON.parse(q.fields || '[]'); } catch (e) { fields = []; }
+      var answers = {};
+      for (var i = 0; i < fields.length; i++) {
+        var el = document.getElementById('qn-f' + i);
+        if (!el) continue;
+        answers[i] = (fields[i].type === 'checkbox') ? !!el.checked : (el.value || '').trim();
+      }
+      var payload = { answers: answers };
+      if (!api._user) {
+        payload.name = (document.getElementById('qnName').value || '').trim();
+        payload.email = (document.getElementById('qnEmail').value || '').trim();
+      }
+      btn.disabled = true; btn.textContent = 'Submitting...';
+      try {
+        await api.answerQuestionnaire(qid, payload);
+        msg.innerHTML = '<span class="text-success">Answers saved — thank you!</span>';
+      } catch (e) {
+        msg.textContent = e.error || 'Submission failed';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Submit answers';
       }
     }
 

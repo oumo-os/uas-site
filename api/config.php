@@ -477,6 +477,62 @@ function article_link_id($v, string $table): ?int {
   return $id;
 }
 
+// ---- Questionnaires: field spec validation ----
+/**
+ * Validate questionnaire fields: [{label, type, required, options?}].
+ * Types: text, textarea, number, select, checkbox, date. Select options may
+ * arrive as an array or a newline/comma-separated string. Max 30 questions.
+ */
+function clean_questionnaire_fields($v): array {
+  $types = ['text', 'textarea', 'number', 'select', 'checkbox', 'date'];
+  if (!is_array($v)) return [];
+  $out = [];
+  foreach (array_slice(array_values($v), 0, 30) as $f) {
+    if (!is_array($f)) continue;
+    $label = trim(preg_replace('/\s+/', ' ', strip_tags((string) ($f['label'] ?? ''))));
+    if ($label === '') continue;
+    $type = in_array($f['type'] ?? '', $types, true) ? $f['type'] : 'text';
+    $opts = [];
+    if ($type === 'select') {
+      $raw = $f['options'] ?? [];
+      if (is_string($raw)) $raw = preg_split('/[\r\n,]+/', $raw);
+      foreach ((array) $raw as $o) {
+        $o = trim(preg_replace('/\s+/', ' ', strip_tags((string) $o)));
+        if ($o !== '') $opts[] = mb_substr($o, 0, 200);
+      }
+      $opts = array_values(array_unique(array_slice($opts, 0, 20)));
+      if (!$opts) continue; // a select without options is useless
+    }
+    $out[] = ['label' => mb_substr($label, 0, 200), 'type' => $type, 'required' => !empty($f['required']), 'options' => $opts];
+  }
+  return $out;
+}
+
+// Who may manage the questionnaire on an event/article (create/edit/delete
+// + read answers): event managers, article authors and approvers.
+function can_manage_questionnaire(?array $event, ?array $article, int $userId): bool {
+  if ($event) return (bool) can_manage_event($userId, $event);
+  if ($article) {
+    if ((int) ($article['author_id'] ?? 0) === $userId) return true;
+    if (user_has_cap($userId, 'articles.approve')) return true;
+  }
+  return false;
+}
+
+// Who may see and answer it: mirrors the linked item's own visibility.
+// Unpublished parents are manager-preview only (handled by callers).
+function questionnaire_visible(?array $event, ?array $article, $viewer): bool {
+  if ($event) {
+    if (!in_array($event['status'] ?? '', ['published', 'cancelled', 'completed'], true)) return false;
+    if (($event['visibility'] ?? 'public') === 'members') {
+      return $viewer && ($viewer['status'] ?? '') === 'active';
+    }
+    return true;
+  }
+  if ($article) return ($article['status'] ?? '') === 'published';
+  return false;
+}
+
 // Role inbox offices (must match the directory on contact.html).
 function office_list(): array {
   return [
