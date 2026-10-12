@@ -731,6 +731,7 @@ tr:hover td { background: var(--accent-glow); }
 .rte-gallery { columns: 3 200px; column-gap: 0.9rem; margin: 1rem 0; }
 .rte-gallery > p, .rte-gallery > img { break-inside: avoid; margin: 0 0 0.9rem; }
 .rte-gallery img { width: 100%; height: auto; border-radius: var(--radius); cursor: zoom-in; display: block; }
+.rte-gallery .rte-cap { display: block; font-size: 0.8rem; color: var(--text-dim); text-align: center; margin: 0 0 0.9rem; break-inside: avoid; }
 @media (max-width: 640px) { .rte-gallery { columns: 2 140px; column-gap: 0.7rem; } }
 
 /* ============ Lightbox (expandable content images) ============ */
