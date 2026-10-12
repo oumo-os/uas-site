@@ -55,7 +55,7 @@ function icon(name, cls) {
 const api = {
   // Client build tag — dashboard compares this against its own tag and
   // prompts a refresh on mismatch (stale cached JS is otherwise silent).
-  BUILD: '20260923-12',
+  BUILD: '20260923-13',
   _token: null,
   _user: null,
   _capabilities: [],
@@ -809,8 +809,6 @@ window.renderTimeline = function (el, opts) {
 (function () {
   const BODY_IMG = '.description-body img, .article-body img, .preview-body img';
 
-  function isBlankText(n) { return !!n && n.nodeType === 3 && !n.textContent.trim(); }
-
   // The movable "block" for an image: its <p> wrapper when the image is the
   // only meaningful content, else the <img> itself.
   function blockOf(img) {
@@ -831,52 +829,23 @@ window.renderTimeline = function (el, opts) {
     return img;
   }
 
-  // Short text between images reads as a caption, not a boundary: it rides
-  // along into the album instead of breaking the run. Anything longer (or
-  // containing an image) still breaks the run.
-  const CAPTION_MAX = 80;
-
-  function nodeText(n) {
-    if (!n) return '';
-    if (n.nodeType === 3) return n.textContent || '';
-    if (n.nodeType === 1) return n.textContent || '';
-    return '';
+  // Skip invisible/empty nodes when looking for the previous meaningful
+  // sibling. ANY text (even a short caption) is meaningful and breaks the
+  // run — albums form only from back-to-back images.
+  function isSkippable(n) {
+    if (!n) return false;
+    if (n.nodeType === 3) return !n.textContent.trim();
+    if (n.nodeType !== 1) return false;
+    if (n.tagName === 'BR') return true;
+    if (n.tagName === 'IMG') return !!(n.style && n.style.display === 'none');
+    if ((n.textContent || '').trim()) return false;
+    return !(n.querySelectorAll ? n.querySelectorAll('img').length : false);
   }
 
-  function hasImg(n) {
-    if (!n || n.nodeType !== 1) return false;
-    if (n.tagName === 'IMG') return true;
-    const kids = n.childNodes || [];
-    for (let i = 0; i < kids.length; i++) if (hasImg(kids[i])) return true;
-    return false;
-  }
-
-  // Classify a gap node when scanning backwards: 'skip' (invisible),
-  // 'caption' (short text, moves into the album), or 'break'.
-  function classifyGap(n) {
-    if (!n) return 'break';
-    if (isBlankText(n)) return 'skip';
-    if (n.nodeType === 1 && n.tagName === 'BR') return 'skip';
-    if (n.nodeType === 1 && n.tagName === 'IMG' && n.style && n.style.display === 'none') return 'skip';
-    if (hasImg(n)) return 'break';
-    const t = nodeText(n).replace(/\s+/g, ' ').trim();
-    if (t === '') return 'skip';
-    if (t.length <= CAPTION_MAX) return 'caption';
-    return 'break';
-  }
-
-  // Walk backwards over skips/captions: {node, caps[]} or {node: null} on
-  // break. caps arrive in document order (unshifted while walking back).
-  function scanBack(block) {
-    let n = block.previousSibling;
-    const caps = [];
-    for (;;) {
-      if (!n) return { node: null, caps: [] };
-      const k = classifyGap(n);
-      if (k === 'skip') { n = n.previousSibling; continue; }
-      if (k === 'caption') { caps.unshift(n); n = n.previousSibling; continue; }
-      return { node: n, caps };
-    }
+  function prevMeaningful(node) {
+    let n = node.previousSibling;
+    while (n && isSkippable(n)) n = n.previousSibling;
+    return n;
   }
 
   function imgSrc(img) { return ((img.getAttribute && img.getAttribute('src')) || '').trim(); }
@@ -893,51 +862,28 @@ window.renderTimeline = function (el, opts) {
       img.setAttribute('decoding', 'async');
     });
     const live = imgs.filter(img => img.style.display !== 'none');
-    // Group consecutive blocks in document order (captions ride along).
+    // Group consecutive blocks in document order.
     const seen = new Set();
-    const claimed = new Set();
     const runs = [];
     live.forEach(img => {
       const b = blockOf(img);
       if (seen.has(b)) return;
       seen.add(b);
       const last = runs.length ? runs[runs.length - 1] : null;
-      const scan = scanBack(b);
-      const prev = scan.node;
-      const fresh = scan.caps.filter(c => !claimed.has(c));
-      if (last && prev && last.blocks[last.blocks.length - 1] === prev && fresh.length === scan.caps.length) {
-        scan.caps.forEach(c => claimed.add(c));
-        fresh.forEach(c => last.items.push({ node: c, cap: true }));
-        last.items.push({ node: b, cap: false });
+      const prev = prevMeaningful(b);
+      if (last && prev && last.blocks[last.blocks.length - 1] === prev) {
         last.blocks.push(b);
-        last.nimgs++;
       } else {
-        runs.push({ items: [{ node: b, cap: false }], blocks: [b], nimgs: 1 });
+        runs.push({ blocks: [b] });
       }
     });
     runs.forEach(run => {
-      if (run.nimgs < 2) return;
+      if (run.blocks.length < 2) return;
       const gal = document.createElement('div');
       gal.className = 'rte-gallery';
-      const first = run.items[0].node;
+      const first = run.blocks[0];
       first.parentNode.insertBefore(gal, first);
-      run.items.forEach(it => {
-        const node = it.node;
-        if (it.cap) {
-          if (node.nodeType === 3) {
-            const s = document.createElement('span');
-            s.className = 'rte-cap';
-            s.textContent = node.textContent;
-            if (node.parentNode) node.parentNode.removeChild(node);
-            gal.appendChild(s);
-          } else {
-            node.className = (node.className ? node.className + ' ' : '') + 'rte-cap';
-            gal.appendChild(node);
-          }
-        } else {
-          gal.appendChild(node);
-        }
-      });
+      run.blocks.forEach(b => gal.appendChild(b));
     });
   };
 
