@@ -726,6 +726,24 @@ tr:hover td { background: var(--accent-glow); }
 .description-body p { margin-bottom: 1.1rem; }
 .description-body h2, .description-body h3 { color: var(--text); margin: 1.5rem 0 0.75rem; }
 .description-body img { max-width: 100%; height: auto; border-radius: var(--radius-lg); margin: 1rem 0; }
+
+/* ============ Rich-media albums (auto-clustered consecutive images) ============ */
+.rte-gallery { columns: 3 200px; column-gap: 0.9rem; margin: 1rem 0; }
+.rte-gallery > p, .rte-gallery > img { break-inside: avoid; margin: 0 0 0.9rem; }
+.rte-gallery img { width: 100%; height: auto; border-radius: var(--radius); cursor: zoom-in; display: block; }
+@media (max-width: 640px) { .rte-gallery { columns: 2 140px; column-gap: 0.7rem; } }
+
+/* ============ Lightbox (expandable content images) ============ */
+.ulb-overlay { position: fixed; inset: 0; z-index: 2000; background: rgba(8,12,20,0.93); display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+.ulb-fig { margin: 0; max-width: min(94vw, 1100px); text-align: center; }
+.ulb-img { max-width: 100%; max-height: 80vh; border-radius: var(--radius); box-shadow: var(--shadow-md); }
+.ulb-cap { color: rgba(255,255,255,0.85); font-size: 0.85rem; margin-top: 0.6rem; }
+.ulb-close, .ulb-prev, .ulb-next { position: absolute; background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.25); border-radius: 50%; width: 2.5rem; height: 2.5rem; font-size: 1.3rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+.ulb-close:hover, .ulb-prev:hover, .ulb-next:hover { background: rgba(255,255,255,0.25); }
+.ulb-close { top: 1rem; right: 1rem; }
+.ulb-prev { left: 1rem; top: 50%; transform: translateY(-50%); }
+.ulb-next { right: 1rem; top: 50%; transform: translateY(-50%); }
+@media (max-width: 640px) { .ulb-prev { left: 0.4rem; } .ulb-next { right: 0.4rem; } }
 .description-body blockquote { border-left: 3px solid var(--accent); margin: 1rem 0; padding: 0.5rem 1rem; background: var(--bg-card); border-radius: 0 var(--radius) var(--radius) 0; }
 .description-body a { color: var(--accent); }
 .description-body ul, .description-body ol { margin: 0.5rem 0; padding-left: 1.5rem; }

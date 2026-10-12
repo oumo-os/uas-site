@@ -55,7 +55,7 @@ function icon(name, cls) {
 const api = {
   // Client build tag — dashboard compares this against its own tag and
   // prompts a refresh on mismatch (stale cached JS is otherwise silent).
-  BUILD: '20260923-10',
+  BUILD: '20260923-11',
   _token: null,
   _user: null,
   _capabilities: [],
@@ -797,6 +797,191 @@ window.renderTimeline = function (el, opts) {
     });
   };
 })();
+
+// === UAS-RICHMEDIA-START ===
+// --- Rich-media albums + lightbox ---
+// Consecutive images in composed bodies (article/event/programme/project
+// descriptions, outputs) cluster into a masonry album; clicking any content
+// image opens an expandable lightbox. Pure render-time enhancement: stored
+// HTML is untouched, so old content upgrades automatically.
+// Usage: enhanceRichMedia(document.getElementById('aBody')) after injecting
+// rich HTML. Touched DOM surface is deliberately small (see Node test).
+(function () {
+  const BODY_IMG = '.description-body img, .article-body img, .preview-body img';
+
+  function isBlankText(n) { return !!n && n.nodeType === 3 && !n.textContent.trim(); }
+
+  function isEmptyPara(n) {
+    if (!n || n.nodeType !== 1 || n.tagName !== 'P') return false;
+    const kids = n.childNodes || [];
+    for (let i = 0; i < kids.length; i++) {
+      const c = kids[i];
+      if (c.nodeType === 3 && c.textContent.trim()) return false;
+      if (c.nodeType === 1 && c.tagName === 'IMG') return false; // image-bearing para is meaningful
+      if (c.nodeType === 1 && c.tagName !== 'BR' && (c.textContent || '').trim()) return false;
+    }
+    return true;
+  }
+
+  // The movable "block" for an image: its <p> wrapper when the image is the
+  // only meaningful content, else the <img> itself.
+  function blockOf(img) {
+    const p = img.parentElement;
+    if (p && p.tagName === 'P') {
+      const kids = p.childNodes || [];
+      let meaningful = 0;
+      let only = null;
+      for (let i = 0; i < kids.length; i++) {
+        const c = kids[i];
+        if (c.nodeType === 3 && !c.textContent.trim()) continue;
+        if (c.nodeType === 1 && c.tagName === 'BR') continue;
+        meaningful++;
+        only = c;
+      }
+      if (meaningful === 1 && only === img) return p;
+    }
+    return img;
+  }
+
+  function prevMeaningful(node) {
+    let n = node.previousSibling;
+    while (n && (isBlankText(n) || (n.nodeType === 1 && (n.tagName === 'BR' || isEmptyPara(n) ||
+      (n.tagName === 'IMG' && n.style && n.style.display === 'none'))))) {
+      n = n.previousSibling;
+    }
+    return n;
+  }
+
+  function imgSrc(img) { return ((img.getAttribute && img.getAttribute('src')) || '').trim(); }
+
+  window.enhanceRichMedia = function (container) {
+    if (!container || !container.querySelectorAll) return;
+    const imgs = Array.prototype.slice.call(container.querySelectorAll('img'))
+      .filter(img => !img.closest('a') && !img.closest('.rte-gallery'));
+    // Hide src-less leftovers (sanitizer kills data-URIs to "#"); lazy-load rest.
+    imgs.forEach(img => {
+      const src = imgSrc(img);
+      if (!src || src === '#') { img.style.display = 'none'; return; }
+      img.setAttribute('loading', 'lazy');
+      img.setAttribute('decoding', 'async');
+    });
+    const live = imgs.filter(img => img.style.display !== 'none');
+    // Group consecutive blocks in document order.
+    const seen = new Set();
+    const runs = [];
+    live.forEach(img => {
+      const b = blockOf(img);
+      if (seen.has(b)) return;
+      seen.add(b);
+      const last = runs.length ? runs[runs.length - 1] : null;
+      const prev = prevMeaningful(b);
+      if (last && prev && last.blocks[last.blocks.length - 1] === prev) {
+        last.blocks.push(b);
+      } else {
+        runs.push({ blocks: [b] });
+      }
+    });
+    runs.forEach(run => {
+      if (run.blocks.length < 2) return;
+      const gal = document.createElement('div');
+      gal.className = 'rte-gallery';
+      const first = run.blocks[0];
+      first.parentNode.insertBefore(gal, first);
+      run.blocks.forEach(b => gal.appendChild(b));
+    });
+  };
+
+  let lbItems = null;
+  let lbIndex = 0;
+  let lbPrevOverflow = '';
+
+  function renderLb() {
+    const ov = document.getElementById('ulbOverlay');
+    if (!ov || !lbItems) return;
+    const it = lbItems[lbIndex];
+    const img = ov.querySelector('.ulb-img');
+    const cap = ov.querySelector('.ulb-cap');
+    if (img) { img.setAttribute('src', it.src); img.setAttribute('alt', it.alt || ''); }
+    if (cap) {
+      cap.textContent = it.alt || '';
+      cap.style.display = it.alt ? '' : 'none';
+    }
+    const prev = ov.querySelector('.ulb-prev');
+    const next = ov.querySelector('.ulb-next');
+    const multi = lbItems.length > 1;
+    if (prev) prev.style.display = multi ? '' : 'none';
+    if (next) next.style.display = multi ? '' : 'none';
+  }
+
+  function closeLightbox() {
+    const ov = document.getElementById('ulbOverlay');
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+    lbItems = null;
+    document.body.style.overflow = lbPrevOverflow;
+  }
+
+  function stepLb(d) {
+    if (!lbItems || lbItems.length < 2) return;
+    lbIndex = (lbIndex + d + lbItems.length) % lbItems.length;
+    renderLb();
+  }
+
+  window.openLightbox = function (items, index) {
+    if (!items || !items.length) return;
+    closeLightbox();
+    const ov = document.createElement('div');
+    ov.className = 'ulb-overlay';
+    ov.id = 'ulbOverlay';
+    const multi = items.length > 1;
+    ov.innerHTML =
+      '<button class="ulb-close" aria-label="Close">&times;</button>' +
+      (multi ? '<button class="ulb-prev" aria-label="Previous">&#8249;</button><button class="ulb-next" aria-label="Next">&#8250;</button>' : '') +
+      '<figure class="ulb-fig"><img class="ulb-img" src="" alt=""><figcaption class="ulb-cap"></figcaption></figure>';
+    document.body.appendChild(ov);
+    lbPrevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    lbItems = items;
+    lbIndex = Math.min(Math.max(index || 0, 0), items.length - 1);
+    renderLb();
+    ov.addEventListener('click', e => {
+      if (e.target.closest('.ulb-close') || e.target === ov) closeLightbox();
+      else if (e.target.closest('.ulb-prev')) stepLb(-1);
+      else if (e.target.closest('.ulb-next')) stepLb(1);
+    });
+  };
+
+  // Clicks on content images (delegated: stored HTML has no handlers).
+  document.addEventListener('click', e => {
+    const t = e.target;
+    const img = t && t.closest ? t.closest(BODY_IMG) : null;
+    if (!img || img.closest('a')) return;
+    const src = imgSrc(img);
+    if (!src || src === '#') return;
+    const gal = img.closest('.rte-gallery');
+    const list = gal
+      ? Array.prototype.slice.call(gal.querySelectorAll('img')).filter(x => { const s = imgSrc(x); return !!s && s !== '#' && !x.closest('a'); })
+      : [img];
+    const idx = Math.max(0, list.indexOf(img));
+    if (e.preventDefault) e.preventDefault();
+    window.openLightbox(list.map(x => ({ src: imgSrc(x), alt: (x.getAttribute && x.getAttribute('alt')) || '' })), idx);
+  });
+
+  document.addEventListener('keydown', e => {
+    if (!lbItems) return;
+    if (e.key === 'Escape') closeLightbox();
+    else if (e.key === 'ArrowLeft') stepLb(-1);
+    else if (e.key === 'ArrowRight') stepLb(1);
+  });
+
+  // Hide broken content images (capture phase; scoped to composed bodies).
+  document.addEventListener('error', e => {
+    const t = e.target;
+    if (t && t.tagName === 'IMG' && t.closest && t.closest('.description-body, .article-body, .preview-body') && !t.closest('a')) {
+      t.style.display = 'none';
+    }
+  }, true);
+})();
+// === UAS-RICHMEDIA-END ===
 
 // --- SEO: dynamic meta + JSON-LD for JS-rendered detail pages ---
 // Call after content loads. Helps crawlers that render JS (e.g. Google);
