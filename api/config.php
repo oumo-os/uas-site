@@ -905,7 +905,8 @@ function mailbox_body($mbox, int $uid): array {
     }
     if ($cs !== 'UTF-8' && function_exists('mb_convert_encoding')) $raw = @mb_convert_encoding($raw, 'UTF-8', $cs) ?: $raw;
     $raw = substr($raw, 0, 200000);
-    if ($isHtml) $raw = trim(preg_replace('/\s+/', ' ', strip_tags(preg_replace('#<(script|style)[^>]*>.*?</\\1>#is', '', $raw))));
+    // Return HTML intact (plus the flag) — viewers render it sandboxed.
+    // Never strip tags here: that produced the unreadable entity soup.
     return [$raw, $isHtml];
   }
   return ['', false];

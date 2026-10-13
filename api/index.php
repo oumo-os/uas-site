@@ -3692,7 +3692,7 @@ try {
     $ov = @imap_fetch_overview($mbox, (string) $uid, FT_UID);
     if (!$ov) { imap_close($mbox); json_error('Message not found', 404); }
     $o = $ov[0];
-    [$body] = mailbox_body($mbox, $uid);
+    [$body, $isHtml] = mailbox_body($mbox, $uid);
     $msg = [
       'uid' => $uid,
       'from' => mailbox_text($o->from ?? ''),
@@ -3701,6 +3701,7 @@ try {
       'date' => date('Y-m-d H:i:s', strtotime($o->date ?? 'now') ?: time()),
       'seen' => !empty($o->seen),
       'body' => $body,
+      'is_html' => (bool) $isHtml,
     ];
     imap_close($mbox);
     json_response($msg);

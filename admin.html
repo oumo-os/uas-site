@@ -105,6 +105,7 @@
     .chat-msg.mine .chat-meta { color: rgba(255, 255, 255, 0.8); }
     .chat-reply-btn { border: none; background: none; padding: 0; font-size: 0.7rem; font-weight: 600; color: var(--accent); cursor: pointer; font-family: inherit; }
     .chat-msg.mine .chat-reply-btn { color: #fff; text-decoration: underline; }
+    .mail-html-frame { width: 100%; height: 300px; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
     .ops-section {
       padding: 1.25rem; background: var(--bg-card); border: 1px solid var(--border);
       border-radius: var(--radius-lg); transition: border-color 0.15s, box-shadow 0.15s;
@@ -1120,13 +1121,33 @@
     }
 
     // One conversation bubble with collapsible quoted history.
-    function mailBubbleHtml(it) {
+    // Rendered-HTML mail bodies: stored per modal open, injected into
+    // sandboxed iframes after render (sandbox="" blocks all scripts).
+    const mailHtmlBodies = [];
+    function mailHtmlDoc(body) {
+      return '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        + '<style>body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.6;color:#222;margin:0;padding:12px;overflow-wrap:break-word}img{max-width:100%;height:auto}a{color:#1a56db}table{max-width:100%}</style>'
+        + '</head><body>' + body + '</body></html>';
+    }
+    function mailBubbleBody(it) {
+      if (it.is_html && /<[a-z][^>]*>/i.test(it.body || '')) {
+        const k = mailHtmlBodies.push(it.body) - 1;
+        return `<iframe class="mail-html-frame" data-mk="${k}" sandbox="allow-popups" referrerpolicy="no-referrer" title="Email content"></iframe>`;
+      }
       const parts = mailSplitQuote(it.body);
+      return `<div class="chat-text">${esc(parts.head)}</div>
+        ${parts.quoted ? `<button class="chat-reply-btn" onclick="this.nextElementSibling.style.display='';this.style.display='none'">Show quoted history</button><div class="chat-quoted" style="display:none;font-size:0.8rem;opacity:0.75;margin-top:0.35rem;border-left:2px solid var(--border);padding-left:0.5rem;white-space:pre-wrap">${esc(parts.quoted)}</div>` : ''}`;
+    }
+    function mailHydrateFrames(box) {
+      box.querySelectorAll('iframe[data-mk]').forEach(f => {
+        f.srcdoc = mailHtmlDoc(mailHtmlBodies[+f.dataset.mk] || '');
+      });
+    }
+    function mailBubbleHtml(it) {
       return `<div class="chat-msg${it.mine ? ' mine' : ''}">
         <div class="chat-bubble">
           <div class="chat-name">${esc(it.mine ? 'Me' : it.name)}</div>
-          <div class="chat-text">${esc(parts.head)}</div>
-          ${parts.quoted ? `<button class="chat-reply-btn" onclick="this.nextElementSibling.style.display='';this.style.display='none'">Show quoted history</button><div class="chat-quoted" style="display:none;font-size:0.8rem;opacity:0.75;margin-top:0.35rem;border-left:2px solid var(--border);padding-left:0.5rem;white-space:pre-wrap">${esc(parts.quoted)}</div>` : ''}
+          ${mailBubbleBody(it)}
           <div class="chat-meta"><span>${esc(it.date)}</span></div>
         </div>
       </div>`;
@@ -1180,16 +1201,17 @@
       try {
         m = await api.request(`/mail/${mailOffice}/messages/${uid}`);
       } catch (e) { alert(e.error || 'Could not load message'); return; }
+      mailHtmlBodies.length = 0;
       const key = mailThreadKey(m.subject, m.from);
       const sentItems = await mailSentItems();
       const kin = (mailMsgs || []).filter(x => x.uid !== uid && mailThreadKey(x.subject, x.from) === key).slice(0, 8);
       const kinBodies = await Promise.all(kin.map(x => api.request(`/mail/${mailOffice}/messages/${x.uid}`).catch(() => null)));
       const items = [];
-      kinBodies.forEach(b => { if (b) items.push({ mine: false, name: b.from, date: b.date, body: b.body }); });
+      kinBodies.forEach(b => { if (b) items.push({ mine: false, name: b.from, date: b.date, body: b.body, is_html: b.is_html }); });
       sentItems.filter(s => mailThreadKey(s.subject, s.to_email) === key).forEach(s => {
         items.push({ mine: true, name: 'Me', date: s.created_at, body: s.body });
       });
-      items.push({ mine: false, name: m.from, date: m.date, body: m.body });
+      items.push({ mine: false, name: m.from, date: m.date, body: m.body, is_html: m.is_html });
       items.sort((a, b) => new Date(a.date) - new Date(b.date));
       document.getElementById('mailModalTitle').textContent = m.subject;
       document.getElementById('mailModalBody').innerHTML = `
@@ -1208,6 +1230,7 @@
           <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" id="mail-send-${uid}" onclick="sendMailReply(${uid})">Send Reply</button>
         </div>`;
       document.getElementById('mailOverlay').classList.add('open');
+      mailHydrateFrames(document.getElementById('mailModalBody'));
       const thread = document.getElementById('mailThread');
       if (thread) thread.scrollTop = thread.scrollHeight;
     }
