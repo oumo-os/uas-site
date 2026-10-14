@@ -350,6 +350,7 @@
       transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), opacity 0.2s ease;
     }
     .modal-overlay.open .modal { transform: translateY(0) scale(1); opacity: 1; }
+    .modal.mail-wide { max-width: 700px; }
     .modal-header {
       display: flex; justify-content: space-between; align-items: flex-start;
       margin-bottom: 1.25rem; padding-bottom: 0.85rem; border-bottom: 1px solid var(--border);
@@ -515,7 +516,10 @@
     .chat-msg.mine .chat-meta { color: rgba(255, 255, 255, 0.8); }
     .chat-reply-btn { border: none; background: none; padding: 0; font-size: 0.7rem; font-weight: 600; color: var(--accent); cursor: pointer; font-family: inherit; }
     .chat-msg.mine .chat-reply-btn { color: #fff; text-decoration: underline; }
-    .mail-html-frame { width: 100%; height: 300px; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
+    .mail-html-frame { width: 100%; height: 360px; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
+    .chat-msg.mail-html { max-width: 100%; }
+    .chat-msg.mail-html .chat-bubble { background: none; border: none; padding: 0; }
+    .chat-msg.mail-html .chat-name, .chat-msg.mail-html .chat-meta { padding: 0 0.25rem; }
     .chat-reply-chip {
       display: none; align-items: center; gap: 0.5rem; padding: 0.4rem 1.25rem;
       font-size: 0.78rem; color: var(--text-dim); background: var(--accent-glow);
@@ -4898,7 +4902,8 @@
     }
     // One conversation bubble with collapsible quoted history.
     function dashMailBubbleHtml(it) {
-      return `<div class="chat-msg${it.mine ? ' mine' : ''}">
+      const isHtml = it.is_html && /<[a-z][^>]*>/i.test(it.body || '');
+      return `<div class="chat-msg${it.mine ? ' mine' : ''}${isHtml ? ' mail-html' : ''}">
         <div class="chat-bubble">
           <div class="chat-name">${esc(it.mine ? 'Me' : it.name)}</div>
           ${dashMailBubbleBody(it)}
@@ -4940,7 +4945,7 @@
           <p class="text-dim text-sm" style="margin:0.3rem 0 0">Your institutional signature is added automatically.</p>
           <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" id="dash-mail-send-${uid}" onclick="sendDashMailReply(${uid})">Send Reply</button>
         </div>
-      `);
+      `, { wide: true });
       dashMailHydrateFrames(document.getElementById('detailModal'));
       const thread = document.querySelector('#detailModal .chat-thread');
       if (thread) thread.scrollTop = thread.scrollHeight;
@@ -5505,6 +5510,8 @@
       document.getElementById('modalBody').innerHTML = html;
       try { enhanceRichMedia(document.getElementById('modalBody')); } catch (e) {}
       const overlay = document.getElementById('detailModal');
+      const box = overlay.querySelector('.modal');
+      if (box) box.classList.toggle('mail-wide', !!opts.wide);
       overlay.classList.add('open');
       document.body.style.overflow = 'hidden';
       // Focus first input

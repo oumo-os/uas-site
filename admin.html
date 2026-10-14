@@ -105,7 +105,10 @@
     .chat-msg.mine .chat-meta { color: rgba(255, 255, 255, 0.8); }
     .chat-reply-btn { border: none; background: none; padding: 0; font-size: 0.7rem; font-weight: 600; color: var(--accent); cursor: pointer; font-family: inherit; }
     .chat-msg.mine .chat-reply-btn { color: #fff; text-decoration: underline; }
-    .mail-html-frame { width: 100%; height: 300px; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
+    .mail-html-frame { width: 100%; height: 360px; border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
+    .chat-msg.mail-html { max-width: 100%; }
+    .chat-msg.mail-html .chat-bubble { background: none; border: none; padding: 0; }
+    .chat-msg.mail-html .chat-name, .chat-msg.mail-html .chat-meta { padding: 0 0.25rem; }
     .ops-section {
       padding: 1.25rem; background: var(--bg-card); border: 1px solid var(--border);
       border-radius: var(--radius-lg); transition: border-color 0.15s, box-shadow 0.15s;
@@ -142,6 +145,7 @@
       transform:translateY(20px) scale(0.97); opacity:0;
       transition:transform 0.25s cubic-bezier(0.34,1.56,0.64,1), opacity 0.2s ease;
     }
+    .modal.mail-wide { max-width:700px; }
     .modal-overlay.open .modal { transform:translateY(0) scale(1); opacity:1; }
     .modal-header {
       display:flex; justify-content:space-between; align-items:flex-start;
@@ -329,7 +333,7 @@
     </div>
 
     <div class="modal-overlay" id="mailOverlay">
-      <div class="modal">
+      <div class="modal mail-wide" id="mailModal">
         <div class="modal-header">
           <h3 id="mailModalTitle"></h3>
           <button class="modal-close" onclick="closeMailModal()">&times;</button>
@@ -1144,7 +1148,8 @@
       });
     }
     function mailBubbleHtml(it) {
-      return `<div class="chat-msg${it.mine ? ' mine' : ''}">
+      const isHtml = it.is_html && /<[a-z][^>]*>/i.test(it.body || '');
+      return `<div class="chat-msg${it.mine ? ' mine' : ''}${isHtml ? ' mail-html' : ''}">
         <div class="chat-bubble">
           <div class="chat-name">${esc(it.mine ? 'Me' : it.name)}</div>
           ${mailBubbleBody(it)}
