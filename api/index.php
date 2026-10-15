@@ -1414,7 +1414,8 @@ try {
     $stmt->execute([$pid]);
     $prog = $stmt->fetch();
     if (!$prog) json_error('Programme not found', 404);
-    $prog['viewer_can_edit'] = user_has_cap_for($user['id'], 'programmes.manage', 'programme', $pid) || is_programme_lead($user['id'], $pid);
+    $prog['viewer_can_edit'] = user_has_cap_for($user['id'], 'programmes.manage', 'programme', $pid) || is_programme_lead($user['id'], $pid)
+      || ((int) ($prog['created_by'] ?? 0) === (int) $user['id'] && ($prog['status'] ?? '') === 'draft');
     $s = db()->prepare('SELECT COUNT(*) FROM projects WHERE programme_id = ?');
     $s->execute([$pid]);
     $prog['project_count'] = (int) $s->fetchColumn();
@@ -1428,8 +1429,8 @@ try {
   elseif ($path === '/programmes/mine' && $method === 'GET') {
     $user = require_login();
     $uid = (int) $user['id'];
-    $stmt = db()->prepare('SELECT p.id, p.title, p.slug, p.description, p.status, p.image_url, p.category FROM programmes p WHERE p.status = "active" ORDER BY p.title');
-    $stmt->execute();
+    $stmt = db()->prepare('SELECT p.id, p.title, p.slug, p.description, p.status, p.image_url, p.category, p.created_by FROM programmes p WHERE p.status = "active" OR (p.status = "draft" AND p.created_by = ?) ORDER BY p.title');
+    $stmt->execute([$uid]);
     $mine = [];
     foreach ($stmt->fetchAll() as $p) {
       $pid = (int) $p['id'];
@@ -1442,7 +1443,8 @@ try {
         $s->execute([$uid, $p['title']]);
         $isLead = (bool) $s->fetch();
       }
-      if (!$membership && !$isLead) continue;
+      $isOwnDraft = $p['status'] === 'draft' && (int) ($p['created_by'] ?? 0) === $uid;
+      if (!$membership && !$isLead && !$isOwnDraft) continue;
       $p['is_member'] = (bool) $membership;
       $p['is_lead'] = (bool) $isLead;
       $p['team_role'] = $membership['role_in_programme'] ?? null;
@@ -4382,11 +4384,23 @@ try {
   elseif (preg_match('#^/programmes/(\d+)$#', $path, $m) && $method === 'PUT') {
     $user = require_login();
     $id = (int) $m[1];
-    // Programme managers (global or scoped) or leads of this programme
-    if (!user_has_cap_for($user['id'], 'programmes.manage', 'programme', $id) && !is_programme_lead($user['id'], $id)) {
-      json_error('Insufficient permissions: programmes.manage', 403);
+    // Programme managers (global or scoped), leads of this programme, or the
+    // creator while still a draft (proposers polish their own proposal;
+    // activation and money stay with leads/managers).
+    $isManagerOrLead = user_has_cap_for($user['id'], 'programmes.manage', 'programme', $id) || is_programme_lead($user['id'], $id);
+    $isDraftCreator = false;
+    if (!$isManagerOrLead) {
+      $stmt = db()->prepare('SELECT created_by, status FROM programmes WHERE id = ?');
+      $stmt->execute([$id]);
+      $progRow = $stmt->fetch();
+      if (!$progRow) json_error('Programme not found', 404);
+      $isDraftCreator = (int) ($progRow['created_by'] ?? 0) === (int) $user['id'] && ($progRow['status'] ?? '') === 'draft';
+      if (!$isDraftCreator) json_error('Insufficient permissions: programmes.manage', 403);
     }
     $data = input_json();
+    if (!$isManagerOrLead && (array_key_exists('status', $data) || array_key_exists('budget', $data) || array_key_exists('spent', $data))) {
+      json_error('Only leads or managers can change status or budget', 403);
+    }
     $sets = [];
     $args = [];
     foreach (['title', 'objectives', 'status'] as $f) {

@@ -4084,7 +4084,7 @@
         const manageBadge = p.can_manage ? '<span class="cap-tag">Manager</span>' : '';
         const pendingBadge = p.pending_apps ? `<span class="badge badge-pending">${p.pending_apps} pending</span>` : '';
         const roleText = p.team_role ? `Your role: ${esc(p.team_role)}` : '';
-        const canEdit = p.is_lead || p.can_manage;
+        const canEdit = p.is_lead || p.can_manage || (api._user && Number(p.created_by) === Number(api._user.id) && p.status === 'draft');
         return `
         <div class="dash-card" style="margin-bottom:1rem" id="prog-${p.id}">
           <div class="dash-card-header">
@@ -5791,7 +5791,7 @@
         } else if (type === 'programme') {
           data = await api.getProgramme(id);
           const actions = [];
-          const canEditProg = (typeof data.viewer_can_edit === 'boolean') ? data.viewer_can_edit : api.hasCap('programmes.manage');
+          const canEditProg = (typeof data.viewer_can_edit === 'boolean') ? data.viewer_can_edit : (api.hasCap('programmes.manage') || (api._user && Number(data.created_by) === Number(api._user.id) && data.status === 'draft'));
           if (canEditProg) actions.push(`<button class="btn btn-outline btn-sm" onclick="editProgrammeForm(${id})">Edit</button>`);
           if (api.hasCap('programmes.manage')) actions.push(`<button class="btn btn-outline btn-sm" style="color:var(--danger)" onclick="modalDelete('programme', ${id})">Delete</button>`);
           if (data.status === 'draft' && canEditProg) actions.push(`<button class="btn btn-primary btn-sm" onclick="modalAction('programme','activate',${id})">Activate</button>`);
@@ -6183,7 +6183,7 @@
         return;
       }
       const edit = q.get('edit');
-      const m = edit && edit.match(/^(event|article):(\d+)$/);
+      const m = edit && edit.match(/^(event|article|project|programme):(\d+)$/);
       if (m) {
         try { await api.me(); } catch (e) { return; }
         try { await showItemDetail(m[1], parseInt(m[2], 10)); }

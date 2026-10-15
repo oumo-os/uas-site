@@ -209,6 +209,10 @@
         '<a class="share-btn" href="https://www.facebook.com/sharer/sharer.php?u=' + pageUrl + '" target="_blank">Facebook</a>' +
         '<a class="share-btn" href="https://wa.me/?text=' + shareText + '%20' + pageUrl + '" target="_blank">WhatsApp</a>' +
         '<a class="share-btn" href="https://www.linkedin.com/sharing/share-offsite/?url=' + pageUrl + '" target="_blank">LinkedIn</a>';
+      // Approvers can edit published pieces (authors edit drafts via dashboard).
+      if (api._user && api.hasCap('articles.approve')) {
+        document.getElementById('aShare').innerHTML += '<a class="btn btn-outline btn-sm" href="/dashboard?edit=article:' + a.id + '">Edit</a>';
+      }
 
       var initials = (a.author_name || '?').split(' ').map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
       document.getElementById('aAuthor').innerHTML =

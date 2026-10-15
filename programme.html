@@ -354,6 +354,15 @@
             '<p class="text-dim" style="font-size:0.78rem;margin:0.4rem 0 0">A coordinator will review your application.</p>';
         }
         box.innerHTML = leadLine + teamLine + cta;
+        // Leads, managers and draft creators edit via the dashboard modal.
+        if (me) {
+          api.request('/programmes/' + p.id).then(function(mine) {
+            if (mine && mine.viewer_can_edit) {
+              var abox = document.getElementById('pActions');
+              if (abox) abox.innerHTML += '<a class="btn btn-outline btn-sm" style="width:100%;margin-top:0.5rem" href="/dashboard?edit=programme:' + p.id + '">Edit</a>';
+            }
+          }).catch(function(){});
+        }
       })();
 
       // Projects: compact rows (title + one-liner + key meta) with
